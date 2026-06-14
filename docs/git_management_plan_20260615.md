@@ -29,8 +29,8 @@ stores the child commit ids as gitlinks.
 - `CameraCalibLab`: keep `https://github.com/Chr0mium24/CameraCalibLab.git`.
 - `TennisBotCV`: keep `https://github.com/Chr0mium24/TennisBotCV.git`.
 - `TennisBallDetectorLab`, `BoardCameraConsole`, `BallTrajectoryLab`, and
-  `TennisWebSim`: use local submodule URLs for now because no origin remote is
-  configured yet.
+  `TennisWebSim`: GitHub remotes created with `gh repo create` and used by the
+  top-level `.gitmodules`.
 
 ## Verification Plan
 
@@ -60,12 +60,9 @@ Completed.
 - Added a top-level README with project roles and the intended workflow.
 - Verified that each child project worktree is clean.
 
-## Remaining Follow-up
+## GitHub Repositories Created
 
-Create real remotes for the local-only projects and replace their local
-submodule URLs:
-
-- `TennisBallDetectorLab`
-- `BoardCameraConsole`
-- `BallTrajectoryLab`
-- `TennisWebSim`
+- `https://github.com/Chr0mium24/TennisBallDetectorLab`
+- `https://github.com/Chr0mium24/BoardCameraConsole`
+- `https://github.com/Chr0mium24/BallTrajectoryLab`
+- `https://github.com/Chr0mium24/TennisWebSim`

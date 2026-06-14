@@ -4,15 +4,15 @@
 
 [submodule "TennisBallDetectorLab"]
 	path = TennisBallDetectorLab
-	url = /home/cr/Codes/TennisBot/TennisBallDetectorLab
+	url = https://github.com/Chr0mium24/TennisBallDetectorLab.git
 
 [submodule "BoardCameraConsole"]
 	path = BoardCameraConsole
-	url = /home/cr/Codes/TennisBot/BoardCameraConsole
+	url = https://github.com/Chr0mium24/BoardCameraConsole.git
 
 [submodule "BallTrajectoryLab"]
 	path = BallTrajectoryLab
-	url = /home/cr/Codes/TennisBot/BallTrajectoryLab
+	url = https://github.com/Chr0mium24/BallTrajectoryLab.git
 
 [submodule "TennisBotCV"]
 	path = TennisBotCV
@@ -20,5 +20,4 @@
 
 [submodule "TennisWebSim"]
 	path = TennisWebSim
-	url = /home/cr/Codes/TennisBot/TennisWebSim
-
+	url = https://github.com/Chr0mium24/TennisWebSim.git

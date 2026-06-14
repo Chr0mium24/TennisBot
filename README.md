@@ -58,7 +58,5 @@ and submodule pointers.
 
 ## Remote Status
 
-`CameraCalibLab` and `TennisBotCV` already use GitHub remotes. The other local
-projects currently use local submodule URLs and should get real remotes before
-this top-level repository is shared across machines.
-
+All tracked projects use GitHub remotes under `Chr0mium24`. `TennisWebSim`
+also contains the upstream `Tennis_Robot_Chassis` submodule.
