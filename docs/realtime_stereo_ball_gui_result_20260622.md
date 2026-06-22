@@ -12,7 +12,7 @@
   - left/right camera frames with YOLO boxes;
   - selected stereo match;
   - `x/y/z` in meters relative to the left camera;
-  - disparity, epipolar error, confidence, frame id, and FPS;
+  - disparity, epipolar error, triangulated-point reprojection error, confidence, frame id, and FPS;
   - an X/Z position plot.
 
 ## Geometry Notes
