@@ -31,6 +31,7 @@ env UV_CACHE_DIR=/tmp/uv-cache uv run tbl collect-camera \
   --fps 30 \
   --duration 30 \
   --sample-every 5 \
+  --dataset-tag device_a_indoor \
   --session indoor_ball_sample
 ```
 
@@ -68,11 +69,16 @@ YOLO_CONFIG_DIR=/tmp/Ultralytics env UV_CACHE_DIR=/tmp/uv-cache uv run tbl stere
 ## Implementation
 
 - Added `tbl collect-camera`.
-- The command saves sampled camera frames directly to `yolo/dataset/images/<camera>`.
+- The command saves sampled camera frames directly to `yolo/dataset/images/<camera>/<dataset-tag>`.
+- Matching labels mirror that structure under `yolo/dataset/labels/<camera>/<dataset-tag>`.
 - Labels are not pre-created by default so the annotator treats new frames as
   unlabeled. `--write-empty-labels` is available only when pre-marking negatives
   is desired.
+- `--dataset-tag` separates devices, lighting setups, or collection sessions.
+  It defaults to `--session` if omitted.
 - A per-session manifest is written under `yolo/dataset/capture_manifests/`.
+- Dataset validation, `tbl train`, and `tbl build-dataset` support recursive
+  `labels/<camera>/<dataset-tag>/...` folders.
 
 ## Verification
 
@@ -87,5 +93,5 @@ env UV_CACHE_DIR=/tmp/uv-cache uv run tbl collect-camera --help
 Results:
 
 - `compileall`: passed.
-- `pytest`: `25 passed`.
+- `pytest`: `29 passed`.
 - `tbl collect-camera --help`: passed and lists single-camera capture options.
