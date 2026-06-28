@@ -125,7 +125,7 @@ cd apps/live3d
 bun test
 bun run typecheck
 bun run build
-bun run verify:hardware -- --timeout-ms 30000 --output ../../docs/live3d_hardware_loop_YYYYMMDD.md
+bun run verify:hardware -- --prepare-uvc-controls --timeout-ms 30000 --output ../../docs/live3d_hardware_loop_YYYYMMDD.md
 ```
 
 Create dry-run calibration artifacts:
@@ -204,7 +204,10 @@ Live3D also exposes `window.__tennisbotLive3dSnapshot` for repeatable hardware
 checks. The verifier command can launch Chrome, start both USB cameras, start
 YOLO, capture left/right frame PNGs with brightness statistics, and poll the
 snapshot until runtime 3D reaches `prediction-ready` or a Markdown report
-records the failed gate.
+records the failed gate. For the current local USU Camera 4K devices, the
+browser request is `1280x720@30`; direct V4L2 tests showed `1280x720` MJPG
+works while high-resolution YUYV times out. `--prepare-uvc-controls` can apply
+the high-brightness UVC controls that recovered non-black browser frames.
 
 Runtime artifacts have also been imported locally:
 
@@ -221,10 +224,10 @@ rectification_y_p95=19.304 px.
 The architecture is implemented in software. These items still require real
 hardware validation:
 
-- fix the current camera frame-output issue: the latest browser captures are
-  fully near-black and direct V4L2 one-frame reads time out;
-- rerun the Live3D hardware verifier with a tennis ball visible in both
-  non-black USB camera views;
+- keep the UVC brightness/exposure preparation or equivalent physical lighting
+  so both USB camera frames are non-black;
+- rerun the Live3D hardware verifier with a tennis ball visible in both USB
+  camera views;
 - verify nonzero ONNX detections on both live frames;
 - verify runtime 3D reaches `prediction-ready` with stable point and prediction
   updates;

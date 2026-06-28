@@ -14,6 +14,8 @@ type Options = {
   keepChrome: boolean;
   outputPath: string;
   captureDir: string;
+  prepareUvcControls: boolean;
+  uvcDevicePaths: string[];
 };
 
 type StepStatus = "passed" | "failed" | "skipped";
@@ -114,6 +116,7 @@ async function runVerification(startedAt: Date, opts: Options): Promise<Verifica
   let cdp: CdpClient | undefined;
 
   try {
+    await prepareUvcCameraControls(opts, steps);
     serverProcess = await ensureLive3dServer(opts, steps);
     const chrome = await launchChrome(opts, steps);
     chromeProcess = chrome.process;
@@ -220,6 +223,33 @@ async function runVerification(startedAt: Date, opts: Options): Promise<Verifica
       serverProcess.kill();
     }
   }
+}
+
+async function prepareUvcCameraControls(
+  opts: Options,
+  steps: VerificationStep[],
+): Promise<void> {
+  if (!opts.prepareUvcControls) {
+    return;
+  }
+
+  for (const devicePath of opts.uvcDevicePaths) {
+    await runCommand(
+      [
+        "v4l2-ctl",
+        "-d",
+        devicePath,
+        "--set-ctrl=brightness=64,gain=255,auto_exposure=1,exposure_time_absolute=2047",
+      ],
+      repoRoot,
+    );
+  }
+
+  steps.push({
+    name: "uvc controls",
+    status: "passed",
+    detail: `Applied brightness=64, gain=255, manual exposure=2047 to ${opts.uvcDevicePaths.join(", ")}.`,
+  });
 }
 
 async function finalizeResult(
@@ -788,6 +818,11 @@ function parseArgs(args: string[]): Options {
   let keepChrome = false;
   let outputPath = resolve(repoRoot, "docs", `live3d_hardware_loop_${timestampForFilename(new Date())}.md`);
   let captureDir = process.env.LIVE3D_VERIFY_CAPTURE_DIR;
+  let prepareUvcControls = process.env.LIVE3D_VERIFY_PREPARE_UVC === "1";
+  let uvcDevicePaths = (process.env.LIVE3D_VERIFY_UVC_DEVICES ?? "/dev/video0,/dev/video2")
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => value !== "");
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -807,6 +842,13 @@ function parseArgs(args: string[]): Options {
       outputPath = resolve(requireValue(args, (index += 1), arg));
     } else if (arg === "--capture-dir") {
       captureDir = resolve(requireValue(args, (index += 1), arg));
+    } else if (arg === "--prepare-uvc-controls") {
+      prepareUvcControls = true;
+    } else if (arg === "--uvc-devices") {
+      uvcDevicePaths = requireValue(args, (index += 1), arg)
+        .split(",")
+        .map((value) => value.trim())
+        .filter((value) => value !== "");
     } else if (arg === "--help" || arg === "-h") {
       printHelp();
       process.exit(0);
@@ -824,6 +866,9 @@ function parseArgs(args: string[]): Options {
   if (!Number.isInteger(chromeDebugPort) || chromeDebugPort <= 0) {
     throw new Error("--chrome-debug-port must be a positive integer.");
   }
+  if (prepareUvcControls && uvcDevicePaths.length === 0) {
+    throw new Error("--uvc-devices must contain at least one device when --prepare-uvc-controls is used.");
+  }
 
   return {
     appUrl,
@@ -834,6 +879,8 @@ function parseArgs(args: string[]): Options {
     keepChrome,
     outputPath,
     captureDir: captureDir ?? defaultCaptureDir(outputPath),
+    prepareUvcControls,
+    uvcDevicePaths,
   };
 }
 
@@ -857,6 +904,8 @@ Options:
   --keep-chrome                Leave Chrome and profile directory running for manual inspection.
   --output <path>              Markdown report path.
   --capture-dir <path>         Directory for left/right video PNG captures.
+  --prepare-uvc-controls       Apply high-brightness UVC controls before launching Chrome.
+  --uvc-devices <csv>          Device paths for UVC preparation. Default: /dev/video0,/dev/video2
 `);
 }
 

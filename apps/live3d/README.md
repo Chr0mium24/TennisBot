@@ -38,10 +38,12 @@ scraping UI text.
 
 This implements the browser software path. Hardware smoke has opened two real
 USB cameras in Chrome and run the exported ONNX model on browser frames. The
-latest hardware-loop report saved left/right frame captures and found both
-captures were near-black, while direct V4L2 frame reads also timed out. Resolve
-camera frame output before judging YOLO detection quality or rerunning the
-ball-in-view validation pass.
+current default camera request is `1280x720@30`, matching the local UVC
+devices' supported mode. Direct V4L2 tests showed `1280x720` MJPG streams work,
+while high-resolution YUYV streams time out. With `--prepare-uvc-controls`, the
+hardware verifier can set high-brightness UVC controls and capture non-black
+browser frames. The latest boosted report still has zero YOLO detections
+because the captured scene is uniform gray and contains no visible tennis ball.
 
 ## Config placeholders
 
@@ -66,7 +68,7 @@ bun run dev
 bun run typecheck
 bun test
 bun run build
-bun run verify:hardware -- --timeout-ms 30000 --output ../../docs/live3d_hardware_loop_YYYYMMDD.md
+bun run verify:hardware -- --prepare-uvc-controls --timeout-ms 30000 --output ../../docs/live3d_hardware_loop_YYYYMMDD.md
 ```
 
 `bun run dev` builds the static bundle and serves `dist/` on port `5178`.
@@ -76,3 +78,6 @@ YOLO, polls the runtime snapshot, captures left/right video PNG frames with
 brightness statistics, and writes a Markdown report. A passing run requires the
 runtime status to reach `prediction-ready`; no-ball or near-black scenes are
 reported as failed hardware validation, not as software success.
+`--prepare-uvc-controls` applies the local USU Camera 4K controls that recovered
+non-black frames during validation: brightness `64`, gain `255`, manual
+exposure `2047` on `/dev/video0` and `/dev/video2`.

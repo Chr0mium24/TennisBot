@@ -58,7 +58,7 @@ describe("Live3D browser camera runtime", () => {
           deviceId: { exact: "device-left" },
           width: { ideal: 1280 },
           height: { ideal: 720 },
-          frameRate: { ideal: 60 },
+          frameRate: { ideal: 30 },
         },
       },
       {
@@ -67,7 +67,7 @@ describe("Live3D browser camera runtime", () => {
           deviceId: { exact: "device-right" },
           width: { ideal: 1280 },
           height: { ideal: 720 },
-          frameRate: { ideal: 60 },
+          frameRate: { ideal: 30 },
         },
       },
     ]);

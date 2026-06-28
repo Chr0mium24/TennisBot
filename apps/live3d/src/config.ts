@@ -36,7 +36,7 @@ export const defaultLive3dConfig: Live3dConfig = {
       devicePath: "/dev/video0",
       labelMatch: "left",
       resolution: { width: 1280, height: 720 },
-      fps: 60,
+      fps: 30,
     },
     right: {
       id: "right",
@@ -44,7 +44,7 @@ export const defaultLive3dConfig: Live3dConfig = {
       devicePath: "/dev/video2",
       labelMatch: "right",
       resolution: { width: 1280, height: 720 },
-      fps: 60,
+      fps: 30,
     },
   },
   artifacts: {

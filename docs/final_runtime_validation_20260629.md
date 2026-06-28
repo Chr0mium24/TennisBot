@@ -15,9 +15,12 @@ This validation covers the current local-machine software architecture:
 It does not claim ROS/Gazebo catch control or final physical 3D accuracy. A
 real local YOLO package and an imported real calibration package are available
 for runtime smoke testing. Live3D has also opened two real USB cameras in
-Chrome and run the ONNX backend loop, but the latest captured browser frames are
-near-black and direct V4L2 frame reads timed out. The imported stereo
-calibration also has quality warnings.
+Chrome and run the ONNX backend loop. The camera path now requests
+`1280x720@30`, matching the local UVC modes. Direct V4L2 diagnostics showed
+MJPG streams work at `1280x720`; high-resolution YUYV streams time out. Applying
+high-brightness UVC controls recovered non-black browser frames, but the current
+scene still contains no visible tennis ball. The imported stereo calibration
+also has quality warnings.
 
 Follow-up YOLO static validation found that Live3D was decoding the exported
 ONNX `xyxy_pixels` output as `xywh`. That postprocessing bug is fixed. The
@@ -56,11 +59,11 @@ cd apps/live3d
 bun test
 bun run typecheck
 bun run build
-bun run verify:hardware -- --timeout-ms 20000 --output ../../docs/live3d_hardware_loop_20260629.md
+bun run verify:hardware -- --prepare-uvc-controls --timeout-ms 20000 --output ../../docs/live3d_hardware_loop_uvc_boost_20260629.md
 ```
 
 Result: 42 tests passed, typecheck passed, browser bundle built. The hardware
-verification command wrote `docs/live3d_hardware_loop_20260629.md`.
+verification command wrote `docs/live3d_hardware_loop_uvc_boost_20260629.md`.
 
 Dev server smoke:
 
@@ -85,40 +88,47 @@ google-chrome --headless=new --use-fake-ui-for-media-stream ...
 Result: two `USU Camera 4K` devices were enumerated, `/dev/video0` and
 `/dev/video2` were opened simultaneously, Chrome opened distinct left/right
 `MediaStream` tracks at 1280x720, and the ONNX backend ran continuously against
-browser camera sources without ONNX session errors. The latest verifier saved
-left/right browser frame captures, but both were fully near-black
-(`mean_luma=0.00`, `max_luma=0.00`), so runtime 3D remained waiting for a
-detection.
+browser camera sources without ONNX session errors. With default UVC controls,
+the verifier saved near-black left/right browser frame captures. After applying
+high-brightness UVC controls, the verifier saved non-black captures but still
+produced zero YOLO detections because the scene is uniform gray and contains no
+visible tennis ball.
 
 Automated hardware loop:
 
 ```bash
 bun apps/live3d/scripts/verify-hardware.ts \
+  --prepare-uvc-controls \
   --timeout-ms 20000 \
-  --output docs/live3d_hardware_loop_20260629.md
+  --output docs/live3d_hardware_loop_uvc_boost_20260629.md
 ```
 
-Result: the script reused `http://localhost:5178`, launched
+Result: the script applied brightness `64`, gain `255`, manual exposure `2047`
+to `/dev/video0` and `/dev/video2`, reused `http://localhost:5178`, launched
 `/usr/bin/google-chrome` on CDP port `9233`, found
 `window.__tennisbotLive3dSnapshot`, opened two real `USU Camera 4K` browser
 streams, loaded the ONNX YOLO artifact, and loaded the stereo calibration
-artifact. It failed the final physical gate because both browser frame captures
-were near-black and both cameras produced zero YOLO tennis-ball detections. Last
-runtime code: `left-detections-missing`.
+artifact. Captured browser frames were non-black (`mean_luma` about `68`,
+`non_black_pixel_percent: 100%`) but still had zero YOLO tennis-ball detections.
+Last runtime code: `left-detections-missing`.
 
 Direct V4L2 cross-check:
 
 ```bash
-timeout 5s ffmpeg -hide_banner -loglevel error -y -f v4l2 -video_size 1280x720 -i /dev/video0 -frames:v 1 artifacts/hardware_smoke/20260629/direct_v4l2_frames/video0.jpg
-timeout 5s ffmpeg -hide_banner -loglevel error -y -f v4l2 -video_size 1280x720 -i /dev/video2 -frames:v 1 artifacts/hardware_smoke/20260629/direct_v4l2_frames/video2.jpg
-timeout 5s v4l2-ctl -d /dev/video0 --stream-mmap --stream-count=1 --stream-to=artifacts/hardware_smoke/20260629/direct_v4l2_frames/video0.raw
-timeout 5s v4l2-ctl -d /dev/video2 --stream-mmap --stream-count=1 --stream-to=artifacts/hardware_smoke/20260629/direct_v4l2_frames/video2.raw
+v4l2-ctl -d /dev/video0 --list-formats-ext
+v4l2-ctl -d /dev/video2 --list-formats-ext
+timeout 5s v4l2-ctl -d /dev/video0 --set-fmt-video=width=1280,height=720,pixelformat=MJPG --stream-mmap --stream-count=1 --stream-to=artifacts/hardware_smoke/20260629/direct_v4l2_frames/video0_MJPG_1280x720.raw
+timeout 5s v4l2-ctl -d /dev/video2 --set-fmt-video=width=1280,height=720,pixelformat=MJPG --stream-mmap --stream-count=1 --stream-to=artifacts/hardware_smoke/20260629/direct_v4l2_frames/video2_MJPG_1280x720.raw
+timeout 5s v4l2-ctl -d /dev/video0 --set-fmt-video=width=1280,height=720,pixelformat=YUYV --stream-mmap --stream-count=1 --stream-to=artifacts/hardware_smoke/20260629/direct_v4l2_frames/video0_YUYV_1280x720.raw
+timeout 5s v4l2-ctl -d /dev/video2 --set-fmt-video=width=1280,height=720,pixelformat=YUYV --stream-mmap --stream-count=1 --stream-to=artifacts/hardware_smoke/20260629/direct_v4l2_frames/video2_YUYV_1280x720.raw
 ```
 
-Result: both `ffmpeg` reads exited with timeout code `124` and produced no JPEG
-file. Both `v4l2-ctl --stream-mmap` reads exited with timeout code `124` and
-left 0-byte raw files. `v4l2-ctl --all` still reports `/dev/video0` and
-`/dev/video2` as UVC capture devices at `1280x720 YUYV`, 30 fps.
+Result: both devices advertise `1280x720` MJPG and YUYV at 30 fps. Explicit
+MJPG streaming succeeds immediately on both devices and writes JPEG frames.
+Explicit YUYV streaming at `1280x720` times out with exit code `124` and writes
+0-byte raw files. With default exposure, MJPG frames were very dark
+(`mean_luma` about `4`, `max_luma` about `12`). After setting brightness `64`,
+gain `255`, manual exposure `2047`, MJPG frames rose to `mean_luma` about `74`.
 
 ### Calibration Tool
 
@@ -185,8 +195,8 @@ Result: 13 tests passed. A real runtime YOLO package was written from the
   rebuilt from `finetune_indoor_cam1/weights/best.pt`.
 - `artifacts/calibration/stereo_cam1_cam2` now contains a real imported stereo
   package with explicit runtime quality warnings.
-- Live3D opened two real USB cameras in Chrome and ran the ONNX backend loop
-  without session concurrency errors.
+- Live3D opened two real USB cameras in Chrome at `1280x720@30` and ran the
+  ONNX backend loop without session concurrency errors.
 - Live3D now has a repeatable headless hardware verifier that reads
   `window.__tennisbotLive3dSnapshot` and records camera, YOLO, calibration,
   detection, runtime 3D state, frame captures, and frame brightness statistics
@@ -202,10 +212,10 @@ Result: 13 tests passed. A real runtime YOLO package was written from the
 
 Before claiming full real-world operation:
 
-1. Resolve the current camera frame-output issue: browser ImageCapture frames
-   are near-black and direct V4L2 one-frame reads time out.
+1. Keep `--prepare-uvc-controls` or equivalent lighting/exposure adjustment so
+   both browser captures are non-black.
 2. Put a tennis ball in both USB camera views and rerun
-   `bun apps/live3d/scripts/verify-hardware.ts --timeout-ms 30000 --output docs/live3d_hardware_loop_ball_YYYYMMDD.md`
+   `bun apps/live3d/scripts/verify-hardware.ts --prepare-uvc-controls --timeout-ms 30000 --output docs/live3d_hardware_loop_ball_YYYYMMDD.md`
    until the report reaches `prediction-ready`.
 3. Confirm runtime 3D scene, prediction curve, and landing marker update from
    those detections.
