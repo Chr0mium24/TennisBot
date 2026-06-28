@@ -12,11 +12,10 @@ TypeScript and Bun frontend app that defines the intended product surface:
 
 ## Current mode
 
-The app currently runs in fixture mode with a Wave 10 ONNX Runtime Web YOLO
-backend path behind the Wave 9 inference adapter boundary. Fixture mode builds
-contract-shaped sample detections and an in-memory stereo calibration, then runs
-them through `packages/core` stereo pairing, triangulation, and trajectory
-prediction before rendering the result.
+The app currently runs with a fixture fallback and a Wave 11 runtime 3D path.
+Fixture mode builds contract-shaped sample detections and an in-memory stereo
+calibration, then runs them through `packages/core` stereo pairing,
+triangulation, and trajectory prediction before rendering the fallback result.
 
 The UI can open browser camera streams, validate YOLO/calibration artifact
 metadata, and run a `YoloInferenceBackend` against the current left and right
@@ -26,13 +25,16 @@ preprocess a readable frame, run `session.run`, and postprocess tennis-ball
 detections. If the artifact package is missing or blocked, the backend remains
 explicitly blocked.
 
-Fixture overlays remain explicitly labelled fixture-only. Runtime overlays are
-rendered only when the ONNX or injected backend returns valid detections.
+Fixture overlays and the fixture 3D scene remain explicitly labelled
+fixture-only. Runtime overlays are rendered only when the ONNX or injected
+backend returns valid detections. When both runtime YOLO sides produce detections
+and the stereo calibration package is loaded, the app selects a stereo pair,
+triangulates a runtime 3D ball point, maintains a runtime trail, and renders a
+runtime prediction/landing once at least two runtime points are available.
 
-This implements the real browser backend path, but it has not been physically
-validated with the exported ONNX model, real USB camera frames, or the
-ROS/Gazebo-controlled catch loop. Live stereo triangulation from runtime
-detections and real prediction remain follow-up work.
+This implements the browser software path, but it has not been physically
+validated with the exported ONNX model, real USB camera frames, real calibration
+artifacts, or the ROS/Gazebo-controlled catch loop.
 
 ## Config placeholders
 
