@@ -111,13 +111,24 @@ uv run tennisbot-calibration capture stereo \
   --right-camera-id cam2 \
   --left-device /dev/video0 \
   --right-device /dev/video2 \
-  --output ../../artifacts/calibration_sessions/stereo_session
+  --output ../../artifacts/calibration_sessions/stereo_session \
+  --prepare-uvc-controls
+uv run tennisbot-calibration capture inspect \
+  --session ../../artifacts/calibration_sessions/stereo_session \
+  --output-report ../../docs/calibration_capture_quality_YYYYMMDD.md
 ```
 
 Defaults are `1280x720`, `MJPG`, 30 fps, and 20 frames or pairs. Add
 `--dry-run` to generate deterministic synthetic frames for CI and review
-without opening hardware. Captured sessions are not calibration packages yet;
-the next tool step is target detection and mono/stereo solve.
+without opening hardware. Add `--prepare-uvc-controls` on the local USU Camera
+4K hardware path to apply the same brightness/gain/manual-exposure preset used
+by the Live3D verifier before opening real devices.
+
+`capture inspect` reads a session manifest and image files, writes
+`inspection.json`, and can write a Markdown quality report. It rejects missing
+images, wrong image sizes, near-black frames, and low-contrast/blank frames.
+Captured sessions are not calibration packages yet; the next tool step after an
+accepted inspection is target detection and mono/stereo solve.
 
 ## Import Existing CameraCalibLab Output
 

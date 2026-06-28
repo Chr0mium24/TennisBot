@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 from time import sleep
@@ -10,6 +12,10 @@ import numpy as np
 
 from tennisbot_calibration.artifacts import TARGET
 from tennisbot_calibration.io import write_json
+
+UVC_CONTROL_STRING = "brightness=64,gain=255,auto_exposure=1,exposure_time_absolute=2047"
+NEAR_BLACK_MAX_LUMA = 8.0
+LOW_CONTRAST_STD_LUMA = 3.0
 
 
 def capture_mono_session(
@@ -24,12 +30,14 @@ def capture_mono_session(
     fourcc: str,
     fps: int | None,
     dry_run: bool,
+    prepare_uvc_controls: bool = False,
 ) -> dict[str, Any]:
     validate_capture_args(frame_count, interval_ms, width, height)
     output.mkdir(parents=True, exist_ok=True)
     frames_dir = output / "frames"
     frames_dir.mkdir(parents=True, exist_ok=True)
     files: list[str] = []
+    uvc_controls = prepare_uvc_device_controls([device], dry_run=dry_run) if prepare_uvc_controls else []
 
     if dry_run:
         for index in range(frame_count):
@@ -64,6 +72,7 @@ def capture_mono_session(
         "fps": fps,
         "frame_count": len(files),
         "interval_ms": interval_ms,
+        "uvc_controls": uvc_controls,
         "target": TARGET,
         "files": files,
         "next_step": "Run target detection and mono calibration solve for this session.",
@@ -88,12 +97,16 @@ def capture_stereo_session(
     fourcc: str,
     fps: int | None,
     dry_run: bool,
+    prepare_uvc_controls: bool = False,
 ) -> dict[str, Any]:
     validate_capture_args(pair_count, interval_ms, width, height)
     output.mkdir(parents=True, exist_ok=True)
     frames_dir = output / "frames"
     frames_dir.mkdir(parents=True, exist_ok=True)
     pairs: list[dict[str, Any]] = []
+    uvc_controls = (
+        prepare_uvc_device_controls([left_device, right_device], dry_run=dry_run) if prepare_uvc_controls else []
+    )
 
     if dry_run:
         for index in range(pair_count):
@@ -137,6 +150,7 @@ def capture_stereo_session(
         "fps": fps,
         "pair_count": len(pairs),
         "interval_ms": interval_ms,
+        "uvc_controls": uvc_controls,
         "target": TARGET,
         "pairs": pairs,
         "next_step": "Run target detection and stereo calibration solve for this session.",
@@ -145,6 +159,231 @@ def capture_stereo_session(
     write_summary(output / "summary.md", manifest)
     write_review_html(output / "review.html", manifest)
     return manifest
+
+
+def inspect_capture_session(*, session: Path, output_report: Path | None = None) -> dict[str, Any]:
+    manifest_path = session / "manifest.json"
+    if not manifest_path.is_file():
+        raise FileNotFoundError(f"capture session manifest not found: {manifest_path}")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    entries = capture_session_image_entries(manifest)
+    expected_size = manifest.get("image_size", {})
+    expected_width = int(expected_size.get("width", 0))
+    expected_height = int(expected_size.get("height", 0))
+
+    frames: list[dict[str, Any]] = []
+    session_issues: list[str] = []
+    for entry in entries:
+        frame_path = session / entry["path"]
+        frame_result = inspect_frame(frame_path, expected_width=expected_width, expected_height=expected_height)
+        frames.append({**entry, **frame_result})
+        session_issues.extend(f"{entry['path']}: {issue}" for issue in frame_result["issues"])
+
+    read_image_count = sum(1 for frame in frames if frame["status"] == "read")
+    accepted = len(entries) > 0 and read_image_count == len(entries) and len(session_issues) == 0
+    result = {
+        "schema_version": "calibration.capture_inspection.v1",
+        "session_id": manifest.get("session_id", session.name),
+        "topology": manifest.get("topology"),
+        "created_at": now_utc(),
+        "session_path": str(session),
+        "accepted": accepted,
+        "ready_for_target_detection": accepted,
+        "image_count": len(entries),
+        "read_image_count": read_image_count,
+        "expected_image_size": {"width": expected_width, "height": expected_height},
+        "thresholds": {
+            "near_black_max_luma": NEAR_BLACK_MAX_LUMA,
+            "low_contrast_std_luma": LOW_CONTRAST_STD_LUMA,
+        },
+        "issues": session_issues,
+        "frames": frames,
+        "recommendation": inspection_recommendation(accepted),
+    }
+    write_json(session / "inspection.json", result)
+    if output_report is not None:
+        write_inspection_report(output_report, result)
+    return result
+
+
+def capture_session_image_entries(manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    topology = manifest.get("topology")
+    if topology == "mono":
+        return [
+            {
+                "index": index + 1,
+                "camera_id": manifest.get("camera_id"),
+                "side": "mono",
+                "path": str(path),
+            }
+            for index, path in enumerate(manifest.get("files", []))
+        ]
+    if topology == "stereo":
+        left_camera_id, right_camera_id = manifest.get("camera_ids", ["left", "right"])
+        entries: list[dict[str, Any]] = []
+        for pair in manifest.get("pairs", []):
+            pair_index = int(pair.get("index", len(entries) // 2 + 1))
+            entries.append(
+                {
+                    "index": pair_index,
+                    "camera_id": left_camera_id,
+                    "side": "left",
+                    "path": str(pair["left"]),
+                }
+            )
+            entries.append(
+                {
+                    "index": pair_index,
+                    "camera_id": right_camera_id,
+                    "side": "right",
+                    "path": str(pair["right"]),
+                }
+            )
+        return entries
+    raise ValueError(f"unsupported capture session topology: {topology}")
+
+
+def inspect_frame(path: Path, *, expected_width: int, expected_height: int) -> dict[str, Any]:
+    issues: list[str] = []
+    if not path.is_file():
+        return {"status": "missing", "issues": ["missing image file"]}
+
+    frame = cv2.imread(str(path), cv2.IMREAD_COLOR)
+    if frame is None:
+        return {"status": "unreadable", "issues": ["unreadable image file"]}
+
+    height, width = frame.shape[:2]
+    if expected_width > 0 and expected_height > 0 and (width != expected_width or height != expected_height):
+        issues.append(f"image size {width}x{height} does not match expected {expected_width}x{expected_height}")
+
+    luma = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY).astype(np.float32)
+    mean_luma = float(luma.mean())
+    std_luma = float(luma.std())
+    min_luma = float(luma.min())
+    max_luma = float(luma.max())
+    non_black_pixel_percent = float((luma > NEAR_BLACK_MAX_LUMA).mean() * 100.0)
+    if max_luma <= NEAR_BLACK_MAX_LUMA:
+        issues.append("near-black frame")
+    if std_luma <= LOW_CONTRAST_STD_LUMA:
+        issues.append("low contrast / likely blank frame")
+
+    return {
+        "status": "read",
+        "width": width,
+        "height": height,
+        "mean_luma": round(mean_luma, 3),
+        "std_luma": round(std_luma, 3),
+        "min_luma": round(min_luma, 3),
+        "max_luma": round(max_luma, 3),
+        "non_black_pixel_percent": round(non_black_pixel_percent, 3),
+        "issues": issues,
+    }
+
+
+def write_inspection_report(path: Path, result: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    issue_lines = ["- none"] if not result["issues"] else [f"- {issue}" for issue in result["issues"]]
+    frame_lines = [
+        "| image | side | size | mean_luma | std_luma | max_luma | non_black_% | issues |",
+        "| --- | --- | --- | ---: | ---: | ---: | ---: | --- |",
+    ]
+    for frame in result["frames"]:
+        size = f"{frame.get('width', '-')}x{frame.get('height', '-')}" if frame["status"] == "read" else "-"
+        issues = ", ".join(frame["issues"]) if frame["issues"] else "none"
+        frame_lines.append(
+            "| "
+            + " | ".join(
+                [
+                    f"`{frame['path']}`",
+                    str(frame["side"]),
+                    size,
+                    str(frame.get("mean_luma", "-")),
+                    str(frame.get("std_luma", "-")),
+                    str(frame.get("max_luma", "-")),
+                    str(frame.get("non_black_pixel_percent", "-")),
+                    issues,
+                ]
+            )
+            + " |"
+        )
+
+    lines = [
+        "# Calibration Capture Session Inspection",
+        "",
+        f"- created_at: {result['created_at']}",
+        f"- session_id: {result['session_id']}",
+        f"- topology: {result['topology']}",
+        f"- accepted: {result['accepted']}",
+        f"- ready_for_target_detection: {result['ready_for_target_detection']}",
+        f"- image_count: {result['image_count']}",
+        f"- read_image_count: {result['read_image_count']}",
+        f"- recommendation: {result['recommendation']}",
+        "",
+        "## Issues",
+        "",
+        *issue_lines,
+        "",
+        "## Frame Metrics",
+        "",
+        *frame_lines,
+        "",
+    ]
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def inspection_recommendation(accepted: bool) -> str:
+    if accepted:
+        return "Proceed to target detection, then mono or stereo calibration solve."
+    return "Recapture after fixing camera exposure, lighting, visibility, and calibration target placement."
+
+
+def prepare_uvc_device_controls(devices: list[str], *, dry_run: bool) -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
+    for device in ordered_unique(devices):
+        if dry_run:
+            results.append(
+                {
+                    "device": device,
+                    "status": "skipped",
+                    "controls": UVC_CONTROL_STRING,
+                    "detail": "dry-run session; v4l2-ctl was not executed.",
+                }
+            )
+            continue
+
+        command = ["v4l2-ctl", "-d", device, f"--set-ctrl={UVC_CONTROL_STRING}"]
+        try:
+            completed = subprocess.run(command, capture_output=True, text=True, timeout=5, check=False)
+        except FileNotFoundError as exc:
+            raise RuntimeError("v4l2-ctl is required for --prepare-uvc-controls") from exc
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError(f"timed out while applying UVC controls to {device}") from exc
+        stdout = completed.stdout.strip()
+        stderr = completed.stderr.strip()
+        if completed.returncode != 0:
+            detail = stderr or stdout or f"v4l2-ctl exited with {completed.returncode}"
+            raise RuntimeError(f"failed to apply UVC controls to {device}: {detail}")
+        results.append(
+            {
+                "device": device,
+                "status": "passed",
+                "controls": UVC_CONTROL_STRING,
+                "returncode": completed.returncode,
+                "stdout": stdout,
+                "stderr": stderr,
+            }
+        )
+    return results
+
+
+def ordered_unique(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    unique: list[str] = []
+    for value in values:
+        if value not in seen:
+            unique.append(value)
+            seen.add(value)
+    return unique
 
 
 def validate_capture_args(frame_count: int, interval_ms: int, width: int, height: int) -> None:
@@ -233,6 +472,10 @@ def write_summary(path: Path, manifest: dict[str, Any]) -> None:
                 f"- pair_count: {manifest['pair_count']}",
             ]
         )
+    if manifest["uvc_controls"]:
+        lines.extend(["", "## UVC Controls", ""])
+        for item in manifest["uvc_controls"]:
+            lines.append(f"- {item['device']}: {item['status']} ({item['controls']})")
     lines.extend(["", "## Next Step", "", manifest["next_step"], ""])
     path.write_text("\n".join(lines), encoding="utf-8")
 

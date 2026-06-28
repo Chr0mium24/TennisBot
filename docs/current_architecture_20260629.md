@@ -152,7 +152,11 @@ uv run tennisbot-calibration capture stereo \
   --right-camera-id cam2 \
   --left-device /dev/video0 \
   --right-device /dev/video2 \
-  --output ../../artifacts/calibration_sessions/stereo_session
+  --output ../../artifacts/calibration_sessions/stereo_session \
+  --prepare-uvc-controls
+uv run tennisbot-calibration capture inspect \
+  --session ../../artifacts/calibration_sessions/stereo_session \
+  --output-report ../../docs/calibration_capture_quality_YYYYMMDD.md
 ```
 
 Import existing CameraCalibLab calibration:
@@ -202,9 +206,12 @@ cd packages/core && bun test && bun run typecheck
 
 ## Current Verification Evidence
 
-Most recent software verification after Wave 11:
+Most recent software verification:
 
 ```text
+cd tools/calibration && uv run pytest -q
+Result: 15 passing tests, 0 failures.
+
 cd apps/live3d && bun test
 Result: 42 passing tests, 0 failures.
 
@@ -241,7 +248,11 @@ runtime-quality review threshold. stereo_rms=0.424 px,
 rectification_y_p95=0.830 px, baseline=0.052486 m.
 Calibration capture sessions: dry-run mono/stereo sessions wrote manifests,
 frames, summary, and review files; a real 1-pair stereo hardware probe opened
-/dev/video0 and /dev/video2 at 1280x720 MJPG.
+/dev/video0 and /dev/video2 at 1280x720 MJPG. The capture tool can also apply
+the local high-brightness UVC preset and inspect sessions before target
+detection. The latest dry-run inspection accepted 4/4 images; the latest real
+hardware probe rejected both images as low contrast / likely blank, so it is not
+ready for mono/stereo solve.
 ```
 
 Latest recalibrated hardware smoke:
@@ -262,6 +273,8 @@ hardware validation:
 
 - keep the UVC brightness/exposure preparation or equivalent physical lighting
   so both USB camera frames are non-black;
+- capture real mono/stereo calibration sessions with visible ChArUco targets and
+  `capture inspect` accepted before solving;
 - rerun the Live3D hardware verifier with a tennis ball visible in both USB
   camera views;
 - verify nonzero ONNX detections on both live frames;

@@ -143,6 +143,10 @@ uv run pytest -q
 uv run tennisbot-calibration capture mono --camera-id cam1 --device /dev/video0 --output ../../artifacts/calibration_sessions/20260629_cam1_dry_run --frame-count 3 --interval-ms 0 --width 320 --height 180 --dry-run
 uv run tennisbot-calibration capture stereo --left-camera-id cam1 --right-camera-id cam2 --left-device /dev/video0 --right-device /dev/video2 --output ../../artifacts/calibration_sessions/20260629_stereo_dry_run --pair-count 3 --interval-ms 0 --width 320 --height 180 --dry-run
 timeout 12s uv run tennisbot-calibration capture stereo --left-camera-id cam1 --right-camera-id cam2 --left-device /dev/video0 --right-device /dev/video2 --output ../../artifacts/calibration_sessions/20260629_stereo_hardware_probe --pair-count 1 --interval-ms 0 --width 1280 --height 720 --fourcc MJPG --fps 30
+uv run tennisbot-calibration capture stereo --left-camera-id cam1 --right-camera-id cam2 --left-device /dev/video0 --right-device /dev/video2 --output ../../artifacts/calibration_sessions/20260629_stereo_quality_dry_run --pair-count 2 --interval-ms 0 --width 320 --height 180 --prepare-uvc-controls --dry-run
+uv run tennisbot-calibration capture inspect --session ../../artifacts/calibration_sessions/20260629_stereo_quality_dry_run --output-report ../../docs/calibration_capture_quality_20260629.md
+timeout 20s uv run tennisbot-calibration capture stereo --left-camera-id cam1 --right-camera-id cam2 --left-device /dev/video0 --right-device /dev/video2 --output ../../artifacts/calibration_sessions/20260629_stereo_quality_hardware_probe --pair-count 1 --interval-ms 0 --width 1280 --height 720 --fourcc MJPG --fps 30 --prepare-uvc-controls
+uv run tennisbot-calibration capture inspect --session ../../artifacts/calibration_sessions/20260629_stereo_quality_hardware_probe --output-report ../../docs/calibration_capture_quality_hardware_probe_20260629.md || true
 uv run tennisbot-calibration gui mono --camera-id cam1 --dry-run --output ../../artifacts/calibration/cam1
 uv run tennisbot-calibration gui mono --camera-id cam2 --dry-run --output ../../artifacts/calibration/cam2
 uv run tennisbot-calibration gui stereo --left-camera-id cam1 --right-camera-id cam2 --dry-run --output ../../artifacts/calibration/stereo_cam1_cam2
@@ -159,11 +163,14 @@ uv run tennisbot-calibration package import-scanned-camera-calib-lab \
 uv run tennisbot-calibration package verify --path ../../artifacts/calibration/stereo_cam1_cam2
 ```
 
-Result: 13 tests passed. Dry-run mono and stereo package generation still works.
+Result: 15 tests passed. Dry-run mono and stereo package generation still works.
 Standalone capture sessions now write manifests, PNG frames, summary files, and
-review HTML. The real stereo capture probe opened `/dev/video0` and
-`/dev/video2` at 1280x720 MJPG and wrote one pair, but the scene was uniform gray
-with no visible calibration target, so it is not sufficient for a solve.
+review HTML. `capture inspect` writes `inspection.json` and optional Markdown
+reports before target detection or solve. The quality-gated dry-run stereo
+session accepted 4/4 images. The real stereo capture probe applied UVC controls,
+opened `/dev/video0` and `/dev/video2` at 1280x720 MJPG, wrote one pair, then
+rejected both images as low contrast / likely blank, so the current scene is not
+sufficient for a solve.
 The scanned import command selected cam1/cam2 mono candidates by path pattern,
 ranked 3 stereo candidates, imported the best ranked CameraCalibLab rational
 fixed-intrinsics stereo output into `artifacts/calibration/stereo_cam1_cam2`, and
@@ -214,6 +221,8 @@ Result: 13 tests passed. A real runtime YOLO package was written from the
 - `tools/calibration` now has standalone mono and stereo capture session
   commands. Dry-run sessions are deterministic, and a real stereo hardware probe
   opened `/dev/video0` plus `/dev/video2` and wrote one 1280x720 MJPG pair.
+  Capture sessions can apply the local UVC exposure preset and run `capture
+  inspect` as a pre-solve image quality gate.
 - The current calibration package verifies with baseline
   `0.05248616443700974`, stereo RMS `0.42365210023675176`, rectification y p95
   `0.8301635742187499`, and a remaining epipolar RMS `4.3304497343502`

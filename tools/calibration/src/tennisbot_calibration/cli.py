@@ -5,7 +5,11 @@ import json
 from pathlib import Path
 
 from tennisbot_calibration.artifacts import write_mono_dry_run, write_stereo_dry_run
-from tennisbot_calibration.capture_sessions import capture_mono_session, capture_stereo_session
+from tennisbot_calibration.capture_sessions import (
+    capture_mono_session,
+    capture_stereo_session,
+    inspect_capture_session,
+)
 from tennisbot_calibration.import_camera_calib_lab import import_camera_calib_lab_package
 from tennisbot_calibration.scan_camera_calib_lab import (
     candidate_path,
@@ -48,6 +52,11 @@ def configure_capture(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
     mono.add_argument("--fourcc", default="MJPG")
     mono.add_argument("--fps", type=int, default=30)
     mono.add_argument("--dry-run", action="store_true", help="Write deterministic synthetic frames instead of opening hardware.")
+    mono.add_argument(
+        "--prepare-uvc-controls",
+        action="store_true",
+        help="Apply the local high-brightness UVC exposure controls before real capture.",
+    )
     mono.set_defaults(handler=capture_mono)
 
     stereo = capture_subparsers.add_parser("stereo", help="Capture a stereo calibration image-pair session.")
@@ -63,7 +72,17 @@ def configure_capture(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
     stereo.add_argument("--fourcc", default="MJPG")
     stereo.add_argument("--fps", type=int, default=30)
     stereo.add_argument("--dry-run", action="store_true", help="Write deterministic synthetic frame pairs instead of opening hardware.")
+    stereo.add_argument(
+        "--prepare-uvc-controls",
+        action="store_true",
+        help="Apply the local high-brightness UVC exposure controls before real capture.",
+    )
     stereo.set_defaults(handler=capture_stereo)
+
+    inspect = capture_subparsers.add_parser("inspect", help="Inspect a captured session for basic image quality.")
+    inspect.add_argument("--session", required=True, help="Capture session directory containing manifest.json.")
+    inspect.add_argument("--output-report", default=None, help="Optional Markdown inspection report path.")
+    inspect.set_defaults(handler=capture_inspect)
 
 
 def configure_gui(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -146,6 +165,7 @@ def capture_mono(args: argparse.Namespace) -> int:
         fourcc=args.fourcc,
         fps=args.fps,
         dry_run=args.dry_run,
+        prepare_uvc_controls=args.prepare_uvc_controls,
     )
     print(json.dumps({"accepted": True, "output": args.output, "session": manifest}, indent=2, sort_keys=True))
     return 0
@@ -165,9 +185,19 @@ def capture_stereo(args: argparse.Namespace) -> int:
         fourcc=args.fourcc,
         fps=args.fps,
         dry_run=args.dry_run,
+        prepare_uvc_controls=args.prepare_uvc_controls,
     )
     print(json.dumps({"accepted": True, "output": args.output, "session": manifest}, indent=2, sort_keys=True))
     return 0
+
+
+def capture_inspect(args: argparse.Namespace) -> int:
+    result = inspect_capture_session(
+        session=Path(args.session),
+        output_report=Path(args.output_report) if args.output_report else None,
+    )
+    print(json.dumps(result, indent=2, sort_keys=True))
+    return 0 if result["accepted"] else 1
 
 
 def gui_mono(args: argparse.Namespace) -> int:

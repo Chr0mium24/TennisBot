@@ -61,7 +61,11 @@ uv run tennisbot-calibration capture stereo \
   --right-camera-id cam2 \
   --left-device /dev/video0 \
   --right-device /dev/video2 \
-  --output ../../artifacts/calibration_sessions/stereo_session
+  --output ../../artifacts/calibration_sessions/stereo_session \
+  --prepare-uvc-controls
+uv run tennisbot-calibration capture inspect \
+  --session ../../artifacts/calibration_sessions/stereo_session \
+  --output-report ../../docs/calibration_capture_quality_YYYYMMDD.md
 ```
 
 Import existing CameraCalibLab calibration into runtime artifacts:
@@ -109,6 +113,8 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 - [Physical artifact import](docs/physical_artifact_import_20260629.md)
 - [Calibration candidate scan](docs/calibration_candidate_scan_20260629.md)
 - [Calibration capture session flow](docs/calibration_capture_session_flow_20260629.md)
+- [Calibration capture quality dry run](docs/calibration_capture_quality_20260629.md)
+- [Calibration capture quality hardware probe](docs/calibration_capture_quality_hardware_probe_20260629.md)
 - [Legacy board/runtime shell retirement](docs/legacy_board_retirement_20260629.md)
 - [Live3D hardware smoke](docs/live3d_hardware_smoke_20260629.md)
 - [YOLO static sample validation](docs/yolo_static_sample_validation_20260629.md)

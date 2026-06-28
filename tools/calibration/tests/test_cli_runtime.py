@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import cv2
+import numpy as np
 import pytest
 
 from tennisbot_calibration.cli import main
@@ -30,6 +32,7 @@ def test_cli_help_exposes_required_commands(capsys: pytest.CaptureFixture[str]) 
     assert "package" in top_help
     assert "capture mono" in top_help
     assert "capture stereo" in top_help
+    assert "inspect" in capture_help
     assert "gui mono" in top_help
     assert "gui stereo" in top_help
     assert "package verify" in top_help
@@ -65,6 +68,7 @@ def test_capture_mono_dry_run_writes_session_frames_and_manifest(tmp_path: Path)
                 "64",
                 "--height",
                 "48",
+                "--prepare-uvc-controls",
                 "--dry-run",
             ]
         )
@@ -77,11 +81,99 @@ def test_capture_mono_dry_run_writes_session_frames_and_manifest(tmp_path: Path)
     assert manifest["dry_run"] is True
     assert manifest["hardware_validated"] is False
     assert manifest["frame_count"] == 3
+    assert manifest["uvc_controls"] == [
+        {
+            "device": "/dev/video0",
+            "status": "skipped",
+            "controls": "brightness=64,gain=255,auto_exposure=1,exposure_time_absolute=2047",
+            "detail": "dry-run session; v4l2-ctl was not executed.",
+        }
+    ]
     assert len(manifest["files"]) == 3
     for rel_path in manifest["files"]:  # type: ignore[union-attr]
         assert (output / str(rel_path)).is_file()
     assert (output / "summary.md").is_file()
     assert (output / "review.html").is_file()
+
+
+def test_capture_inspect_accepts_dry_run_session(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    output = tmp_path / "cam1_session"
+    report = tmp_path / "inspection.md"
+    assert (
+        main(
+            [
+                "capture",
+                "mono",
+                "--camera-id",
+                "cam1",
+                "--output",
+                str(output),
+                "--frame-count",
+                "2",
+                "--interval-ms",
+                "0",
+                "--width",
+                "64",
+                "--height",
+                "48",
+                "--dry-run",
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+
+    assert main(["capture", "inspect", "--session", str(output), "--output-report", str(report)]) == 0
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["accepted"] is True
+    assert payload["ready_for_target_detection"] is True
+    assert payload["image_count"] == 2
+    assert payload["read_image_count"] == 2
+    assert (output / "inspection.json").is_file()
+    assert "# Calibration Capture Session Inspection" in report.read_text(encoding="utf-8")
+
+
+def test_capture_inspect_rejects_low_contrast_frame(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    output = tmp_path / "cam1_session"
+    assert (
+        main(
+            [
+                "capture",
+                "mono",
+                "--camera-id",
+                "cam1",
+                "--output",
+                str(output),
+                "--frame-count",
+                "1",
+                "--interval-ms",
+                "0",
+                "--width",
+                "64",
+                "--height",
+                "48",
+                "--dry-run",
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+    blank = np.full((48, 64, 3), 80, dtype=np.uint8)
+    assert cv2.imwrite(str(output / "frames" / "cam1_0001.png"), blank)
+
+    assert main(["capture", "inspect", "--session", str(output)]) == 1
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["accepted"] is False
+    assert payload["ready_for_target_detection"] is False
+    assert "low contrast / likely blank frame" in payload["issues"][0]
 
 
 def test_capture_stereo_dry_run_writes_pair_session(tmp_path: Path) -> None:
