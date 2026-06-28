@@ -31,6 +31,7 @@ import {
   type YoloInferenceBackend,
   type YoloInferenceRuntimeStatus,
 } from "./detections";
+import { OnnxYoloInferenceBackend } from "./onnx-yolo";
 import "./styles.css";
 
 declare global {
@@ -41,11 +42,6 @@ declare global {
 
 const fixture = createFixture(defaultLive3dConfig);
 const artifactReader = new BrowserFetchJsonReader();
-const yoloBackend =
-  window.__tennisbotLive3dYoloBackend ??
-  createBlockedYoloInferenceBackend(
-    "Wave 9 wires the injectable YOLO adapter path only. A real ONNX Runtime Web backend is deferred to a later wave.",
-  );
 
 function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
@@ -265,7 +261,7 @@ function renderYoloControls(
   return `
     <div class="camera-controls" aria-label="YOLO inference controls">
       <button id="yolo-start-button" type="button" ${startDisabled ? "disabled" : ""}>
-        Start YOLO adapter
+        Start YOLO backend
       </button>
       <button id="yolo-stop-button" type="button" ${stopDisabled ? "disabled" : ""}>
         Stop YOLO adapter
@@ -454,6 +450,8 @@ const [yoloStatus, calibrationStatus] = await Promise.all([
     defaultLive3dConfig.artifacts.stereoCalibrationPackagePath,
   ),
 ]);
+const yoloBackend =
+  window.__tennisbotLive3dYoloBackend ?? createDefaultYoloBackend(yoloStatus);
 
 let cameraStatus: StereoCameraRuntimeStatus = createStereoCameraIdleStatus(defaultLive3dConfig);
 let detectionStatus: StereoYoloInferenceRuntimeStatus = createStereoYoloInferenceIdleStatus();
@@ -558,6 +556,19 @@ function stopYoloInferenceFromUserAction(): void {
   yoloRunSerial += 1;
   yoloBackend.stop?.();
   detectionStatus = createStereoYoloInferenceIdleStatus();
+}
+
+function createDefaultYoloBackend(status: YoloArtifactLoadStatus): YoloInferenceBackend {
+  if (status.status !== "loaded") {
+    return createBlockedYoloInferenceBackend(
+      `YOLO artifact is blocked; ONNX backend cannot start: ${status.message}`,
+    );
+  }
+
+  return new OnnxYoloInferenceBackend({
+    packagePath: status.packagePath,
+    metadata: status.value,
+  });
 }
 
 function getVideoImageSize(

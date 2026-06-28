@@ -12,5 +12,8 @@
   "devDependencies": {
     "@types/bun": "^1.2.0",
     "typescript": "^5.8.0"
+  },
+  "dependencies": {
+    "onnxruntime-web": "^1.27.0"
   }
 }
