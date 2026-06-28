@@ -57,7 +57,9 @@ artifacts/models/tennis_ball_yolo/
 ### `tools/calibration`
 
 Owns mono/stereo calibration package production and verification. It does not
-own YOLO inference, trajectory prediction, or Live3D rendering.
+own YOLO inference, trajectory prediction, or Live3D rendering. It can import
+existing CameraCalibLab calibration JSON into the runtime artifact contract
+without making the main runtime depend on CameraCalibLab source code.
 
 Default runtime output:
 
@@ -135,11 +137,39 @@ uv run tennisbot-calibration gui stereo --left-camera-id cam1 --right-camera-id 
 uv run tennisbot-calibration package verify --path ../../artifacts/calibration/stereo_cam1_cam2
 ```
 
+Import existing CameraCalibLab calibration:
+
+```bash
+cd tools/calibration
+uv run tennisbot-calibration package import-camera-calib-lab \
+  --cam1 ../../CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622/cam1_mono/calibration/calibration.json \
+  --cam2 ../../CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622/cam2_mono/calibration/calibration.json \
+  --stereo ../../CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622/stereo/calibration/calibration.json \
+  --output ../../artifacts/calibration/stereo_cam1_cam2 \
+  --left-camera-id cam1 \
+  --right-camera-id cam2 \
+  --source-session CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622
+uv run tennisbot-calibration package verify --path ../../artifacts/calibration/stereo_cam1_cam2
+```
+
 Create dry-run YOLO artifacts:
 
 ```bash
 cd tools/yolo
 uv run tennisbot-yolo package create --dry-run --output-dir ../../artifacts/models/tennis_ball_yolo
+uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_yolo
+```
+
+Create runtime YOLO artifacts from existing local model files:
+
+```bash
+cd tools/yolo
+uv run tennisbot-yolo package create \
+  --output-dir ../../artifacts/models/tennis_ball_yolo \
+  --model-pt ../../TennisBallDetectorLab/detector_package/model.pt \
+  --model-onnx ../../TennisBallDetectorLab/detector_package/model.onnx \
+  --model-rknn ../../TennisBallDetectorLab/detector_package/model.rknn \
+  --default-model onnx
 uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_yolo
 ```
 
@@ -168,15 +198,23 @@ Result: passed.
 The software path is connected through Live3D, ONNX backend boundary, core
 stereo triangulation, and prediction using synthetic tests.
 
+Runtime artifacts have also been imported locally:
+
+```text
+YOLO: dry_run=false, inference_ready=true, default_model=onnx.
+Calibration: dry_run=false, hardware_validated=true, package verify accepted.
+Calibration quality warning: stereo_rms=23.487 px, epipolar_rms=30.802 px,
+rectification_y_p95=19.304 px.
+```
+
 ## Remaining Physical Validation
 
 The architecture is implemented in software. These items still require real
-hardware/artifacts:
+hardware validation:
 
-- produce or copy real accepted calibration packages into `artifacts/calibration/`;
-- produce or copy a real ONNX YOLO package into `artifacts/models/`;
 - run Live3D with two real USB cameras in the target browser;
 - verify ONNX detections on live frames;
 - verify runtime 3D point stability and prediction quality;
+- re-run mono/stereo calibration if imported stereo error remains high;
 - validate ROS/Gazebo closed-loop catch behavior only after the real visual
   tracking path is stable.

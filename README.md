@@ -47,6 +47,21 @@ uv run tennisbot-calibration gui stereo --left-camera-id cam1 --right-camera-id 
 uv run tennisbot-calibration package verify --path ../../artifacts/calibration/stereo_cam1_cam2
 ```
 
+Import existing CameraCalibLab calibration into runtime artifacts:
+
+```bash
+cd tools/calibration
+uv run tennisbot-calibration package import-camera-calib-lab \
+  --cam1 ../../CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622/cam1_mono/calibration/calibration.json \
+  --cam2 ../../CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622/cam2_mono/calibration/calibration.json \
+  --stereo ../../CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622/stereo/calibration/calibration.json \
+  --output ../../artifacts/calibration/stereo_cam1_cam2 \
+  --left-camera-id cam1 \
+  --right-camera-id cam2 \
+  --source-session CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622
+uv run tennisbot-calibration package verify --path ../../artifacts/calibration/stereo_cam1_cam2
+```
+
 Create dry-run YOLO artifacts:
 
 ```bash
@@ -55,10 +70,24 @@ uv run tennisbot-yolo package create --dry-run --output-dir ../../artifacts/mode
 uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_yolo
 ```
 
+Create a runtime YOLO package from existing local model files:
+
+```bash
+cd tools/yolo
+uv run tennisbot-yolo package create \
+  --output-dir ../../artifacts/models/tennis_ball_yolo \
+  --model-pt ../../TennisBallDetectorLab/detector_package/model.pt \
+  --model-onnx ../../TennisBallDetectorLab/detector_package/model.onnx \
+  --model-rknn ../../TennisBallDetectorLab/detector_package/model.rknn \
+  --default-model onnx
+uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_yolo
+```
+
 ## Architecture
 
 - [Current architecture](docs/current_architecture_20260629.md)
 - [Final runtime validation](docs/final_runtime_validation_20260629.md)
+- [Physical artifact import](docs/physical_artifact_import_20260629.md)
 - [Architecture simplification plan](docs/architecture_simplification_plan_20260628.md)
 - [Multi-agent refactor task plan](docs/multi_agent_refactor_tasks_20260628.md)
 - [Multi-agent refactor Wave 1 result](docs/multi_agent_refactor_wave1_result_20260628.md)

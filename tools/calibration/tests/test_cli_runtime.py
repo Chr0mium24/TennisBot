@@ -32,6 +32,7 @@ def test_cli_help_exposes_required_commands(capsys: pytest.CaptureFixture[str]) 
     assert "mono" in gui_help
     assert "stereo" in gui_help
     assert "verify" in package_help
+    assert "import-camera-calib-lab" in package_help
 
 
 def test_mono_dry_run_writes_required_package_files_for_cam1(tmp_path: Path) -> None:
@@ -195,3 +196,126 @@ def test_generated_stereo_rectification_uses_row_major_matrices_and_matching_cam
     assert all(isinstance(row, list) and len(row) == 4 for row in rectification["p1"])  # type: ignore[index]
     assert len(rectification["q"]) == 4
     assert all(isinstance(row, list) and len(row) == 4 for row in rectification["q"])  # type: ignore[index]
+
+
+def test_import_camera_calib_lab_writes_verified_runtime_stereo_package(tmp_path: Path) -> None:
+    source = write_camera_calib_lab_fixture(tmp_path / "source")
+    output = tmp_path / "stereo_cam1_cam2"
+
+    assert (
+        main(
+            [
+                "package",
+                "import-camera-calib-lab",
+                "--cam1",
+                str(source["cam1"]),
+                "--cam2",
+                str(source["cam2"]),
+                "--stereo",
+                str(source["stereo"]),
+                "--output",
+                str(output),
+                "--left-camera-id",
+                "cam1",
+                "--right-camera-id",
+                "cam2",
+            ]
+        )
+        == 0
+    )
+
+    assert main(["package", "verify", "--path", str(output)]) == 0
+    package = read_json(output / "package.json")
+    stereo = read_json(output / "stereo.json")
+    rectification = read_json(output / "rectification.json")
+    verification = read_json(output / "verification.json")
+
+    assert package["dry_run"] is False
+    assert package["hardware_validated"] is True
+    assert package["camera_ids"] == ["cam1", "cam2"]
+    assert stereo["baseline_m"] == pytest.approx(0.12)
+    assert len(stereo["essential_matrix"]) == 3
+    assert len(stereo["fundamental_matrix"]) == 3
+    assert len(rectification["p1"]) == 3
+    assert all(isinstance(row, list) and len(row) == 4 for row in rectification["p1"])  # type: ignore[index]
+    assert len(rectification["q"]) == 4
+    assert verification["rectification"]["accepted"] is True  # type: ignore[index]
+    assert "Imported from CameraCalibLab" in (output / "summary.md").read_text(encoding="utf-8")
+
+
+def write_camera_calib_lab_fixture(root: Path) -> dict[str, Path]:
+    root.mkdir(parents=True)
+    cam1 = root / "cam1.json"
+    cam2 = root / "cam2.json"
+    stereo = root / "stereo.json"
+    camera_matrix_left = [
+        [900.0, 0.0, 640.0],
+        [0.0, 900.0, 360.0],
+        [0.0, 0.0, 1.0],
+    ]
+    camera_matrix_right = [
+        [910.0, 0.0, 642.0],
+        [0.0, 908.0, 358.0],
+        [0.0, 0.0, 1.0],
+    ]
+    write_json_fixture(
+        cam1,
+        {
+            "topology": "mono",
+            "status": "ready",
+            "created_at": "2026-06-29T00:00:00Z",
+            "result_id": "fixture_cam1",
+            "method_id": "fixture_mono",
+            "image_size": [1280, 720],
+            "camera_matrix": camera_matrix_left,
+            "dist_coeffs": [0.01, -0.02, 0.0, 0.0, 0.0],
+            "metrics": {"accepted_views": 20, "calibration_rms_px": 0.2},
+            "validation": {"failures": [], "metrics": {"view_count": 20}},
+        },
+    )
+    write_json_fixture(
+        cam2,
+        {
+            "topology": "mono",
+            "status": "ready",
+            "created_at": "2026-06-29T00:00:00Z",
+            "result_id": "fixture_cam2",
+            "method_id": "fixture_mono",
+            "image_size": [1280, 720],
+            "camera_matrix": camera_matrix_right,
+            "dist_coeffs": [0.011, -0.018, 0.0, 0.0, 0.0],
+            "metrics": {"accepted_views": 22, "calibration_rms_px": 0.24},
+            "validation": {"failures": [], "metrics": {"view_count": 22}},
+        },
+    )
+    write_json_fixture(
+        stereo,
+        {
+            "topology": "stereo",
+            "status": "ready",
+            "created_at": "2026-06-29T00:00:00Z",
+            "result_id": "fixture_stereo",
+            "method_id": "fixture_stereo",
+            "image_size": [1280, 720],
+            "rotation": [
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [0.0, 0.0, 1.0],
+            ],
+            "translation": [0.12, 0.0, 0.0],
+            "metrics": {
+                "accepted_pairs": 18,
+                "baseline_m": 0.12,
+                "epipolar_rms_px": 0.4,
+                "matched_point_count_min": 96,
+                "rectification_y_p95_px": 0.6,
+                "stereo_rms_px": 0.5,
+            },
+            "validation": {"failures": [], "metrics": {"pair_count": 18}},
+        },
+    )
+    return {"cam1": cam1, "cam2": cam2, "stereo": stereo}
+
+
+def write_json_fixture(path: Path, payload: dict[str, object]) -> None:
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")

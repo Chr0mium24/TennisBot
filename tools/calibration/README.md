@@ -94,6 +94,30 @@ artifacts/calibration/stereo_cam1_cam2/
 Mono and stereo package contracts are defined in
 [`artifact_contracts.md`](artifact_contracts.md).
 
+## Import Existing CameraCalibLab Output
+
+Existing CameraCalibLab mono/stereo `calibration.json` files can be converted
+into the runtime stereo package contract without coupling the main runtime to
+CameraCalibLab internals:
+
+```bash
+cd tools/calibration
+uv run tennisbot-calibration package import-camera-calib-lab \
+  --cam1 ../../CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622/cam1_mono/calibration/calibration.json \
+  --cam2 ../../CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622/cam2_mono/calibration/calibration.json \
+  --stereo ../../CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622/stereo/calibration/calibration.json \
+  --output ../../artifacts/calibration/stereo_cam1_cam2 \
+  --left-camera-id cam1 \
+  --right-camera-id cam2 \
+  --source-session CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622
+uv run tennisbot-calibration package verify --path ../../artifacts/calibration/stereo_cam1_cam2
+```
+
+The imported package is marked `dry_run: false` and `hardware_validated: true`.
+If stereo quality metrics exceed runtime warning thresholds, the package remains
+loadable for smoke testing but its summary records that recalibration is needed
+before relying on 3D prediction accuracy.
+
 ## Migration Checklist
 
 - [ ] Freeze the current `CameraCalibLab` baseline and record its commit.

@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "Standalone TennisBot calibration artifact tooling."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "opencv-python-headless>=4.13.0.92",
+]
 
 [project.scripts]
 tennisbot-calibration = "tennisbot_calibration.cli:main"
