@@ -45,7 +45,7 @@ export function resolveStaticRequestPath(
 }
 
 export function startServer() {
-  Bun.serve({
+  const server = Bun.serve({
     port,
     async fetch(request) {
       const url = new URL(request.url);
@@ -61,7 +61,8 @@ export function startServer() {
     },
   });
 
-  console.log(`Live3D fixture UI available at http://localhost:${port}`);
+  console.log(`Live3D UI available at http://localhost:${port}`);
+  return server;
 }
 
 function decodePathname(pathname) {
@@ -90,4 +91,5 @@ function isServableFileInRoot(filePath, root) {
 
 if (import.meta.main) {
   startServer();
+  await new Promise(() => undefined);
 }
