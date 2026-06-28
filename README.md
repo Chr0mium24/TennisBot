@@ -51,6 +51,8 @@ uv run camera-calib-lab --help
 - [Multi-agent refactor Wave 3 Live3D core fixture result](docs/multi_agent_refactor_wave3_live3d_core_fixture_result_20260628.md)
 - [Multi-agent refactor Wave 3 Live3D core fixture review](docs/multi_agent_refactor_wave3_live3d_core_fixture_review_20260628.md)
 - [Multi-agent refactor Wave 4 artifact loaders plan](docs/multi_agent_refactor_wave4_artifact_loaders_plan_20260628.md)
+- [Multi-agent refactor Wave 4 artifact loaders result](docs/multi_agent_refactor_wave4_artifact_loaders_result_20260628.md)
+- [Multi-agent refactor Wave 4 artifact loaders review](docs/multi_agent_refactor_wave4_artifact_loaders_review_20260628.md)
 
 ## Git Workflow
 

@@ -45,6 +45,16 @@ artifact files:
 Validation returns explicit success/failure objects with actionable error
 messages for ordinary invalid package data.
 
+Lead review tightened the final merged version to also reject:
+
+- malformed YOLO class entries without throwing;
+- YOLO model entries missing required `sha256` or `bytes` metadata;
+- out-of-range YOLO confidence thresholds;
+- non-positive artifact image dimensions;
+- unparseable package timestamps;
+- unsupported distortion model names;
+- rectification camera IDs that do not match the stereo package and extrinsics.
+
 ## Out Of Scope
 
 This wave intentionally does not add:
@@ -66,7 +76,10 @@ Focused Bun fixtures cover:
 
 - valid YOLO package metadata conversion;
 - rejected YOLO metadata missing class `0 = tennis_ball`;
+- rejected malformed YOLO class entries;
+- rejected YOLO model entries missing checksum metadata;
 - valid stereo calibration package conversion;
 - rejected stereo calibration package where quality and verification are not
   accepted;
+- rejected rectification camera ID mismatches;
 - row-major matrix flattening for 3x3 and 3x4 artifact matrices.
