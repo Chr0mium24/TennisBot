@@ -2,6 +2,8 @@ export type CameraDeviceConfig = {
   id: "left" | "right";
   label: string;
   devicePath: string;
+  deviceId?: string;
+  labelMatch?: string;
   resolution: {
     width: number;
     height: number;
@@ -32,6 +34,7 @@ export const defaultLive3dConfig: Live3dConfig = {
       id: "left",
       label: "Left USB camera",
       devicePath: "/dev/video0",
+      labelMatch: "left",
       resolution: { width: 1280, height: 720 },
       fps: 60,
     },
@@ -39,6 +42,7 @@ export const defaultLive3dConfig: Live3dConfig = {
       id: "right",
       label: "Right USB camera",
       devicePath: "/dev/video2",
+      labelMatch: "right",
       resolution: { width: 1280, height: 720 },
       fps: 60,
     },

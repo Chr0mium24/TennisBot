@@ -1,5 +1,11 @@
 import { defaultLive3dConfig, describeFixtureMode } from "./config";
 import {
+  attachCameraStream,
+  startStereoCameraRuntime,
+  type CameraRuntimeStatus,
+  type StereoCameraRuntimeStatus,
+} from "./cameras";
+import {
   BrowserFetchJsonReader,
   loadStereoCalibrationArtifactStatus,
   loadYoloArtifactStatus,
@@ -42,15 +48,23 @@ function renderCameraPanel(camera: CameraFixture, side: "left" | "right"): strin
     <section class="camera-panel" aria-label="${camera.name}">
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">${side} feed</p>
+          <p class="eyebrow">${side} live feed</p>
           <h2>${camera.name}</h2>
         </div>
         <span class="device-pill">${camera.frameLabel}</span>
       </div>
       <div class="camera-frame">
+        <video
+          id="${side}-camera-video"
+          class="camera-video"
+          aria-label="${side} USB camera video"
+          muted
+          autoplay
+          playsinline
+        ></video>
         <div class="frame-grid"></div>
         <div class="frame-horizon"></div>
-        <div class="frame-label">USB camera frame placeholder</div>
+        <div class="frame-label">Fixture detections overlay only; not YOLO validation</div>
         ${camera.detections.map(detectionToBox).map(renderDetection).join("")}
       </div>
     </section>
@@ -86,8 +100,8 @@ function renderScene(): string {
     <section class="scene-panel" aria-label="3D scene placeholder">
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">fixture-only 3D scene</p>
-          <h2>Ball trail and prediction placeholder</h2>
+          <p class="eyebrow">fixture-only non-validation 3D scene</p>
+          <h2>Ball trail and prediction placeholder until YOLO inference is added</h2>
         </div>
         <span class="device-pill">${fixture.scene.prediction.model}</span>
       </div>
@@ -123,6 +137,7 @@ function formatPoint(point: Point3d): string {
 }
 
 function renderStatusPanel(
+  cameraStatus: StereoCameraRuntimeStatus,
   yoloStatus: YoloArtifactLoadStatus,
   calibrationStatus: StereoCalibrationArtifactLoadStatus,
 ): string {
@@ -136,12 +151,12 @@ function renderStatusPanel(
       </div>
       <div class="config-list">
         <div>
-          <span>Left camera</span>
-          <strong>${defaultLive3dConfig.cameras.left.devicePath}</strong>
+          <span>Left camera config</span>
+          <strong>${formatCameraConfig(defaultLive3dConfig.cameras.left)}</strong>
         </div>
         <div>
-          <span>Right camera</span>
-          <strong>${defaultLive3dConfig.cameras.right.devicePath}</strong>
+          <span>Right camera config</span>
+          <strong>${formatCameraConfig(defaultLive3dConfig.cameras.right)}</strong>
         </div>
         <div>
           <span>YOLO package</span>
@@ -152,6 +167,10 @@ function renderStatusPanel(
           <strong>${defaultLive3dConfig.artifacts.stereoCalibrationPackagePath}</strong>
         </div>
       </div>
+      <section class="camera-status" aria-label="Camera runtime status">
+        ${renderCameraRuntimeStatus(cameraStatus.left)}
+        ${renderCameraRuntimeStatus(cameraStatus.right)}
+      </section>
       <section class="artifact-status" aria-label="Artifact status">
         ${renderYoloArtifactStatus(yoloStatus)}
         ${renderCalibrationArtifactStatus(calibrationStatus)}
@@ -172,6 +191,32 @@ function renderStatusPanel(
           .join("")}
       </ol>
     </aside>
+  `;
+}
+
+function formatCameraConfig(camera: (typeof defaultLive3dConfig.cameras)["left"]): string {
+  const browserHints = [
+    camera.deviceId === undefined ? undefined : `deviceId=${camera.deviceId}`,
+    camera.labelMatch === undefined ? undefined : `label~${camera.labelMatch}`,
+  ].filter((item): item is string => item !== undefined);
+  return [
+    camera.devicePath,
+    `${camera.resolution.width}x${camera.resolution.height}@${camera.fps}`,
+    ...browserHints,
+  ].join(" ");
+}
+
+function renderCameraRuntimeStatus(status: CameraRuntimeStatus): string {
+  return `
+    <article class="runtime-card runtime-${status.state}">
+      <h3>${escapeHtml(status.label)}</h3>
+      <p>${escapeHtml(status.detail)}</p>
+      ${
+        status.deviceId === undefined
+          ? ""
+          : `<small>${escapeHtml(status.deviceLabel || status.deviceId)}</small>`
+      }
+    </article>
   `;
 }
 
@@ -254,6 +299,7 @@ function escapeHtml(value: string): string {
 }
 
 function renderApp(
+  cameraStatus: StereoCameraRuntimeStatus,
   yoloStatus: YoloArtifactLoadStatus,
   calibrationStatus: StereoCalibrationArtifactLoadStatus,
 ): string {
@@ -272,7 +318,7 @@ function renderApp(
           ${renderCameraPanel(fixture.cameras.right, "right")}
           ${renderScene()}
         </div>
-        ${renderStatusPanel(yoloStatus, calibrationStatus)}
+        ${renderStatusPanel(cameraStatus, yoloStatus, calibrationStatus)}
       </section>
     </main>
   `;
@@ -284,7 +330,8 @@ if (!app) {
   throw new Error("Missing #app mount point");
 }
 
-const [yoloStatus, calibrationStatus] = await Promise.all([
+const [cameraStatus, yoloStatus, calibrationStatus] = await Promise.all([
+  startStereoCameraRuntime(globalThis.navigator?.mediaDevices, defaultLive3dConfig),
   loadYoloArtifactStatus(artifactReader, defaultLive3dConfig.artifacts.yoloModelPackagePath),
   loadStereoCalibrationArtifactStatus(
     artifactReader,
@@ -292,4 +339,16 @@ const [yoloStatus, calibrationStatus] = await Promise.all([
   ),
 ]);
 
-app.innerHTML = renderApp(yoloStatus, calibrationStatus);
+app.innerHTML = renderApp(cameraStatus, yoloStatus, calibrationStatus);
+
+if (cameraStatus.state === "ready") {
+  const leftVideo = document.querySelector<HTMLVideoElement>("#left-camera-video");
+  const rightVideo = document.querySelector<HTMLVideoElement>("#right-camera-video");
+
+  if (leftVideo !== null) {
+    attachCameraStream(leftVideo, cameraStatus.streams.left);
+  }
+  if (rightVideo !== null) {
+    attachCameraStream(rightVideo, cameraStatus.streams.right);
+  }
+}
