@@ -5,11 +5,13 @@ const distDir = resolve(import.meta.dirname, "..", "dist");
 const artifactsDir = resolve(import.meta.dirname, "..", "..", "..", "artifacts");
 const port = Number(process.env.PORT ?? 5178);
 
-function contentType(pathname) {
+export function contentType(pathname) {
   if (pathname.endsWith(".html")) return "text/html; charset=utf-8";
   if (pathname.endsWith(".js")) return "text/javascript; charset=utf-8";
+  if (pathname.endsWith(".mjs")) return "text/javascript; charset=utf-8";
   if (pathname.endsWith(".css")) return "text/css; charset=utf-8";
   if (pathname.endsWith(".json")) return "application/json; charset=utf-8";
+  if (pathname.endsWith(".wasm")) return "application/wasm";
   return "application/octet-stream";
 }
 
