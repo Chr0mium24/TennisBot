@@ -21,6 +21,11 @@ export type OrtSession = {
 };
 
 export type OrtRuntime = {
+  env?: {
+    wasm?: {
+      wasmPaths?: string | Record<string, string>;
+    };
+  };
   readonly Tensor: new (
     type: "float32",
     data: Float32Array,
@@ -164,6 +169,7 @@ export class OnnxYoloInferenceBackend implements YoloInferenceBackend {
     if (this.session !== undefined) {
       return this.session;
     }
+    configureOrtWasmPaths(this.runtime);
     this.sessionPromise ??= this.runtime.InferenceSession.create(this.modelUrl, {
       executionProviders: ["wasm"],
     });
@@ -235,6 +241,13 @@ export function postprocessYoloOutput(
   if (!rows.ok) {
     return rows;
   }
+  if (rows.rows.some((row) => row.length > 6)) {
+    return {
+      ok: false,
+      message:
+        "Unsupported YOLO ONNX output row width for single-class tennis_ball. Expected xywh+score or xywh+objectness+class0 score.",
+    };
+  }
 
   const boxes = rows.rows
     .map((row) => decodeYoloRow(row, letterbox, options.classId))
@@ -274,13 +287,23 @@ export function createLetterboxTransform(options: {
 }
 
 function validateMetadata(metadata: YoloModelArtifactMetadata): string | undefined {
-  if (metadata.modelRuntime !== "onnxruntime" && !metadata.modelPath.endsWith(".onnx")) {
+  if (metadata.modelRuntime !== "onnxruntime" || !metadata.modelPath.endsWith(".onnx")) {
     return `YOLO artifact selected model '${metadata.selectedModel}' is not ONNX-compatible: runtime=${metadata.modelRuntime}, path=${metadata.modelPath}`;
   }
   if (metadata.classId !== 0 || metadata.labels[0] !== "tennis_ball") {
     return "YOLO artifact must expose class 0 as tennis_ball for Live3D runtime detections.";
   }
+  if (!["RGB", "BGR"].includes(metadata.inputColor.toUpperCase())) {
+    return `YOLO artifact input_color '${metadata.inputColor}' is unsupported. Expected RGB or BGR.`;
+  }
   return undefined;
+}
+
+function configureOrtWasmPaths(runtime: OrtRuntime): void {
+  if (runtime.env?.wasm === undefined || runtime.env.wasm.wasmPaths !== undefined) {
+    return;
+  }
+  runtime.env.wasm.wasmPaths = "/assets/";
 }
 
 function selectOutputTensor(
@@ -435,25 +458,45 @@ function decodeYoloRow(
   }
 
   const [xCenter, yCenter, width, height] = row;
-  const confidence = row.length === 5 ? row[4] : Math.max(row[4] ?? 0, row[5] ?? 0);
+  const confidence = decodeSingleClassConfidence(row);
   if (![xCenter, yCenter, width, height, confidence].every(Number.isFinite)) {
     return null;
   }
 
   const xMin = (xCenter - width / 2 - letterbox.padX) / letterbox.scale;
   const yMin = (yCenter - height / 2 - letterbox.padY) / letterbox.scale;
-  const boxWidth = width / letterbox.scale;
-  const boxHeight = height / letterbox.scale;
+  const xMax = (xCenter + width / 2 - letterbox.padX) / letterbox.scale;
+  const yMax = (yCenter + height / 2 - letterbox.padY) / letterbox.scale;
+  const clippedXMin = clamp(xMin, 0, letterbox.sourceWidth);
+  const clippedYMin = clamp(yMin, 0, letterbox.sourceHeight);
+  const clippedXMax = clamp(xMax, 0, letterbox.sourceWidth);
+  const clippedYMax = clamp(yMax, 0, letterbox.sourceHeight);
+  const boxWidth = clippedXMax - clippedXMin;
+  const boxHeight = clippedYMax - clippedYMin;
+
+  if (boxWidth <= 0 || boxHeight <= 0) {
+    return null;
+  }
 
   return {
     classId,
     label: "tennis_ball",
     confidence,
-    xPx: clamp(xMin, 0, letterbox.sourceWidth),
-    yPx: clamp(yMin, 0, letterbox.sourceHeight),
-    widthPx: clamp(boxWidth, 0, letterbox.sourceWidth),
-    heightPx: clamp(boxHeight, 0, letterbox.sourceHeight),
+    xPx: clippedXMin,
+    yPx: clippedYMin,
+    widthPx: boxWidth,
+    heightPx: boxHeight,
   };
+}
+
+function decodeSingleClassConfidence(row: number[]): number {
+  if (row.length === 5) {
+    return row[4] ?? Number.NaN;
+  }
+  if (row.length === 6) {
+    return (row[4] ?? Number.NaN) * (row[5] ?? Number.NaN);
+  }
+  return Number.NaN;
 }
 
 function nonMaxSuppression(

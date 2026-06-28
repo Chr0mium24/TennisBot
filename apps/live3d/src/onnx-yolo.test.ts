@@ -47,7 +47,7 @@ describe("Live3D ONNX YOLO backend", () => {
     expect(result.tensorData[0]).toBeCloseTo(114 / 255);
   });
 
-  test("postprocesses [1,N,6] YOLO output and applies NMS", () => {
+  test("postprocesses [1,N,6] YOLO output with objectness and applies NMS", () => {
     const letterbox = createLetterboxTransform({
       sourceWidth: 640,
       sourceHeight: 480,
@@ -58,8 +58,8 @@ describe("Live3D ONNX YOLO backend", () => {
       {
         dims: [1, 3, 6],
         data: new Float32Array([
-          320, 320, 64, 64, 0.9, 0.9,
-          322, 322, 64, 64, 0.8, 0.8,
+          320, 320, 64, 64, 0.95, 0.9,
+          322, 322, 64, 64, 0.8, 0.7,
           100, 120, 20, 20, 0.04, 0.04,
         ]),
       },
@@ -81,7 +81,7 @@ describe("Live3D ONNX YOLO backend", () => {
     expect(result.boxes[0]).toMatchObject({
       classId: 0,
       label: "tennis_ball",
-      confidence: expect.closeTo(0.9, 5),
+      confidence: expect.closeTo(0.855, 5),
       xPx: 288,
       yPx: 208,
       widthPx: 64,
@@ -98,8 +98,8 @@ describe("Live3D ONNX YOLO backend", () => {
           60, 160,
           20, 30,
           10, 40,
-          0.3, 0.7,
-          0.3, 0.7,
+          0.3, 0.9,
+          0.3, 0.8,
         ]),
       },
       createLetterboxTransform({
@@ -125,10 +125,82 @@ describe("Live3D ONNX YOLO backend", () => {
     expect(result.boxes[0].yPx).toBe(140);
   });
 
+  test("blocks multi-class ONNX rows for the current single-class runtime", () => {
+    const result = postprocessYoloOutput(
+      {
+        dims: [1, 1, 7],
+        data: new Float32Array([100, 100, 20, 20, 0.9, 0.8, 0.7]),
+      },
+      createLetterboxTransform({
+        sourceWidth: 200,
+        sourceHeight: 200,
+        inputWidth: 200,
+        inputHeight: 200,
+      }),
+      {
+        classId: 0,
+        confidenceThreshold: 0.5,
+        nmsIouThreshold: 0.5,
+        maxDetections: 10,
+      },
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.message).toContain("single-class tennis_ball");
+    }
+  });
+
+  test("clips decoded boxes at source-frame boundaries", () => {
+    const result = postprocessYoloOutput(
+      {
+        dims: [1, 1, 5],
+        data: new Float32Array([5, 5, 40, 40, 0.9]),
+      },
+      createLetterboxTransform({
+        sourceWidth: 100,
+        sourceHeight: 100,
+        inputWidth: 100,
+        inputHeight: 100,
+      }),
+      {
+        classId: 0,
+        confidenceThreshold: 0.5,
+        nmsIouThreshold: 0.5,
+        maxDetections: 10,
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.boxes[0]).toMatchObject({
+        xPx: 0,
+        yPx: 0,
+        widthPx: 25,
+        heightPx: 25,
+      });
+    }
+  });
+
   test("returns blocked status for unsupported runtime before loading a session", async () => {
     const backend = new OnnxYoloInferenceBackend({
       packagePath: "/artifacts/models/tennis_ball_yolo",
       metadata: { ...metadata(), modelRuntime: "rknn", modelPath: "model.rknn" },
+      runtime: fakeRuntime(sessionWithOutput([1, 0, 6], [])),
+    });
+
+    const result = await backend.infer(frame());
+
+    expect(result.status).toBe("blocked");
+    if (result.status === "blocked") {
+      expect(result.message).toContain("not ONNX-compatible");
+    }
+  });
+
+  test("returns blocked status when runtime and model extension disagree", async () => {
+    const backend = new OnnxYoloInferenceBackend({
+      packagePath: "/artifacts/models/tennis_ball_yolo",
+      metadata: { ...metadata(), modelRuntime: "rknn", modelPath: "model.onnx" },
       runtime: fakeRuntime(sessionWithOutput([1, 0, 6], [])),
     });
 
@@ -172,11 +244,12 @@ describe("Live3D ONNX YOLO backend", () => {
     expect(runtime.createdModelUrls).toEqual([
       "/artifacts/models/tennis_ball_yolo/model.onnx",
     ]);
+    expect(runtime.env.wasm.wasmPaths).toBe("/assets/");
     expect(session.lastFeedDims).toEqual([1, 3, 320, 320]);
     expect(result.status).toBe("ok");
     if (result.status === "ok") {
       expect(result.boxes).toHaveLength(1);
-      expect(result.boxes[0].confidence).toBeCloseTo(0.95);
+      expect(result.boxes[0].confidence).toBeCloseTo(0.9025);
       expect(result.boxes[0].xPx).toBe(144);
       expect(result.boxes[0].yPx).toBe(104);
     }
@@ -215,9 +288,13 @@ function metadata(): YoloModelArtifactMetadata {
   };
 }
 
-function fakeRuntime(session: FakeSession): OrtRuntime & { createdModelUrls: string[] } {
+function fakeRuntime(session: FakeSession): OrtRuntime & {
+  createdModelUrls: string[];
+  env: { wasm: { wasmPaths?: string | Record<string, string> } };
+} {
   const createdModelUrls: string[] = [];
   return {
+    env: { wasm: {} },
     createdModelUrls,
     Tensor: class FakeTensor implements OrtTensor {
       constructor(

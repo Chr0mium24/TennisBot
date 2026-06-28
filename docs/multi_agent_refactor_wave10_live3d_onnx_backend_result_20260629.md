@@ -30,6 +30,12 @@ and NMS, and returns source-frame tennis-ball boxes.
   missing outputs, and unsupported output shapes.
 - `apps/live3d/scripts/copy-static.js` copies ONNX Runtime Web wasm/mjs sidecar
   files into `dist/assets` for the browser bundle.
+- Lead review tightened browser runtime handling by serving `.mjs` and `.wasm`
+  sidecars with browser-compatible MIME types, configuring ORT wasm sidecar
+  loading from `/assets/`, requiring both `runtime=onnxruntime` and a `.onnx`
+  model path, blocking multi-class rows for the current single-class runtime,
+  combining objectness and class score for `[1,N,6]` output, and clipping decoded
+  boxes at source-frame boundaries.
 
 ## Not Yet Physically Validated
 
@@ -53,4 +59,6 @@ cd apps/live3d && bun run build
 git diff --check
 ```
 
-Observed test result: 29 passing tests, 0 failures.
+Observed worker test result: 29 passing tests, 0 failures.
+
+Lead review result after runtime fixes: 33 passing tests, 0 failures.

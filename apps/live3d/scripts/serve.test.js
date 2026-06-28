@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { resolveStaticRequestPath } from "./serve.js";
+import { contentType, resolveStaticRequestPath } from "./serve.js";
 
 describe("Live3D dev server path mapping", () => {
   test("serves /artifacts only from the repo-root artifacts directory", () => {
@@ -57,5 +57,12 @@ describe("Live3D dev server path mapping", () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  test("serves ONNX Runtime Web sidecars with browser-compatible MIME types", () => {
+    expect(contentType("/assets/ort-wasm-simd-threaded.mjs")).toBe(
+      "text/javascript; charset=utf-8",
+    );
+    expect(contentType("/assets/ort-wasm-simd-threaded.wasm")).toBe("application/wasm");
   });
 });
