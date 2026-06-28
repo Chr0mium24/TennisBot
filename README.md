@@ -48,6 +48,8 @@ uv run camera-calib-lab --help
 - [Multi-agent refactor Wave 2 core migration plan](docs/multi_agent_refactor_wave2_core_migration_plan_20260628.md)
 - [Multi-agent refactor Wave 2 core migration result](docs/multi_agent_refactor_wave2_core_migration_result_20260628.md)
 - [Multi-agent refactor Wave 3 Live3D core fixture plan](docs/multi_agent_refactor_wave3_live3d_core_fixture_plan_20260628.md)
+- [Multi-agent refactor Wave 3 Live3D core fixture result](docs/multi_agent_refactor_wave3_live3d_core_fixture_result_20260628.md)
+- [Multi-agent refactor Wave 3 Live3D core fixture review](docs/multi_agent_refactor_wave3_live3d_core_fixture_review_20260628.md)
 
 ## Git Workflow
 
