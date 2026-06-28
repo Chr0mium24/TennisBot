@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+import math
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -144,22 +145,19 @@ def verify_model_package(package_dir: Path) -> None:
     postprocessing_path = _package_file(package_dir, package_json.get("postprocessing"), "postprocessing.json")
     postprocessing_json = _load_json(postprocessing_path, errors)
     threshold = postprocessing_json.get("confidence_threshold") if isinstance(postprocessing_json, dict) else None
-    if not isinstance(threshold, (int, float)) or not 0 <= threshold <= 1:
+    if not is_finite_number(threshold) or not 0 <= threshold <= 1:
         errors.append("postprocessing.json.confidence_threshold must be between 0 and 1")
 
     models = package_json.get("models")
     default_model = package_json.get("default_model")
     if not isinstance(models, dict) or not models:
         errors.append("package.json.models must include at least one model entry")
-        selected = None
     elif not isinstance(default_model, str) or default_model not in models:
         errors.append("package.json.default_model must reference an existing model entry")
-        selected = None
-    else:
-        selected = models[default_model]
 
-    if selected is not None:
-        _verify_model_entry(package_dir, default_model, selected, errors)
+    if isinstance(models, dict):
+        for key, value in sorted(models.items()):
+            _verify_model_entry(package_dir, str(key), value, errors)
 
     if errors:
         raise PackageVerificationError(errors)
@@ -341,12 +339,7 @@ def _valid_input_size(preprocessing_json: Any) -> bool:
         return False
     width = input_size.get("width")
     height = input_size.get("height")
-    return (
-        isinstance(width, (int, float))
-        and isinstance(height, (int, float))
-        and width > 0
-        and height > 0
-    )
+    return is_finite_number(width) and is_finite_number(height) and width > 0 and height > 0
 
 
 def _verify_model_entry(package_dir: Path, key: str, selected: Any, errors: list[str]) -> None:
@@ -362,16 +355,20 @@ def _verify_model_entry(package_dir: Path, key: str, selected: Any, errors: list
         return
     if not isinstance(expected_sha256, str) or not expected_sha256:
         errors.append(f"package.json.models.{key}.sha256 must be a non-empty string")
-    if not isinstance(expected_bytes, (int, float)):
+    if not is_finite_number(expected_bytes):
         errors.append(f"package.json.models.{key}.bytes must be a finite number")
     if not isinstance(runtime, str) or not runtime:
         errors.append(f"package.json.models.{key}.runtime must be a non-empty string")
 
     full_path = package_dir / model_path
     if not full_path.is_file():
-        errors.append(f"missing selected model file: {model_path}")
+        errors.append(f"missing model file: {model_path}")
         return
-    if isinstance(expected_bytes, (int, float)) and full_path.stat().st_size != expected_bytes:
-        errors.append(f"selected model bytes mismatch: {model_path}")
+    if is_finite_number(expected_bytes) and full_path.stat().st_size != expected_bytes:
+        errors.append(f"model bytes mismatch: {model_path}")
     if isinstance(expected_sha256, str) and expected_sha256 and sha256_file(full_path) != expected_sha256:
-        errors.append(f"selected model sha256 mismatch: {model_path}")
+        errors.append(f"model sha256 mismatch: {model_path}")
+
+
+def is_finite_number(value: object) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)

@@ -87,7 +87,7 @@ def test_package_verification_rejects_missing_selected_model_file(tmp_path: Path
     with pytest.raises(PackageVerificationError) as exc_info:
         verify_model_package(output)
 
-    assert "missing selected model file" in str(exc_info.value)
+    assert "missing model file" in str(exc_info.value)
 
 
 def test_package_verification_rejects_checksum_mismatch(tmp_path: Path) -> None:
@@ -97,7 +97,38 @@ def test_package_verification_rejects_checksum_mismatch(tmp_path: Path) -> None:
     with pytest.raises(PackageVerificationError) as exc_info:
         verify_model_package(output)
 
-    assert "selected model sha256 mismatch" in str(exc_info.value)
+    assert "model sha256 mismatch" in str(exc_info.value)
+
+
+def test_package_verification_checks_all_declared_model_files(tmp_path: Path) -> None:
+    pt_fixture = tmp_path / "fixture.pt"
+    onnx_fixture = tmp_path / "fixture.onnx"
+    pt_fixture.write_bytes(b"fake pt bytes")
+    onnx_fixture.write_bytes(b"fake onnx bytes")
+    output = create_model_package(
+        tmp_path / "package",
+        model_pt=pt_fixture,
+        model_onnx=onnx_fixture,
+        default_model="onnx",
+    )
+    (output / "model.pt").unlink()
+
+    with pytest.raises(PackageVerificationError) as exc_info:
+        verify_model_package(output)
+
+    assert "missing model file: model.pt" in str(exc_info.value)
+
+
+def test_package_verification_rejects_boolean_model_bytes(tmp_path: Path) -> None:
+    output = create_model_package(tmp_path / "package", dry_run=True)
+    package_json = read_json(output / "package.json")
+    package_json["models"]["onnx"]["bytes"] = True
+    (output / "package.json").write_text(json.dumps(package_json), encoding="utf-8")
+
+    with pytest.raises(PackageVerificationError) as exc_info:
+        verify_model_package(output)
+
+    assert "package.json.models.onnx.bytes must be a finite number" in str(exc_info.value)
 
 
 def test_package_verification_rejects_labels_without_class_zero_tennis_ball(tmp_path: Path) -> None:
