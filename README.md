@@ -64,6 +64,7 @@ uv run camera-calib-lab --help
 - [Multi-agent refactor Wave 7 Live3D artifacts review](docs/multi_agent_refactor_wave7_live3d_artifacts_review_20260629.md)
 - [Multi-agent refactor Wave 8 Live3D USB camera plan](docs/multi_agent_refactor_wave8_live3d_usb_camera_plan_20260629.md)
 - [Multi-agent refactor Wave 8 Live3D USB camera result](docs/multi_agent_refactor_wave8_live3d_usb_camera_result_20260629.md)
+- [Multi-agent refactor Wave 8 Live3D USB camera review](docs/multi_agent_refactor_wave8_live3d_usb_camera_review_20260629.md)
 
 ## Git Workflow
 
