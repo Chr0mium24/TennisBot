@@ -5,6 +5,7 @@ import type {
   Matrix3x3,
   RectifiedStereoProjectionMatrices,
   PredictionCurve,
+  StereoPairingDiagnostics,
   StereoExtrinsics,
   TimestampedStereoDetectionPair,
   TriangulatedBallPoint3D,
@@ -111,6 +112,15 @@ describe('runtime data contracts', () => {
 
     expect(pair.left.label).toBe('tennis_ball');
     expect(point.sourcePairId).toBe(pair.pairId);
+
+    const pairingDiagnostics: StereoPairingDiagnostics = {
+      evaluatedCandidateCount: 4,
+      rejectedByTimestampCount: 1,
+      rejectedByEpipolarCount: 1,
+      rejectedByDisparityCount: 1,
+      bestCost: -0.7,
+    };
+    expect(pairingDiagnostics.rejectedByTimestampCount).toBe(1);
   });
 
   test('represents prediction curves and landing points', () => {

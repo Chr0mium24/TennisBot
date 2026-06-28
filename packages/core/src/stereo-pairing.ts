@@ -39,12 +39,19 @@ export function selectBestStereoPair(options: SelectStereoPairOptions): SelectSt
   let bestMatch: TimestampedStereoDetectionPair | null = null;
   let bestCost = Number.POSITIVE_INFINITY;
   let evaluatedCandidateCount = 0;
+  let rejectedByTimestampCount = 0;
   let rejectedByEpipolarCount = 0;
   let rejectedByDisparityCount = 0;
 
   for (const left of options.leftDetections) {
     for (const right of options.rightDetections) {
       evaluatedCandidateCount += 1;
+      const timestampDeltaMs = Math.abs(left.timestampUnixMs - right.timestampUnixMs);
+      if (timestampDeltaMs > options.maxTimestampDeltaMs) {
+        rejectedByTimestampCount += 1;
+        continue;
+      }
+
       const epipolarErrorPx = epipolarErrorRectified(left.centerPx, right.centerPx);
       if (epipolarErrorPx > spec.maxEpipolarErrorPx) {
         rejectedByEpipolarCount += 1;
@@ -85,6 +92,7 @@ export function selectBestStereoPair(options: SelectStereoPairOptions): SelectSt
     match: bestMatch,
     diagnostics: {
       evaluatedCandidateCount,
+      rejectedByTimestampCount,
       rejectedByEpipolarCount,
       rejectedByDisparityCount,
       bestCost: Number.isFinite(bestCost) ? bestCost : null,

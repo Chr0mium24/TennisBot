@@ -135,6 +135,10 @@ describe('stereo pairing', () => {
   test('selects the best candidate after epipolar and disparity filtering', () => {
     const leftA = makeDetection('left-a', 'cam-left', 690, 380, 0.6);
     const leftB = makeDetection('left-b', 'cam-left', 705, 382, 0.95);
+    const rightLate = {
+      ...makeDetection('right-late', 'cam-right', 605, 382, 0.99),
+      timestampUnixMs: 1710000000200,
+    };
     const rightBadEpipolar = makeDetection('right-bad-epi', 'cam-right', 590, 392, 0.99);
     const rightBadDisparity = makeDetection('right-bad-disp', 'cam-right', 704, 382, 0.99);
     const rightGood = makeDetection('right-good', 'cam-right', 605, 382.5, 0.9);
@@ -144,11 +148,12 @@ describe('stereo pairing', () => {
       timestampUnixMs: 1710000000000,
       maxTimestampDeltaMs: 8,
       leftDetections: [leftA, leftB],
-      rightDetections: [rightBadEpipolar, rightBadDisparity, rightGood],
+      rightDetections: [rightLate, rightBadEpipolar, rightBadDisparity, rightGood],
       spec: { maxEpipolarErrorPx: 3, minDisparityPx: 10, maxDisparityPx: 160, temporalWeight: 0.25 },
     });
 
-    expect(result.diagnostics.evaluatedCandidateCount).toBe(6);
+    expect(result.diagnostics.evaluatedCandidateCount).toBe(8);
+    expect(result.diagnostics.rejectedByTimestampCount).toBe(2);
     expect(result.match?.left.detectionId).toBe('left-b');
     expect(result.match?.right.detectionId).toBe('right-good');
     expect(result.match?.disparityPx).toBe(100);

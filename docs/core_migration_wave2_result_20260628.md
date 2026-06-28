@@ -15,6 +15,7 @@ TypeScript package APIs:
 - rectified stereo triangulation without OpenCV;
 - stereo detection pairing with epipolar, disparity, confidence, and temporal
   scoring;
+- stereo detection timestamp-delta filtering;
 - simple projectile prediction with trajectory samples and optional landing
   point.
 
@@ -60,6 +61,7 @@ Focused Bun tests cover:
 - average stereo reprojection error;
 - timestamped stereo pair triangulation diagnostics;
 - stereo pairing with competing candidates;
+- stereo pairing timestamp rejection;
 - temporal stereo pairing scoring;
 - projectile prediction landing time and landing point;
 - no-landing and invalid-input prediction behavior.

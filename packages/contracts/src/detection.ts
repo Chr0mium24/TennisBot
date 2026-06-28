@@ -26,6 +26,7 @@ export interface TimestampedStereoDetectionPair {
 
 export interface StereoPairingDiagnostics {
   evaluatedCandidateCount: number;
+  rejectedByTimestampCount: number;
   rejectedByEpipolarCount: number;
   rejectedByDisparityCount: number;
   bestCost: number | null;
