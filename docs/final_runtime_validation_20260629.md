@@ -12,10 +12,12 @@ This validation covers the current local-machine software architecture:
 - `tools/yolo`
 - `apps/live3d`
 
-It does not claim physical validation with real USB cameras or ROS/Gazebo catch
-control. A real local YOLO package and an imported real calibration package are
-available for runtime smoke testing, but the imported stereo calibration has
-quality warnings and must be revalidated before final 3D accuracy claims.
+It does not claim ROS/Gazebo catch control or final physical 3D accuracy. A
+real local YOLO package and an imported real calibration package are available
+for runtime smoke testing. Live3D has also opened two real USB cameras in
+Chrome and run the ONNX backend on live frames, but the current scene did not
+contain a detectable tennis ball and the imported stereo calibration has quality
+warnings.
 
 ## Verified Commands
 
@@ -48,7 +50,7 @@ bun run typecheck
 bun run build
 ```
 
-Result: 38 tests passed, typecheck passed, browser bundle built.
+Result: 39 tests passed, typecheck passed, browser bundle built.
 
 Dev server smoke:
 
@@ -61,6 +63,21 @@ curl -I http://localhost:5178/artifacts/calibration/stereo_cam1_cam2/package.jso
 ```
 
 Result: all HTTP checks returned `200 OK`.
+
+Hardware smoke:
+
+```bash
+v4l2-ctl --list-devices
+ffmpeg ... -i /dev/video0 ... -i /dev/video2 ...
+google-chrome --headless=new --use-fake-ui-for-media-stream ...
+```
+
+Result: two `USU Camera 4K` devices were enumerated, `/dev/video0` and
+`/dev/video2` were opened simultaneously, Chrome opened distinct left/right
+`MediaStream` tracks at 1280x720, and the ONNX backend ran continuously against
+live camera frames without ONNX session errors. The frames produced zero
+tennis-ball detections in the current scene, so runtime 3D remained waiting for
+a detection.
 
 ### Calibration Tool
 
@@ -124,6 +141,8 @@ Result: 12 tests passed. A real runtime YOLO package was written from
 - `artifacts/models/tennis_ball_yolo` now contains a real ONNX-default package.
 - `artifacts/calibration/stereo_cam1_cam2` now contains a real imported stereo
   package with explicit runtime quality warnings.
+- Live3D opened two real USB cameras in Chrome and ran the ONNX backend on live
+  browser frames without session concurrency errors.
 - Board-side runtime code is not part of the current active architecture.
 - The only dirty worktree entry after validation is the pre-existing
   `TennisBallDetectorLab` submodule state, which remains untouched.
@@ -132,9 +151,10 @@ Result: 12 tests passed. A real runtime YOLO package was written from
 
 Before claiming full real-world operation:
 
-1. Run Live3D against two physical USB cameras.
-2. Confirm browser ONNX detections on real camera frames.
-3. Confirm stereo 3D point stability and prediction quality.
-4. Re-run mono/stereo calibration if imported stereo quality remains poor.
-5. Validate ROS/Gazebo closed-loop catch behavior only after real visual
+1. Put a tennis ball in both USB camera views and confirm nonzero runtime
+   detections.
+2. Confirm runtime 3D scene, prediction curve, and landing marker update from
+   those detections.
+3. Re-run mono/stereo calibration if imported stereo quality remains poor.
+4. Validate ROS/Gazebo closed-loop catch behavior only after real visual
    tracking is stable.

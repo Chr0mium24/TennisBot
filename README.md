@@ -88,6 +88,7 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 - [Current architecture](docs/current_architecture_20260629.md)
 - [Final runtime validation](docs/final_runtime_validation_20260629.md)
 - [Physical artifact import](docs/physical_artifact_import_20260629.md)
+- [Live3D hardware smoke](docs/live3d_hardware_smoke_20260629.md)
 - [Architecture simplification plan](docs/architecture_simplification_plan_20260628.md)
 - [Multi-agent refactor task plan](docs/multi_agent_refactor_tasks_20260628.md)
 - [Multi-agent refactor Wave 1 result](docs/multi_agent_refactor_wave1_result_20260628.md)

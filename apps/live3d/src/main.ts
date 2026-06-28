@@ -47,6 +47,7 @@ declare global {
 
 const fixture = createFixture(defaultLive3dConfig);
 const artifactReader = new BrowserFetchJsonReader();
+const YOLO_LOOP_DELAY_MS = 250;
 
 function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
@@ -220,6 +221,7 @@ function renderStatusPanel(
   yoloStatus: YoloArtifactLoadStatus,
   calibrationStatus: StereoCalibrationArtifactLoadStatus,
   runtime3dState: Runtime3dState,
+  yoloLoopActive: boolean,
 ): string {
   return `
     <aside class="status-panel" aria-label="Runtime status">
@@ -252,7 +254,7 @@ function renderStatusPanel(
         ${renderCameraRuntimeStatus(cameraStatus.left)}
         ${renderCameraRuntimeStatus(cameraStatus.right)}
       </section>
-      ${renderYoloControls(cameraStatus, detectionStatus, yoloStatus)}
+      ${renderYoloControls(cameraStatus, detectionStatus, yoloStatus, yoloLoopActive)}
       <section class="camera-status" aria-label="YOLO inference runtime status">
         ${renderYoloInferenceRuntimeStatus(detectionStatus.left)}
         ${renderYoloInferenceRuntimeStatus(detectionStatus.right)}
@@ -285,12 +287,14 @@ function renderYoloControls(
   cameraStatus: StereoCameraRuntimeStatus,
   detectionStatus: StereoYoloInferenceRuntimeStatus,
   yoloStatus: YoloArtifactLoadStatus,
+  yoloLoopActive: boolean,
 ): string {
   const isRunning =
     detectionStatus.left.state === "running" || detectionStatus.right.state === "running";
-  const startDisabled = isRunning || cameraStatus.state !== "ready" || yoloStatus.status !== "loaded";
+  const startDisabled =
+    yoloLoopActive || isRunning || cameraStatus.state !== "ready" || yoloStatus.status !== "loaded";
   const stopDisabled =
-    detectionStatus.left.state === "idle" && detectionStatus.right.state === "idle";
+    !yoloLoopActive && detectionStatus.left.state === "idle" && detectionStatus.right.state === "idle";
 
   return `
     <div class="camera-controls" aria-label="YOLO inference controls">
@@ -459,6 +463,7 @@ function renderApp(
   yoloStatus: YoloArtifactLoadStatus,
   calibrationStatus: StereoCalibrationArtifactLoadStatus,
   runtime3dState: Runtime3dState,
+  yoloLoopActive: boolean,
 ): string {
   return `
     <main class="app-shell">
@@ -475,7 +480,7 @@ function renderApp(
           ${renderCameraPanel(fixture.cameras.right, "right", detectionStatus.right)}
           ${renderScene(runtime3dState)}
         </div>
-        ${renderStatusPanel(cameraStatus, detectionStatus, yoloStatus, calibrationStatus, runtime3dState)}
+        ${renderStatusPanel(cameraStatus, detectionStatus, yoloStatus, calibrationStatus, runtime3dState, yoloLoopActive)}
       </section>
     </main>
   `;
@@ -502,6 +507,8 @@ let cameraStatus: StereoCameraRuntimeStatus = createStereoCameraIdleStatus(defau
 let detectionStatus: StereoYoloInferenceRuntimeStatus = createStereoYoloInferenceIdleStatus();
 let runtime3dState: Runtime3dState = createInitialRuntime3dState();
 let yoloRunSerial = 0;
+let yoloLoopActive = false;
+let yoloLoopTimeout: ReturnType<typeof globalThis.setTimeout> | undefined;
 
 function renderCurrentApp(): void {
   appElement.innerHTML = renderApp(
@@ -510,6 +517,7 @@ function renderCurrentApp(): void {
     yoloStatus,
     calibrationStatus,
     runtime3dState,
+    yoloLoopActive,
   );
   bindCameraControls();
   bindYoloControls();
@@ -563,9 +571,19 @@ async function startYoloInferenceFromUserAction(): Promise<void> {
     return;
   }
 
-  const timestampUnixMs = Date.now();
   const runSerial = yoloRunSerial + 1;
   yoloRunSerial = runSerial;
+  yoloLoopActive = true;
+  scheduleYoloInferenceIteration(runSerial, 0);
+  renderCurrentApp();
+}
+
+async function runYoloInferenceIteration(runSerial: number): Promise<void> {
+  if (runSerial !== yoloRunSerial || !yoloLoopActive || cameraStatus.state !== "ready") {
+    return;
+  }
+
+  const timestampUnixMs = Date.now();
   const leftFrameId = `left-${timestampUnixMs}`;
   const rightFrameId = `right-${timestampUnixMs}`;
   detectionStatus = {
@@ -596,7 +614,7 @@ async function startYoloInferenceFromUserAction(): Promise<void> {
     }),
   ]);
 
-  if (runSerial !== yoloRunSerial || cameraStatus.state !== "ready") {
+  if (runSerial !== yoloRunSerial || !yoloLoopActive || cameraStatus.state !== "ready") {
     return;
   }
 
@@ -610,10 +628,29 @@ async function startYoloInferenceFromUserAction(): Promise<void> {
     timestampUnixMs,
   });
   renderCurrentApp();
+  scheduleYoloInferenceIteration(runSerial, YOLO_LOOP_DELAY_MS);
+}
+
+function scheduleYoloInferenceIteration(runSerial: number, delayMs: number): void {
+  if (runSerial !== yoloRunSerial || !yoloLoopActive) {
+    return;
+  }
+  if (yoloLoopTimeout !== undefined) {
+    globalThis.clearTimeout(yoloLoopTimeout);
+  }
+  yoloLoopTimeout = globalThis.setTimeout(() => {
+    yoloLoopTimeout = undefined;
+    void runYoloInferenceIteration(runSerial);
+  }, delayMs);
 }
 
 function stopYoloInferenceFromUserAction(): void {
   yoloRunSerial += 1;
+  yoloLoopActive = false;
+  if (yoloLoopTimeout !== undefined) {
+    globalThis.clearTimeout(yoloLoopTimeout);
+    yoloLoopTimeout = undefined;
+  }
   yoloBackend.stop?.();
   detectionStatus = createStereoYoloInferenceIdleStatus();
   runtime3dState = createInitialRuntime3dState();

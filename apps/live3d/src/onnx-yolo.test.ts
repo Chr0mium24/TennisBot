@@ -254,6 +254,30 @@ describe("Live3D ONNX YOLO backend", () => {
       expect(result.boxes[0].yPx).toBe(104);
     }
   });
+
+  test("serializes concurrent inference calls against one ORT session", async () => {
+    const session = concurrentSensitiveSessionWithOutput(
+      [1, 1, 6],
+      [160, 160, 32, 32, 0.95, 0.95],
+    );
+    const runtime = fakeRuntime(session);
+    const backend = new OnnxYoloInferenceBackend({
+      packagePath: "/artifacts/models/tennis_ball_yolo",
+      metadata: metadata(),
+      runtime,
+    });
+
+    const [left, right] = await Promise.all([
+      backend.infer({ ...frame(), side: "left", frameId: "left-frame" }),
+      backend.infer({ ...frame(), side: "right", frameId: "right-frame" }),
+    ]);
+
+    expect(runtime.createdModelUrls).toHaveLength(1);
+    expect(session.runCount).toBe(2);
+    expect(session.maxConcurrentRuns).toBe(1);
+    expect(left.status).toBe("ok");
+    expect(right.status).toBe("ok");
+  });
 });
 
 function frame(): YoloInferenceFrame {
@@ -313,6 +337,10 @@ function fakeRuntime(session: FakeSession): OrtRuntime & {
 }
 
 type FakeSession = OrtSession & { lastFeedDims?: readonly number[] };
+type ConcurrentSensitiveFakeSession = FakeSession & {
+  runCount: number;
+  maxConcurrentRuns: number;
+};
 
 function sessionWithOutput(dims: number[], data: number[]): FakeSession {
   return {
@@ -326,6 +354,39 @@ function sessionWithOutput(dims: number[], data: number[]): FakeSession {
           data: new Float32Array(data),
         },
       };
+    },
+  };
+}
+
+function concurrentSensitiveSessionWithOutput(
+  dims: number[],
+  data: number[],
+): ConcurrentSensitiveFakeSession {
+  let activeRuns = 0;
+  return {
+    inputNames: ["images"],
+    outputNames: ["output0"],
+    runCount: 0,
+    maxConcurrentRuns: 0,
+    async run(feeds): Promise<Record<string, OrtTensor>> {
+      this.runCount += 1;
+      activeRuns += 1;
+      this.maxConcurrentRuns = Math.max(this.maxConcurrentRuns, activeRuns);
+      if (activeRuns > 1) {
+        throw new Error("session run was called concurrently");
+      }
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        this.lastFeedDims = feeds.images.dims;
+        return {
+          output0: {
+            dims,
+            data: new Float32Array(data),
+          },
+        };
+      } finally {
+        activeRuns -= 1;
+      }
     },
   };
 }

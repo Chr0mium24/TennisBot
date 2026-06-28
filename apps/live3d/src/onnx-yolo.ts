@@ -77,6 +77,7 @@ export class OnnxYoloInferenceBackend implements YoloInferenceBackend {
   private readonly maxDetections: number;
   private sessionPromise?: Promise<OrtSession>;
   private session?: OrtSession;
+  private inferenceLock: Promise<void> = Promise.resolve();
 
   constructor(private readonly options: OnnxYoloBackendOptions) {
     this.runtime = options.runtime ?? (ort as unknown as OrtRuntime);
@@ -132,7 +133,7 @@ export class OnnxYoloInferenceBackend implements YoloInferenceBackend {
 
     let outputs: Record<string, OrtTensor>;
     try {
-      outputs = await session.run({ [inputName]: inputTensor });
+      outputs = await this.runSessionExclusive(session, { [inputName]: inputTensor });
     } catch (error) {
       return {
         status: "blocked",
@@ -162,6 +163,7 @@ export class OnnxYoloInferenceBackend implements YoloInferenceBackend {
     const session = this.session;
     this.session = undefined;
     this.sessionPromise = undefined;
+    this.inferenceLock = Promise.resolve();
     void session?.release?.();
   }
 
@@ -175,6 +177,24 @@ export class OnnxYoloInferenceBackend implements YoloInferenceBackend {
     });
     this.session = await this.sessionPromise;
     return this.session;
+  }
+
+  private async runSessionExclusive(
+    session: OrtSession,
+    feeds: Record<string, OrtTensor>,
+  ): Promise<Record<string, OrtTensor>> {
+    let releaseLock: () => void = () => undefined;
+    const previousLock = this.inferenceLock;
+    this.inferenceLock = new Promise<void>((resolve) => {
+      releaseLock = resolve;
+    });
+
+    await previousLock;
+    try {
+      return await session.run(feeds);
+    } finally {
+      releaseLock();
+    }
   }
 }
 

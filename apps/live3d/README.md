@@ -18,12 +18,13 @@ calibration, then runs them through `packages/core` stereo pairing,
 triangulation, and trajectory prediction before rendering the fallback result.
 
 The UI can open browser camera streams, validate YOLO/calibration artifact
-metadata, and run a `YoloInferenceBackend` against the current left and right
-video elements. When the YOLO artifact package is loaded and its selected model
-is ONNX-compatible, the default backend uses `onnxruntime-web` to load the model,
-preprocess a readable frame, run `session.run`, and postprocess tennis-ball
-detections. If the artifact package is missing or blocked, the backend remains
-explicitly blocked.
+metadata, and run a `YoloInferenceBackend` loop against the current left and
+right video elements. When the YOLO artifact package is loaded and its selected
+model is ONNX-compatible, the default backend uses `onnxruntime-web` to load the
+model, preprocess readable frames, run `session.run`, and postprocess
+tennis-ball detections. The backend serializes ONNX session runs so left/right
+camera inference does not call the same WASM session concurrently. If the
+artifact package is missing or blocked, the backend remains explicitly blocked.
 
 Fixture overlays and the fixture 3D scene remain explicitly labelled
 fixture-only. Runtime overlays are rendered only when the ONNX or injected
@@ -32,9 +33,11 @@ and the stereo calibration package is loaded, the app selects a stereo pair,
 triangulates a runtime 3D ball point, maintains a runtime trail, and renders a
 runtime prediction/landing once at least two runtime points are available.
 
-This implements the browser software path, but it has not been physically
-validated with the exported ONNX model, real USB camera frames, real calibration
-artifacts, or the ROS/Gazebo-controlled catch loop.
+This implements the browser software path. Hardware smoke has opened two real
+USB cameras in Chrome and run the exported ONNX model on live frames. The
+current scene did not contain a detectable tennis ball, so runtime ball
+detections, 3D point stability, and prediction updates still need a ball-in-view
+validation pass.
 
 ## Config placeholders
 
