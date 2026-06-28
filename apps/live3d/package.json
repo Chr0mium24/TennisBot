@@ -1,0 +1,16 @@
+{
+  "name": "@tennisbot/live3d",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run build && bun ./scripts/serve.js",
+    "build": "bun run typecheck && bun build ./src/main.ts --target browser --outdir ./dist/assets && bun ./scripts/copy-static.js",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "typescript": "^5.8.0"
+  }
+}
