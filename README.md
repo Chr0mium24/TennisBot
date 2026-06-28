@@ -54,6 +54,8 @@ uv run camera-calib-lab --help
 - [Multi-agent refactor Wave 4 artifact loaders result](docs/multi_agent_refactor_wave4_artifact_loaders_result_20260628.md)
 - [Multi-agent refactor Wave 4 artifact loaders review](docs/multi_agent_refactor_wave4_artifact_loaders_review_20260628.md)
 - [Multi-agent refactor Wave 5 calibration tool plan](docs/multi_agent_refactor_wave5_calibration_tool_plan_20260629.md)
+- [Multi-agent refactor Wave 5 calibration tool result](docs/multi_agent_refactor_wave5_calibration_tool_result_20260629.md)
+- [Multi-agent refactor Wave 5 calibration tool review](docs/multi_agent_refactor_wave5_calibration_tool_review_20260629.md)
 
 ## Git Workflow
 

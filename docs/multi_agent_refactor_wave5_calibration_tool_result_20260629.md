@@ -23,6 +23,10 @@ Date: 2026-06-29
 - Added focused tests for CLI help, generated packages, verification rejection,
   and row-major rectification matrices.
 
+Lead review tightened the final merged version to also reject stereo packages
+whose `verification.json` omits `rectification.accepted: true`. It also rejects
+boolean values inside numeric rectification matrices.
+
 ## Verification
 
 Completed local run:
@@ -30,7 +34,7 @@ Completed local run:
 ```bash
 cd tools/calibration
 uv sync                                            # passed
-uv run pytest -q                                  # 7 passed
+uv run pytest -q                                  # 8 passed after lead review
 uv run tennisbot-calibration --help               # lists gui mono, gui stereo, package verify
 uv run tennisbot-calibration gui mono --camera-id cam1 --output ../../artifacts/calibration/cam1 --dry-run
 uv run tennisbot-calibration gui mono --camera-id cam2 --output ../../artifacts/calibration/cam2 --dry-run
@@ -53,3 +57,8 @@ The generated stereo package verification returned:
 ```
 
 Generated `artifacts/**` smoke outputs were removed before commit.
+
+After merge, the generated stereo dry-run package was also loaded through
+`packages/core`'s `loadStereoCalibrationArtifact` helper. That smoke check
+returned `cam1`, `cam2`, and `baselineMeters: 0.12`, confirming the generated
+contract shape is consumable by the runtime loader.
