@@ -111,7 +111,7 @@ export function validateYoloModelArtifact(
     requireString(packageJson, 'package.json.version', errors);
     requireLiteral(packageJson, 'package.json.contract', 'tennisbot.yolo-model-package', errors);
     requireString(packageJson, 'package.json.contract_version', errors);
-    requireString(packageJson, 'package.json.created_at', errors);
+    requireTimestamp(packageJson, 'package.json.created_at', errors);
     const models = asRecord(packageJson.models, 'package.json.models', errors);
     const defaultModel = requireString(packageJson, 'package.json.default_model', errors);
     requireString(packageJson, 'package.json.labels', errors);
@@ -129,8 +129,8 @@ export function validateYoloModelArtifact(
         }
         requireString(model, `package.json.models.${key}.path`, errors);
         requireString(model, `package.json.models.${key}.runtime`, errors);
-        optionalString(model, `package.json.models.${key}.sha256`, errors);
-        optionalNumber(model, `package.json.models.${key}.bytes`, errors);
+        requireString(model, `package.json.models.${key}.sha256`, errors);
+        requireNumber(model, `package.json.models.${key}.bytes`, errors);
       }
       if (defaultModel && !(defaultModel in models)) {
         errors.push(`package.json.default_model '${defaultModel}' must reference package.json.models`);
@@ -140,21 +140,21 @@ export function validateYoloModelArtifact(
 
   if (labelsJson) {
     const classes = asArray(labelsJson.classes, 'labels.json.classes', errors);
-    const tennisBallClass = classes?.find((value) => {
-      const cls = value as Record<string, unknown>;
-      return cls.id === 0 && cls.name === 'tennis_ball';
-    });
-    if (!tennisBallClass) {
-      errors.push('labels.json.classes must include class id 0 named tennis_ball');
-    }
+    let hasTennisBallClass = false;
     classes?.forEach((value, index) => {
       const cls = asRecord(value, `labels.json.classes[${index}]`, errors);
       if (!cls) {
         return;
       }
-      requireNumber(cls, `labels.json.classes[${index}].id`, errors);
-      requireString(cls, `labels.json.classes[${index}].name`, errors);
+      const id = requireNumber(cls, `labels.json.classes[${index}].id`, errors);
+      const name = requireString(cls, `labels.json.classes[${index}].name`, errors);
+      if (id === 0 && name === 'tennis_ball') {
+        hasTennisBallClass = true;
+      }
     });
+    if (classes && !hasTennisBallClass) {
+      errors.push('labels.json.classes must include class id 0 named tennis_ball');
+    }
   }
 
   if (preprocessingJson) {
@@ -170,10 +170,13 @@ export function validateYoloModelArtifact(
 
   if (postprocessingJson) {
     requireNumber(postprocessingJson, 'postprocessing.json.class_id', errors);
-    requireNumber(postprocessingJson, 'postprocessing.json.confidence_threshold', errors);
+    const confidenceThreshold = requireNumber(postprocessingJson, 'postprocessing.json.confidence_threshold', errors);
     requireString(postprocessingJson, 'postprocessing.json.box_format', errors);
     if (postprocessingJson.class_id !== 0) {
       errors.push('postprocessing.json.class_id must be 0 for tennis_ball');
+    }
+    if (confidenceThreshold !== undefined && (confidenceThreshold < 0 || confidenceThreshold > 1)) {
+      errors.push('postprocessing.json.confidence_threshold must be between 0 and 1');
     }
   }
 
@@ -210,7 +213,7 @@ export function validateStereoCalibrationArtifact(
     requireLiteral(packageJson, 'package.json.schema_version', 'calibration.stereo.v1', errors);
     requireLiteral(packageJson, 'package.json.package_type', 'stereo_camera_calibration', errors);
     const cameraIds = requireStringTuple(packageJson.camera_ids, 'package.json.camera_ids', 2, errors);
-    requireString(packageJson, 'package.json.created_at', errors);
+    requireTimestamp(packageJson, 'package.json.created_at', errors);
     requireString(packageJson, 'package.json.source_session', errors);
     const files = asRecord(packageJson.files, 'package.json.files', errors);
     if (files) {
@@ -249,6 +252,27 @@ export function validateStereoCalibrationArtifact(
       if (stereoJson.right_camera_id !== cameraIds[1]) {
         errors.push('stereo.json.right_camera_id must match package.json.camera_ids[1]');
       }
+    }
+  }
+
+  if (packageJson && rectificationJson) {
+    const cameraIds = packageJson.camera_ids;
+    if (Array.isArray(cameraIds) && cameraIds.length === 2) {
+      if (rectificationJson.left_camera_id !== cameraIds[0]) {
+        errors.push('rectification.json.left_camera_id must match package.json.camera_ids[0]');
+      }
+      if (rectificationJson.right_camera_id !== cameraIds[1]) {
+        errors.push('rectification.json.right_camera_id must match package.json.camera_ids[1]');
+      }
+    }
+  }
+
+  if (stereoJson && rectificationJson) {
+    if (rectificationJson.left_camera_id !== stereoJson.left_camera_id) {
+      errors.push('rectification.json.left_camera_id must match stereo.json.left_camera_id');
+    }
+    if (rectificationJson.right_camera_id !== stereoJson.right_camera_id) {
+      errors.push('rectification.json.right_camera_id must match stereo.json.right_camera_id');
     }
   }
 
@@ -411,7 +435,10 @@ function validateCameraIntrinsicsJson(
   requireString(json, `${path}.camera_id`, errors);
   requireImageSize(json.image_size, `${path}.image_size`, errors);
   requireMatrix3x3(json.camera_matrix, `${path}.camera_matrix`, errors);
-  requireString(json, `${path}.distortion_model`, errors);
+  const distortionModel = requireString(json, `${path}.distortion_model`, errors);
+  if (distortionModel !== undefined && !isSupportedDistortionModel(distortionModel)) {
+    errors.push(`${path}.distortion_model must be one of none, opencv_radtan, opencv_rational, opencv_radial_tangential, opencv_fisheye`);
+  }
   requireNumberArray(json.distortion_coefficients, `${path}.distortion_coefficients`, undefined, errors);
   return json as unknown as CameraIntrinsicsArtifactJson;
 }
@@ -534,6 +561,14 @@ function requireString(record: Record<string, unknown>, path: string, errors: st
   return record[key];
 }
 
+function requireTimestamp(record: Record<string, unknown>, path: string, errors: string[]): string | undefined {
+  const value = requireString(record, path, errors);
+  if (value !== undefined && Number.isNaN(Date.parse(value))) {
+    errors.push(`${path} must be a parseable timestamp`);
+  }
+  return value;
+}
+
 function optionalString(record: Record<string, unknown>, path: string, errors: string[]): string | undefined {
   const key = lastPathSegment(path);
   if (record[key] === undefined) {
@@ -598,8 +633,16 @@ function requireImageSize(value: unknown, path: string, errors: string[]): void 
   if (!size) {
     return;
   }
-  requireNumber(size, `${path}.width`, errors);
-  requireNumber(size, `${path}.height`, errors);
+  requirePositiveNumber(size, `${path}.width`, errors);
+  requirePositiveNumber(size, `${path}.height`, errors);
+}
+
+function requirePositiveNumber(record: Record<string, unknown>, path: string, errors: string[]): number | undefined {
+  const value = requireNumber(record, path, errors);
+  if (value !== undefined && value <= 0) {
+    errors.push(`${path} must be greater than 0`);
+  }
+  return value;
 }
 
 function requireMatrix3x3(value: unknown, path: string, errors: string[]): void {
@@ -636,6 +679,14 @@ function requireNumberArray(value: unknown, path: string, length: number | undef
   if (length !== undefined && value.length !== length) {
     errors.push(`${path} must contain ${length} numbers`);
   }
+}
+
+function isSupportedDistortionModel(model: string): boolean {
+  return model === 'none' ||
+    model === 'opencv_radtan' ||
+    model === 'opencv_rational' ||
+    model === 'opencv_radial_tangential' ||
+    model === 'opencv_fisheye';
 }
 
 function lastPathSegment(path: string): string {

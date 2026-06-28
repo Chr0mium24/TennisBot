@@ -54,6 +54,37 @@ describe('artifact loaders', () => {
     }
   });
 
+  test('rejects malformed YOLO class entries without throwing', () => {
+    const bundle = validYoloBundle();
+    bundle.labelsJson = { classes: [null] } as unknown as YoloLabelsJson;
+
+    const result = loadYoloModelArtifactMetadata(bundle);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors).toContain('labels.json.classes[0] must be an object');
+      expect(result.errors).toContain('labels.json.classes must include class id 0 named tennis_ball');
+    }
+  });
+
+  test('rejects YOLO model entries missing checksum metadata', () => {
+    const bundle = validYoloBundle();
+    bundle.packageJson = {
+      ...bundle.packageJson,
+      models: {
+        onnx: { path: 'model.onnx', runtime: 'onnxruntime' } as unknown as YoloPackageJson['models'][string],
+      },
+    };
+
+    const result = loadYoloModelArtifactMetadata(bundle);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors).toContain('package.json.models.onnx.sha256 must be a non-empty string');
+      expect(result.errors).toContain('package.json.models.onnx.bytes must be a finite number');
+    }
+  });
+
   test('validates and converts accepted stereo calibration package metadata', () => {
     const result = loadStereoCalibrationArtifact(validStereoBundle());
 
@@ -91,6 +122,22 @@ describe('artifact loaders', () => {
       expect(result.errors).toContain('package.json.quality.accepted must be true for runtime loading');
       expect(result.errors).toContain('verification.json.accepted must be true for runtime loading');
       expect(result.errors).toContain('verification.json.rectification.accepted must be true for runtime loading');
+    }
+  });
+
+  test('rejects rectification camera IDs that do not match the stereo package', () => {
+    const bundle = validStereoBundle();
+    bundle.rectificationJson = {
+      ...bundle.rectificationJson,
+      left_camera_id: 'cam3',
+    };
+
+    const result = loadStereoCalibrationArtifact(bundle);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors).toContain('rectification.json.left_camera_id must match package.json.camera_ids[0]');
+      expect(result.errors).toContain('rectification.json.left_camera_id must match stereo.json.left_camera_id');
     }
   });
 

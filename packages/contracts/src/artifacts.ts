@@ -40,8 +40,8 @@ export interface ArtifactImageSizeJson {
 
 export interface YoloPackageModelEntryJson {
   path: string;
-  sha256?: string;
-  bytes?: number;
+  sha256: string;
+  bytes: number;
   runtime: string;
 }
 
