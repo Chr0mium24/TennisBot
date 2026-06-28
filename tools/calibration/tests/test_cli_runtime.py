@@ -33,6 +33,7 @@ def test_cli_help_exposes_required_commands(capsys: pytest.CaptureFixture[str]) 
     assert "capture mono" in top_help
     assert "capture stereo" in top_help
     assert "inspect" in capture_help
+    assert "detect-charuco" in capture_help
     assert "gui mono" in top_help
     assert "gui stereo" in top_help
     assert "package verify" in top_help
@@ -174,6 +175,102 @@ def test_capture_inspect_rejects_low_contrast_frame(
     assert payload["accepted"] is False
     assert payload["ready_for_target_detection"] is False
     assert "low contrast / likely blank frame" in payload["issues"][0]
+
+
+def test_capture_detect_charuco_accepts_rendered_board(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    output = tmp_path / "cam1_session"
+    observations = tmp_path / "observations.json"
+    report = tmp_path / "detect.md"
+    assert (
+        main(
+            [
+                "capture",
+                "mono",
+                "--camera-id",
+                "cam1",
+                "--output",
+                str(output),
+                "--frame-count",
+                "1",
+                "--interval-ms",
+                "0",
+                "--width",
+                "960",
+                "--height",
+                "640",
+                "--dry-run",
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+    write_rendered_charuco(output / "frames" / "cam1_0001.png", image_size=(960, 640))
+
+    assert (
+        main(
+            [
+                "capture",
+                "detect-charuco",
+                "--session",
+                str(output),
+                "--output",
+                str(observations),
+                "--output-report",
+                str(report),
+                "--min-corners",
+                "6",
+            ]
+        )
+        == 0
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["accepted"] is True
+    assert payload["accepted_view_count"] == 1
+    assert payload["views"][0]["accepted"] is True
+    assert payload["views"][0]["corner_count"] >= 6
+    assert observations.is_file()
+    assert "# Calibration ChArUco Detection" in report.read_text(encoding="utf-8")
+
+
+def test_capture_detect_charuco_rejects_session_without_target(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    output = tmp_path / "cam1_session"
+    assert (
+        main(
+            [
+                "capture",
+                "mono",
+                "--camera-id",
+                "cam1",
+                "--output",
+                str(output),
+                "--frame-count",
+                "1",
+                "--interval-ms",
+                "0",
+                "--width",
+                "160",
+                "--height",
+                "120",
+                "--dry-run",
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+
+    assert main(["capture", "detect-charuco", "--session", str(output), "--min-corners", "6"]) == 1
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["accepted"] is False
+    assert payload["accepted_view_count"] == 0
+    assert "need at least 6" in payload["views"][0]["rejection_reason"]
 
 
 def test_capture_stereo_dry_run_writes_pair_session(tmp_path: Path) -> None:
@@ -600,3 +697,10 @@ def write_camera_calib_lab_fixture(root: Path) -> dict[str, Path]:
 def write_json_fixture(path: Path, payload: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def write_rendered_charuco(path: Path, *, image_size: tuple[int, int]) -> None:
+    dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_5X5_100)
+    board = cv2.aruco.CharucoBoard((14, 9), 0.015, 0.011, dictionary)
+    image = board.generateImage(image_size, marginSize=40)
+    assert cv2.imwrite(str(path), image)

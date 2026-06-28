@@ -157,6 +157,10 @@ uv run tennisbot-calibration capture stereo \
 uv run tennisbot-calibration capture inspect \
   --session ../../artifacts/calibration_sessions/stereo_session \
   --output-report ../../docs/calibration_capture_quality_YYYYMMDD.md
+uv run tennisbot-calibration capture detect-charuco \
+  --session ../../artifacts/calibration_sessions/stereo_session \
+  --output ../../artifacts/calibration_sessions/stereo_session/observations.json \
+  --output-report ../../docs/calibration_charuco_detection_YYYYMMDD.md
 ```
 
 Import existing CameraCalibLab calibration:
@@ -210,7 +214,7 @@ Most recent software verification:
 
 ```text
 cd tools/calibration && uv run pytest -q
-Result: 15 passing tests, 0 failures.
+Result: 17 passing tests, 0 failures.
 
 cd apps/live3d && bun test
 Result: 42 passing tests, 0 failures.
@@ -252,7 +256,10 @@ frames, summary, and review files; a real 1-pair stereo hardware probe opened
 the local high-brightness UVC preset and inspect sessions before target
 detection. The latest dry-run inspection accepted 4/4 images; the latest real
 hardware probe rejected both images as low contrast / likely blank, so it is not
-ready for mono/stereo solve.
+ready for mono/stereo solve. ChArUco detection is implemented for the DFOptix
+14x9 `DICT_5X5_100` target profile; a rendered target dry-run detected 104
+corners and 63 markers, while the current real hardware probe detected 0
+corners in both views.
 ```
 
 Latest recalibrated hardware smoke:
@@ -274,7 +281,7 @@ hardware validation:
 - keep the UVC brightness/exposure preparation or equivalent physical lighting
   so both USB camera frames are non-black;
 - capture real mono/stereo calibration sessions with visible ChArUco targets and
-  `capture inspect` accepted before solving;
+  `capture inspect` plus `capture detect-charuco` accepted before solving;
 - rerun the Live3D hardware verifier with a tennis ball visible in both USB
   camera views;
 - verify nonzero ONNX detections on both live frames;

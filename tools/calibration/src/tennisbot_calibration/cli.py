@@ -10,6 +10,7 @@ from tennisbot_calibration.capture_sessions import (
     capture_stereo_session,
     inspect_capture_session,
 )
+from tennisbot_calibration.charuco_detection import detect_charuco_session
 from tennisbot_calibration.import_camera_calib_lab import import_camera_calib_lab_package
 from tennisbot_calibration.scan_camera_calib_lab import (
     candidate_path,
@@ -25,8 +26,8 @@ def build_parser() -> argparse.ArgumentParser:
         prog="tennisbot-calibration",
         description="TennisBot calibration artifact tooling.",
         epilog=(
-            "Workflows: capture mono, capture stereo, gui mono, gui stereo, package verify, package scan-camera-calib-lab, "
-            "package import-scanned-camera-calib-lab. "
+            "Workflows: capture mono, capture stereo, capture inspect, capture detect-charuco, gui mono, gui stereo, "
+            "package verify, package scan-camera-calib-lab, package import-scanned-camera-calib-lab. "
             "Wave 5 GUI commands support dry-run/non-hardware output only."
         ),
     )
@@ -83,6 +84,16 @@ def configure_capture(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
     inspect.add_argument("--session", required=True, help="Capture session directory containing manifest.json.")
     inspect.add_argument("--output-report", default=None, help="Optional Markdown inspection report path.")
     inspect.set_defaults(handler=capture_inspect)
+
+    detect_charuco = capture_subparsers.add_parser(
+        "detect-charuco",
+        help="Detect ChArUco observations from a captured session.",
+    )
+    detect_charuco.add_argument("--session", required=True, help="Capture session directory containing manifest.json.")
+    detect_charuco.add_argument("--output", default=None, help="Observation JSON path; defaults to <session>/observations.json.")
+    detect_charuco.add_argument("--output-report", default=None, help="Optional Markdown detection report path.")
+    detect_charuco.add_argument("--min-corners", type=int, default=6, help="Minimum ChArUco corners required per view.")
+    detect_charuco.set_defaults(handler=capture_detect_charuco)
 
 
 def configure_gui(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -198,6 +209,44 @@ def capture_inspect(args: argparse.Namespace) -> int:
     )
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0 if result["accepted"] else 1
+
+
+def capture_detect_charuco(args: argparse.Namespace) -> int:
+    result = detect_charuco_session(
+        session=Path(args.session),
+        output=Path(args.output) if args.output else None,
+        output_report=Path(args.output_report) if args.output_report else None,
+        min_corners=args.min_corners,
+    )
+    print(json.dumps(charuco_detection_summary(result), indent=2, sort_keys=True))
+    return 0 if result["accepted"] else 1
+
+
+def charuco_detection_summary(result: dict[str, object]) -> dict[str, object]:
+    views = result.get("views", [])
+    assert isinstance(views, list)
+    return {
+        "accepted": result["accepted"],
+        "accepted_pair_count": result["accepted_pair_count"],
+        "accepted_view_count": result["accepted_view_count"],
+        "output": result["output_path"],
+        "recommendation": result["recommendation"],
+        "session_id": result["session_id"],
+        "topology": result["topology"],
+        "total_pair_count": result["total_pair_count"],
+        "total_view_count": result["total_view_count"],
+        "views": [
+            {
+                "path": view["path"],
+                "side": view["side"],
+                "accepted": view["accepted"],
+                "corner_count": view["corner_count"],
+                "marker_count": view["marker_count"],
+                "rejection_reason": view.get("rejection_reason"),
+            }
+            for view in views
+        ],
+    }
 
 
 def gui_mono(args: argparse.Namespace) -> int:

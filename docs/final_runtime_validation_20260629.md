@@ -147,6 +147,9 @@ uv run tennisbot-calibration capture stereo --left-camera-id cam1 --right-camera
 uv run tennisbot-calibration capture inspect --session ../../artifacts/calibration_sessions/20260629_stereo_quality_dry_run --output-report ../../docs/calibration_capture_quality_20260629.md
 timeout 20s uv run tennisbot-calibration capture stereo --left-camera-id cam1 --right-camera-id cam2 --left-device /dev/video0 --right-device /dev/video2 --output ../../artifacts/calibration_sessions/20260629_stereo_quality_hardware_probe --pair-count 1 --interval-ms 0 --width 1280 --height 720 --fourcc MJPG --fps 30 --prepare-uvc-controls
 uv run tennisbot-calibration capture inspect --session ../../artifacts/calibration_sessions/20260629_stereo_quality_hardware_probe --output-report ../../docs/calibration_capture_quality_hardware_probe_20260629.md || true
+# Before this dry-run detection, frames/cam1_0001.png was replaced with a rendered DFOptix ChArUco target.
+uv run tennisbot-calibration capture detect-charuco --session ../../artifacts/calibration_sessions/20260629_charuco_detection_dry_run --output ../../artifacts/calibration_sessions/20260629_charuco_detection_dry_run/observations.json --output-report ../../docs/calibration_charuco_detection_20260629.md
+uv run tennisbot-calibration capture detect-charuco --session ../../artifacts/calibration_sessions/20260629_stereo_quality_hardware_probe --output ../../artifacts/calibration_sessions/20260629_stereo_quality_hardware_probe/observations.json --output-report ../../docs/calibration_charuco_detection_hardware_probe_20260629.md || true
 uv run tennisbot-calibration gui mono --camera-id cam1 --dry-run --output ../../artifacts/calibration/cam1
 uv run tennisbot-calibration gui mono --camera-id cam2 --dry-run --output ../../artifacts/calibration/cam2
 uv run tennisbot-calibration gui stereo --left-camera-id cam1 --right-camera-id cam2 --dry-run --output ../../artifacts/calibration/stereo_cam1_cam2
@@ -163,14 +166,17 @@ uv run tennisbot-calibration package import-scanned-camera-calib-lab \
 uv run tennisbot-calibration package verify --path ../../artifacts/calibration/stereo_cam1_cam2
 ```
 
-Result: 15 tests passed. Dry-run mono and stereo package generation still works.
+Result: 17 tests passed. Dry-run mono and stereo package generation still works.
 Standalone capture sessions now write manifests, PNG frames, summary files, and
 review HTML. `capture inspect` writes `inspection.json` and optional Markdown
 reports before target detection or solve. The quality-gated dry-run stereo
 session accepted 4/4 images. The real stereo capture probe applied UVC controls,
 opened `/dev/video0` and `/dev/video2` at 1280x720 MJPG, wrote one pair, then
 rejected both images as low contrast / likely blank, so the current scene is not
-sufficient for a solve.
+sufficient for a solve. `capture detect-charuco` now writes observation JSON and
+Markdown reports for the DFOptix 14x9 `DICT_5X5_100` ChArUco profile. A rendered
+target dry-run detected 104 corners and 63 markers; the current real hardware
+probe detected 0 ChArUco corners in both views.
 The scanned import command selected cam1/cam2 mono candidates by path pattern,
 ranked 3 stereo candidates, imported the best ranked CameraCalibLab rational
 fixed-intrinsics stereo output into `artifacts/calibration/stereo_cam1_cam2`, and
@@ -222,7 +228,7 @@ Result: 13 tests passed. A real runtime YOLO package was written from the
   commands. Dry-run sessions are deterministic, and a real stereo hardware probe
   opened `/dev/video0` plus `/dev/video2` and wrote one 1280x720 MJPG pair.
   Capture sessions can apply the local UVC exposure preset and run `capture
-  inspect` as a pre-solve image quality gate.
+  inspect` plus `capture detect-charuco` as pre-solve gates.
 - The current calibration package verifies with baseline
   `0.05248616443700974`, stereo RMS `0.42365210023675176`, rectification y p95
   `0.8301635742187499`, and a remaining epipolar RMS `4.3304497343502`

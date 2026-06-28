@@ -116,6 +116,10 @@ uv run tennisbot-calibration capture stereo \
 uv run tennisbot-calibration capture inspect \
   --session ../../artifacts/calibration_sessions/stereo_session \
   --output-report ../../docs/calibration_capture_quality_YYYYMMDD.md
+uv run tennisbot-calibration capture detect-charuco \
+  --session ../../artifacts/calibration_sessions/stereo_session \
+  --output ../../artifacts/calibration_sessions/stereo_session/observations.json \
+  --output-report ../../docs/calibration_charuco_detection_YYYYMMDD.md
 ```
 
 Defaults are `1280x720`, `MJPG`, 30 fps, and 20 frames or pairs. Add
@@ -127,8 +131,10 @@ by the Live3D verifier before opening real devices.
 `capture inspect` reads a session manifest and image files, writes
 `inspection.json`, and can write a Markdown quality report. It rejects missing
 images, wrong image sizes, near-black frames, and low-contrast/blank frames.
-Captured sessions are not calibration packages yet; the next tool step after an
-accepted inspection is target detection and mono/stereo solve.
+`capture detect-charuco` then runs OpenCV ChArUco detection for the DFOptix
+14x9, `DICT_5X5_100`, 15 mm target profile and writes an observations JSON plus
+optional Markdown report. Captured sessions are not calibration packages yet;
+the next tool step after accepted observations is mono/stereo solve.
 
 ## Import Existing CameraCalibLab Output
 

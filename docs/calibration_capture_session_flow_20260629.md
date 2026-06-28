@@ -81,6 +81,25 @@ uv run tennisbot-calibration capture inspect \
   --output-report ../../docs/calibration_capture_quality_20260629.md
 ```
 
+Rendered ChArUco detection dry-run:
+
+```bash
+cd tools/calibration
+uv run tennisbot-calibration capture mono \
+  --camera-id cam1 \
+  --output ../../artifacts/calibration_sessions/20260629_charuco_detection_dry_run \
+  --frame-count 1 \
+  --interval-ms 0 \
+  --width 960 \
+  --height 640 \
+  --dry-run
+# Replace the dry-run frame with a rendered DFOptix ChArUco board, then detect:
+uv run tennisbot-calibration capture detect-charuco \
+  --session ../../artifacts/calibration_sessions/20260629_charuco_detection_dry_run \
+  --output ../../artifacts/calibration_sessions/20260629_charuco_detection_dry_run/observations.json \
+  --output-report ../../docs/calibration_charuco_detection_20260629.md
+```
+
 Quality-gated real stereo hardware probe:
 
 ```bash
@@ -101,6 +120,10 @@ timeout 20s uv run tennisbot-calibration capture stereo \
 uv run tennisbot-calibration capture inspect \
   --session ../../artifacts/calibration_sessions/20260629_stereo_quality_hardware_probe \
   --output-report ../../docs/calibration_capture_quality_hardware_probe_20260629.md || true
+uv run tennisbot-calibration capture detect-charuco \
+  --session ../../artifacts/calibration_sessions/20260629_stereo_quality_hardware_probe \
+  --output ../../artifacts/calibration_sessions/20260629_stereo_quality_hardware_probe/observations.json \
+  --output-report ../../docs/calibration_charuco_detection_hardware_probe_20260629.md || true
 ```
 
 ## Result
@@ -112,6 +135,8 @@ dry-run stereo session: manifest.json, 3 left/right PNG pairs, summary.md, revie
 hardware stereo probe: opened /dev/video0 and /dev/video2, wrote 1 left/right PNG pair at 1280x720 MJPG.
 quality dry-run inspection: accepted=true, 4/4 images read, no issues.
 quality hardware inspection: accepted=false, 2/2 images read, both frames rejected as low contrast / likely blank.
+rendered ChArUco detection dry-run: accepted=true, 104 corners and 63 markers detected.
+hardware ChArUco detection: accepted=false, 0/2 views accepted, 0/1 stereo pairs accepted.
 ```
 
 The hardware probe proves this tool can open and save frames from the two local
@@ -122,8 +147,9 @@ for a mono or stereo solve.
 
 ## Remaining Work
 
-- Add target detection for captured mono and stereo sessions.
-- Add mono calibration solving from accepted mono sessions.
-- Add stereo calibration solving from accepted stereo sessions and mono
+- Capture real mono and stereo sessions with visible ChArUco targets that pass
+  `capture inspect` and `capture detect-charuco`.
+- Add mono calibration solving from accepted mono observations.
+- Add stereo calibration solving from accepted stereo observations and mono
   intrinsics.
 - Add a richer review GUI for accepting/rejecting captured frames before solve.
