@@ -61,7 +61,7 @@ function renderDetection(box: DetectionBox): string {
 
   return `
     <div class="detection-box" style="${style}">
-      <span>${box.label} ${formatPercent(box.confidence)}</span>
+      <span>${escapeHtml(box.label)} ${formatPercent(box.confidence)}</span>
     </div>
   `;
 }
@@ -151,7 +151,7 @@ function renderScene(): string {
       <div class="panel-heading">
         <div>
           <p class="eyebrow">fixture-only non-validation 3D scene</p>
-          <h2>Ball trail and prediction placeholder until YOLO inference is added</h2>
+          <h2>Ball trail and prediction placeholder until runtime detections feed 3D</h2>
         </div>
         <span class="device-pill">${fixture.scene.prediction.model}</span>
       </div>
@@ -457,6 +457,7 @@ const [yoloStatus, calibrationStatus] = await Promise.all([
 
 let cameraStatus: StereoCameraRuntimeStatus = createStereoCameraIdleStatus(defaultLive3dConfig);
 let detectionStatus: StereoYoloInferenceRuntimeStatus = createStereoYoloInferenceIdleStatus();
+let yoloRunSerial = 0;
 
 function renderCurrentApp(): void {
   appElement.innerHTML = renderApp(cameraStatus, detectionStatus, yoloStatus, calibrationStatus);
@@ -482,7 +483,10 @@ function bindYoloControls(): void {
   startButton?.addEventListener("click", () => {
     void startYoloInferenceFromUserAction();
   });
-  stopButton?.addEventListener("click", stopYoloInferenceFromUserAction);
+  stopButton?.addEventListener("click", () => {
+    stopYoloInferenceFromUserAction();
+    renderCurrentApp();
+  });
 }
 
 async function startCameraRuntimeFromUserAction(): Promise<void> {
@@ -510,6 +514,8 @@ async function startYoloInferenceFromUserAction(): Promise<void> {
   }
 
   const timestampUnixMs = Date.now();
+  const runSerial = yoloRunSerial + 1;
+  yoloRunSerial = runSerial;
   const leftFrameId = `left-${timestampUnixMs}`;
   const rightFrameId = `right-${timestampUnixMs}`;
   detectionStatus = {
@@ -540,11 +546,16 @@ async function startYoloInferenceFromUserAction(): Promise<void> {
     }),
   ]);
 
+  if (runSerial !== yoloRunSerial || cameraStatus.state !== "ready") {
+    return;
+  }
+
   detectionStatus = { left, right };
   renderCurrentApp();
 }
 
 function stopYoloInferenceFromUserAction(): void {
+  yoloRunSerial += 1;
   yoloBackend.stop?.();
   detectionStatus = createStereoYoloInferenceIdleStatus();
 }

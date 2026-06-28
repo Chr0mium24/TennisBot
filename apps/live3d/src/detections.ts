@@ -135,16 +135,16 @@ export async function runYoloInferenceForFrame(
     if (result.status === "blocked") {
       return {
         side: frame.side,
-      state: "blocked",
-      code: "backend-blocked",
-      label: `${capitalize(frame.side)} YOLO blocked`,
-      detail: result.message,
-      frameId: frame.frameId,
-      timestampUnixMs: frame.timestampUnixMs,
-      imageSize: frame.imageSize,
-      detectionCount: 0,
-      detections: [],
-      warnings: result.warnings ?? [],
+        state: "blocked",
+        code: "backend-blocked",
+        label: `${capitalize(frame.side)} YOLO blocked`,
+        detail: result.message,
+        frameId: frame.frameId,
+        timestampUnixMs: frame.timestampUnixMs,
+        imageSize: frame.imageSize,
+        detectionCount: 0,
+        detections: [],
+        warnings: result.warnings ?? [],
       };
     }
 
@@ -157,18 +157,25 @@ export async function runYoloInferenceForFrame(
     });
     const warnings = [...(result.warnings ?? []), ...converted.warnings];
 
+    const hasValidDetections = converted.detections.length > 0;
+    const hasOnlyRejectedBoxes = result.boxes.length > 0 && !hasValidDetections;
+    const state = hasOnlyRejectedBoxes ? "blocked" : "ready";
+    const code = hasOnlyRejectedBoxes ? "invalid-output" : "updated";
+    const label = hasOnlyRejectedBoxes
+      ? `${capitalize(frame.side)} YOLO output blocked`
+      : `${capitalize(frame.side)} YOLO updated`;
+    const detail = hasValidDetections
+      ? `${backend.name} produced ${converted.detections.length} runtime detection(s).`
+      : hasOnlyRejectedBoxes
+        ? "Backend output did not contain any valid tennis-ball boxes."
+        : `${backend.name} produced no tennis-ball detections for this frame.`;
+
     return {
       side: frame.side,
-      state: converted.detections.length > 0 ? "ready" : "blocked",
-      code: converted.detections.length > 0 ? "updated" : "invalid-output",
-      label:
-        converted.detections.length > 0
-          ? `${capitalize(frame.side)} YOLO updated`
-          : `${capitalize(frame.side)} YOLO output blocked`,
-      detail:
-        converted.detections.length > 0
-          ? `${backend.name} produced ${converted.detections.length} runtime detection(s).`
-          : "Backend output did not contain any valid tennis-ball boxes.",
+      state,
+      code,
+      label,
+      detail,
       frameId: frame.frameId,
       timestampUnixMs: frame.timestampUnixMs,
       imageSize: frame.imageSize,
@@ -204,6 +211,11 @@ export function convertBackendYoloBoxesToDetections(options: {
   const warnings: string[] = [];
 
   options.boxes.forEach((box, index) => {
+    if (!isSupportedTennisBallBox(box)) {
+      warnings.push(`box ${index} rejected because it is not class 0 tennis_ball`);
+      return;
+    }
+
     const normalized = normalizeBackendBox(box, options.imageSize);
     if (normalized === null) {
       warnings.push(`box ${index} rejected because its geometry or confidence is invalid`);
@@ -217,8 +229,8 @@ export function convertBackendYoloBoxesToDetections(options: {
       cameraId: options.cameraId,
       frameId: options.frameId,
       timestampUnixMs: options.timestampUnixMs,
-      classId: box.classId ?? TENNIS_BALL_CLASS_ID,
-      label: box.label ?? TENNIS_BALL_LABEL,
+      classId: TENNIS_BALL_CLASS_ID,
+      label: TENNIS_BALL_LABEL,
       confidence: normalized.confidence,
       bboxPx: {
         xPx: normalized.xPx,
@@ -291,6 +303,16 @@ function normalizeBackendBox(
     widthPx,
     heightPx,
   };
+}
+
+function isSupportedTennisBallBox(box: BackendYoloBox): boolean {
+  if (box.classId !== undefined && box.classId !== TENNIS_BALL_CLASS_ID) {
+    return false;
+  }
+  if (box.label !== undefined && box.label !== TENNIS_BALL_LABEL) {
+    return false;
+  }
+  return true;
 }
 
 function clamp(value: number, min: number, max: number): number {

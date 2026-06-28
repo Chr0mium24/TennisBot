@@ -73,6 +73,22 @@ describe("Live3D YOLO detection adapter", () => {
     expect(status.detections).toEqual([]);
   });
 
+  test("empty backend output is a valid updated frame with zero detections", async () => {
+    const backend: YoloInferenceBackend = {
+      name: "fake-empty-yolo",
+      async infer() {
+        return { status: "ok", boxes: [] };
+      },
+    };
+
+    const status = await runYoloInferenceForFrame(backend, frame("left", "cam-left", "frame-l"));
+
+    expect(status.state).toBe("ready");
+    expect(status.code).toBe("updated");
+    expect(status.detectionCount).toBe(0);
+    expect(status.detail).toContain("produced no tennis-ball detections");
+  });
+
   test("clamps partially out-of-frame boxes and rejects malformed boxes", () => {
     const result = convertBackendYoloBoxesToDetections({
       cameraId: "cam-left",
@@ -113,6 +129,40 @@ describe("Live3D YOLO detection adapter", () => {
     });
     expect(result.detections[0].centerPx).toEqual({ x: 10, y: 710 });
     expect(result.warnings).toHaveLength(2);
+  });
+
+  test("rejects backend boxes for unsupported classes or labels", () => {
+    const result = convertBackendYoloBoxesToDetections({
+      cameraId: "cam-left",
+      frameId: "frame-1",
+      timestampUnixMs: 1_770_000_000_000,
+      imageSize: { widthPx: 1280, heightPx: 720 },
+      boxes: [
+        {
+          classId: 1,
+          label: "person",
+          confidence: 0.9,
+          xPx: 10,
+          yPx: 10,
+          widthPx: 20,
+          heightPx: 20,
+        },
+        {
+          classId: 0,
+          label: "tennis_ball",
+          confidence: 0.8,
+          xPx: 30,
+          yPx: 30,
+          widthPx: 20,
+          heightPx: 20,
+        },
+      ],
+    });
+
+    expect(result.detections).toHaveLength(1);
+    expect(result.detections[0].classId).toBe(0);
+    expect(result.detections[0].label).toBe("tennis_ball");
+    expect(result.warnings).toContain("box 0 rejected because it is not class 0 tennis_ball");
   });
 
   test("converts runtime detections into percentage overlay boxes", () => {

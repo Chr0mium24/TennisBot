@@ -37,8 +37,8 @@ The initial placeholders live in `src/config.ts`:
 ```text
 left camera device: /dev/video0
 right camera device: /dev/video2
-YOLO model package: ../../artifacts/models/tennis_ball_yolo
-stereo calibration package: ../../artifacts/calibration/stereo_cam1_cam2
+YOLO model package: /artifacts/models/tennis_ball_yolo
+stereo calibration package: /artifacts/calibration/stereo_cam1_cam2
 ```
 
 These paths match the target artifact boundaries from the architecture

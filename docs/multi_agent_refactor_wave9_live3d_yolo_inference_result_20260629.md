@@ -29,6 +29,10 @@ default backend is intentionally blocked and does not claim real YOLO inference.
   backend detections are available.
 - Tests use fake and blocked backends only; they require no USB cameras, model
   files, browser permissions, or `onnxruntime-web`.
+- Lead review tightened the adapter by rejecting non-`tennis_ball` classes,
+  treating empty backend output as a valid zero-detection frame, escaping
+  backend-provided overlay labels, refreshing Stop YOLO immediately, and
+  preventing stopped async inference runs from writing stale UI state.
 
 ## Adapter-Only Items
 
@@ -57,3 +61,5 @@ cd apps/live3d && bun run typecheck
 cd apps/live3d && bun run build
 git diff --check
 ```
+
+Lead review result after the runtime-state fixes: 23 passing tests, 0 failures.
