@@ -20,7 +20,8 @@ Chrome and run the ONNX backend loop. The camera path now requests
 MJPG streams work at `1280x720`; high-resolution YUYV streams time out. Applying
 high-brightness UVC controls recovered non-black browser frames, but the current
 scene still contains no visible tennis ball. The imported stereo calibration
-also has quality warnings.
+now uses the selected rational fixed-intrinsics CameraCalibLab result; it has a
+remaining epipolar RMS quality warning.
 
 Follow-up YOLO static validation found that Live3D was decoding the exported
 ONNX `xyxy_pixels` output as `xywh`. That postprocessing bug is fixed. The
@@ -59,11 +60,14 @@ cd apps/live3d
 bun test
 bun run typecheck
 bun run build
-bun run verify:hardware -- --prepare-uvc-controls --timeout-ms 20000 --output ../../docs/live3d_hardware_loop_uvc_boost_20260629.md
+bun run verify:hardware -- --prepare-uvc-controls --timeout-ms 20000 --output ../../docs/live3d_hardware_loop_recalibrated_20260629.md
 ```
 
 Result: 42 tests passed, typecheck passed, browser bundle built. The hardware
-verification command wrote `docs/live3d_hardware_loop_uvc_boost_20260629.md`.
+verification command wrote
+`docs/live3d_hardware_loop_recalibrated_20260629.md`; it loaded the refreshed
+calibration baseline `0.05248616443700974`, captured non-black left/right
+frames, and failed only because the live scene had no detectable tennis ball.
 
 Dev server smoke:
 
@@ -100,7 +104,7 @@ Automated hardware loop:
 bun apps/live3d/scripts/verify-hardware.ts \
   --prepare-uvc-controls \
   --timeout-ms 20000 \
-  --output docs/live3d_hardware_loop_uvc_boost_20260629.md
+  --output docs/live3d_hardware_loop_recalibrated_20260629.md
 ```
 
 Result: the script applied brightness `64`, gain `255`, manual exposure `2047`
@@ -108,8 +112,9 @@ to `/dev/video0` and `/dev/video2`, reused `http://localhost:5178`, launched
 `/usr/bin/google-chrome` on CDP port `9233`, found
 `window.__tennisbotLive3dSnapshot`, opened two real `USU Camera 4K` browser
 streams, loaded the ONNX YOLO artifact, and loaded the stereo calibration
-artifact. Captured browser frames were non-black (`mean_luma` about `68`,
-`non_black_pixel_percent: 100%`) but still had zero YOLO tennis-ball detections.
+artifact with baseline `0.05248616443700974`. Captured browser frames were
+non-black (`mean_luma` about `68`, `non_black_pixel_percent: 100%`) but still
+had zero YOLO tennis-ball detections.
 Last runtime code: `left-detections-missing`.
 
 Direct V4L2 cross-check:
@@ -140,27 +145,28 @@ uv run tennisbot-calibration gui mono --camera-id cam2 --dry-run --output ../../
 uv run tennisbot-calibration gui stereo --left-camera-id cam1 --right-camera-id cam2 --dry-run --output ../../artifacts/calibration/stereo_cam1_cam2
 uv run tennisbot-calibration package verify --path ../../artifacts/calibration/stereo_cam1_cam2
 uv run tennisbot-calibration package import-camera-calib-lab \
-  --cam1 ../../CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622/cam1_mono/calibration/calibration.json \
-  --cam2 ../../CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622/cam2_mono/calibration/calibration.json \
-  --stereo ../../CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622/stereo/calibration/calibration.json \
+  --cam1 ../../CameraCalibLab/runs/calibrations/dfoptix_charuco_auto_combined_rational_20260620_top_right_eps1e7/calibration.json \
+  --cam2 ../../CameraCalibLab/runs/calibrations/dfoptix_charuco_auto_cam2/calibration.json \
+  --stereo ../../CameraCalibLab/runs/calibrations/dfoptix_charuco_stereo_auto_fixed_intrinsics_rational_20260622/calibration.json \
   --output ../../artifacts/calibration/stereo_cam1_cam2 \
   --left-camera-id cam1 \
   --right-camera-id cam2 \
-  --source-session CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622
+  --source-session CameraCalibLab/runs/calibrations/dfoptix_charuco_stereo_auto_fixed_intrinsics_rational_20260622
 uv run tennisbot-calibration package verify --path ../../artifacts/calibration/stereo_cam1_cam2
 ```
 
 Result: 9 tests passed. Dry-run mono and stereo package generation still works.
-The existing CameraCalibLab stereo output was also imported into
-`artifacts/calibration/stereo_cam1_cam2` and verified with `accepted: true`,
+The selected CameraCalibLab rational fixed-intrinsics stereo output was imported
+into `artifacts/calibration/stereo_cam1_cam2` and verified with `accepted: true`,
 `dry_run: false`, and `hardware_validated: true`.
 
 Imported calibration quality warning:
 
 ```text
-stereo_rms_reprojection_px: 23.486769410254507
-epipolar_rms_px: 30.801563164769544
-rectification_y_p95_px: 19.30416870117187
+baseline_m: 0.05248616443700974
+stereo_rms_reprojection_px: 0.42365210023675176
+epipolar_rms_px: 4.3304497343502
+rectification_y_p95_px: 0.8301635742187499
 ```
 
 ### YOLO Tool
@@ -194,9 +200,15 @@ Result: 13 tests passed. A real runtime YOLO package was written from the
 - `artifacts/models/tennis_ball_yolo` now contains a real ONNX-default package
   rebuilt from `finetune_indoor_cam1/weights/best.pt`.
 - `artifacts/calibration/stereo_cam1_cam2` now contains a real imported stereo
-  package with explicit runtime quality warnings.
+  package from the selected rational fixed-intrinsics CameraCalibLab result.
+- The current calibration package verifies with baseline
+  `0.05248616443700974`, stereo RMS `0.42365210023675176`, rectification y p95
+  `0.8301635742187499`, and a remaining epipolar RMS `4.3304497343502`
+  warning.
 - Live3D opened two real USB cameras in Chrome at `1280x720@30` and ran the
   ONNX backend loop without session concurrency errors.
+- The recalibrated Live3D hardware report loaded baselineMeters
+  `0.05248616443700974` and captured non-black frames after UVC preparation.
 - Live3D now has a repeatable headless hardware verifier that reads
   `window.__tennisbotLive3dSnapshot` and records camera, YOLO, calibration,
   detection, runtime 3D state, frame captures, and frame brightness statistics
@@ -219,6 +231,7 @@ Before claiming full real-world operation:
    until the report reaches `prediction-ready`.
 3. Confirm runtime 3D scene, prediction curve, and landing marker update from
    those detections.
-4. Re-run mono/stereo calibration if imported stereo quality remains poor.
+4. Re-run or refine stereo calibration if the remaining epipolar RMS warning
+   must be reduced below the runtime-quality review threshold.
 5. Validate ROS/Gazebo closed-loop catch behavior only after real visual
    tracking is stable.

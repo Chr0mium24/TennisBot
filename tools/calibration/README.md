@@ -103,20 +103,20 @@ CameraCalibLab internals:
 ```bash
 cd tools/calibration
 uv run tennisbot-calibration package import-camera-calib-lab \
-  --cam1 ../../CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622/cam1_mono/calibration/calibration.json \
-  --cam2 ../../CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622/cam2_mono/calibration/calibration.json \
-  --stereo ../../CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622/stereo/calibration/calibration.json \
+  --cam1 ../../CameraCalibLab/runs/calibrations/dfoptix_charuco_auto_combined_rational_20260620_top_right_eps1e7/calibration.json \
+  --cam2 ../../CameraCalibLab/runs/calibrations/dfoptix_charuco_auto_cam2/calibration.json \
+  --stereo ../../CameraCalibLab/runs/calibrations/dfoptix_charuco_stereo_auto_fixed_intrinsics_rational_20260622/calibration.json \
   --output ../../artifacts/calibration/stereo_cam1_cam2 \
   --left-camera-id cam1 \
   --right-camera-id cam2 \
-  --source-session CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622
+  --source-session CameraCalibLab/runs/calibrations/dfoptix_charuco_stereo_auto_fixed_intrinsics_rational_20260622
 uv run tennisbot-calibration package verify --path ../../artifacts/calibration/stereo_cam1_cam2
 ```
 
 The imported package is marked `dry_run: false` and `hardware_validated: true`.
 If stereo quality metrics exceed runtime warning thresholds, the package remains
-loadable for smoke testing but its summary records that recalibration is needed
-before relying on 3D prediction accuracy.
+loadable for smoke testing but its summary records the warning before relying on
+3D prediction accuracy.
 
 ## Migration Checklist
 

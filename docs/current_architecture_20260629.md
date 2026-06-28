@@ -143,13 +143,13 @@ Import existing CameraCalibLab calibration:
 ```bash
 cd tools/calibration
 uv run tennisbot-calibration package import-camera-calib-lab \
-  --cam1 ../../CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622/cam1_mono/calibration/calibration.json \
-  --cam2 ../../CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622/cam2_mono/calibration/calibration.json \
-  --stereo ../../CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622/stereo/calibration/calibration.json \
+  --cam1 ../../CameraCalibLab/runs/calibrations/dfoptix_charuco_auto_combined_rational_20260620_top_right_eps1e7/calibration.json \
+  --cam2 ../../CameraCalibLab/runs/calibrations/dfoptix_charuco_auto_cam2/calibration.json \
+  --stereo ../../CameraCalibLab/runs/calibrations/dfoptix_charuco_stereo_auto_fixed_intrinsics_rational_20260622/calibration.json \
   --output ../../artifacts/calibration/stereo_cam1_cam2 \
   --left-camera-id cam1 \
   --right-camera-id cam2 \
-  --source-session CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622
+  --source-session CameraCalibLab/runs/calibrations/dfoptix_charuco_stereo_auto_fixed_intrinsics_rational_20260622
 uv run tennisbot-calibration package verify --path ../../artifacts/calibration/stereo_cam1_cam2
 ```
 
@@ -215,8 +215,20 @@ Runtime artifacts have also been imported locally:
 YOLO: dry_run=false, inference_ready=true, default_model=onnx.
 YOLO static smoke: 109/109 matched labeled samples detected at threshold 0.05.
 Calibration: dry_run=false, hardware_validated=true, package verify accepted.
-Calibration quality warning: stereo_rms=23.487 px, epipolar_rms=30.802 px,
-rectification_y_p95=19.304 px.
+Calibration quality warning: epipolar_rms=4.330 px exceeds the 2.000 px
+runtime-quality review threshold. stereo_rms=0.424 px,
+rectification_y_p95=0.830 px, baseline=0.052486 m.
+```
+
+Latest recalibrated hardware smoke:
+
+```text
+Report: docs/live3d_hardware_loop_recalibrated_20260629.md
+Loaded calibration baselineMeters: 0.05248616443700974
+Camera path: two USU Camera 4K browser captures at 1280x720@30.
+Frame quality: left/right captures are non-black after UVC preparation.
+Remaining gate: no visible tennis ball was detected, so runtime 3D stayed at
+left-detections-missing instead of prediction-ready.
 ```
 
 ## Remaining Physical Validation
@@ -231,6 +243,7 @@ hardware validation:
 - verify nonzero ONNX detections on both live frames;
 - verify runtime 3D reaches `prediction-ready` with stable point and prediction
   updates;
-- re-run mono/stereo calibration if imported stereo error remains high;
+- re-run stereo calibration if the remaining epipolar RMS warning must be
+  reduced below the runtime-quality review threshold;
 - validate ROS/Gazebo closed-loop catch behavior only after the real visual
   tracking path is stable.

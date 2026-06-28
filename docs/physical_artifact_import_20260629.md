@@ -12,7 +12,8 @@ Imported assets:
 - YOLO model package rebuilt from
   `TennisBallDetectorLab/yolo/runs/training/finetune_indoor_cam1/weights/best.pt`
   and an exported ONNX model under `artifacts/model_candidates/`.
-- Stereo calibration package from `CameraCalibLab/calibration_packages/`.
+- Stereo calibration package from selected `CameraCalibLab/runs/calibrations/`
+  outputs.
 
 Runtime output paths:
 
@@ -55,13 +56,13 @@ Command:
 ```bash
 cd tools/calibration
 uv run tennisbot-calibration package import-camera-calib-lab \
-  --cam1 ../../CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622/cam1_mono/calibration/calibration.json \
-  --cam2 ../../CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622/cam2_mono/calibration/calibration.json \
-  --stereo ../../CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622/stereo/calibration/calibration.json \
+  --cam1 ../../CameraCalibLab/runs/calibrations/dfoptix_charuco_auto_combined_rational_20260620_top_right_eps1e7/calibration.json \
+  --cam2 ../../CameraCalibLab/runs/calibrations/dfoptix_charuco_auto_cam2/calibration.json \
+  --stereo ../../CameraCalibLab/runs/calibrations/dfoptix_charuco_stereo_auto_fixed_intrinsics_rational_20260622/calibration.json \
   --output ../../artifacts/calibration/stereo_cam1_cam2 \
   --left-camera-id cam1 \
   --right-camera-id cam2 \
-  --source-session CameraCalibLab/calibration_packages/dfoptix_three_calibration_photos_cam1_60_20260622
+  --source-session CameraCalibLab/runs/calibrations/dfoptix_charuco_stereo_auto_fixed_intrinsics_rational_20260622
 uv run tennisbot-calibration package verify --path ../../artifacts/calibration/stereo_cam1_cam2
 ```
 
@@ -72,17 +73,19 @@ accepted: true
 dry_run: false
 hardware_validated: true
 runtime_quality_warning: true
-baseline_m: 0.06778794228688073
+baseline_m: 0.05248616443700974
 accepted_pair_count: 33
-stereo_rms_reprojection_px: 23.486769410254507
-epipolar_rms_px: 30.801563164769544
-rectification_y_p95_px: 19.30416870117187
+stereo_rms_reprojection_px: 0.42365210023675176
+epipolar_rms_px: 4.3304497343502
+rectification_y_p95_px: 0.8301635742187499
 ```
 
-The source calibration is real hardware output, but the stereo quality metrics
-are too high for final physical accuracy claims. This package is acceptable for
-Live3D artifact loading and runtime smoke testing. It should not be treated as
-the final calibration for 3D prediction quality.
+The source calibration is real hardware output. Stereo RMS and rectification
+quality are now much better than the earlier imported package, but epipolar RMS
+still exceeds the runtime-quality review threshold of 2 px. This package is
+acceptable for Live3D artifact loading and runtime smoke testing. It should not
+be treated as final metric-level calibration until the epipolar warning is
+resolved or accepted.
 
 ## Verification
 
@@ -106,4 +109,5 @@ Calibration package verification accepted with no missing files.
 - Open Live3D in the browser and grant access to the two real USB cameras.
 - Confirm the ONNX model detects tennis balls on live frames.
 - Confirm the imported calibration produces stable 3D points.
-- Re-run mono and stereo calibration if the imported stereo error remains high.
+- Re-run or refine stereo calibration if the remaining epipolar RMS warning must
+  be reduced below the runtime-quality review threshold.
