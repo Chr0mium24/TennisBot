@@ -77,6 +77,14 @@ def verify_stereo_package(package_dir: Path, package: dict[str, Any]) -> dict[st
     elif verification.get("accepted") is not True:
         accepted = False
         details.append("verification accepted flag is false")
+    else:
+        rectification_verification = verification.get("rectification")
+        if not isinstance(rectification_verification, dict):
+            accepted = False
+            details.append("verification rectification block is missing")
+        elif rectification_verification.get("accepted") is not True:
+            accepted = False
+            details.append("verification rectification accepted flag is false")
 
     camera_ids = package.get("camera_ids")
     if not isinstance(camera_ids, list) or len(camera_ids) != 2:
@@ -151,7 +159,7 @@ def is_matrix(value: object, rows: int, cols: int) -> bool:
     for row in value:
         if not isinstance(row, list) or len(row) != cols:
             return False
-        if not all(isinstance(item, int | float) for item in row):
+        if not all(isinstance(item, int | float) and not isinstance(item, bool) for item in row):
             return False
     return True
 

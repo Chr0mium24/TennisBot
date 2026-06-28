@@ -140,6 +140,33 @@ def test_package_verify_rejects_missing_required_file(tmp_path: Path) -> None:
     assert main(["package", "verify", "--path", str(output)]) == 1
 
 
+def test_package_verify_rejects_stereo_rectification_not_accepted(tmp_path: Path) -> None:
+    output = tmp_path / "stereo_cam1_cam2"
+    assert (
+        main(
+            [
+                "gui",
+                "stereo",
+                "--left-camera-id",
+                "cam1",
+                "--right-camera-id",
+                "cam2",
+                "--output",
+                str(output),
+                "--dry-run",
+            ]
+        )
+        == 0
+    )
+    verification_path = output / "verification.json"
+    verification = read_json(verification_path)
+    assert isinstance(verification["rectification"], dict)
+    verification["rectification"]["accepted"] = False  # type: ignore[index]
+    verification_path.write_text(json.dumps(verification, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    assert main(["package", "verify", "--path", str(output)]) == 1
+
+
 def test_generated_stereo_rectification_uses_row_major_matrices_and_matching_camera_ids(tmp_path: Path) -> None:
     output = tmp_path / "stereo_cam1_cam2"
     assert (
