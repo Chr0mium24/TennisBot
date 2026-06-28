@@ -1,8 +1,24 @@
 export type {
+  ArtifactPendingCheck,
+  ArtifactValidationResult,
   CalibrationArtifactLoader,
   RuntimeArtifactLoaders,
+  StereoArtifactParts,
+  YoloArtifactParts,
   YoloModelArtifactLoader,
   YoloModelArtifactMetadata,
+} from './artifacts.js';
+export {
+  convertCameraIntrinsicsArtifact,
+  convertRectificationArtifact,
+  convertStereoCalibrationArtifact,
+  convertYoloModelArtifactMetadata,
+  loadStereoCalibrationArtifact,
+  loadYoloModelArtifactMetadata,
+  matrix3x3FromArtifact,
+  matrix3x4FromArtifact,
+  validateStereoCalibrationArtifact,
+  validateYoloModelArtifact,
 } from './artifacts.js';
 export {
   averageStereoReprojectionErrorPx,
