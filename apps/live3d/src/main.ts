@@ -1,7 +1,10 @@
 import { defaultLive3dConfig, describeFixtureMode } from "./config";
 import {
   attachCameraStream,
+  createStereoCameraIdleStatus,
+  createStereoCameraStartingStatus,
   startStereoCameraRuntime,
+  stopStereoCameraRuntime,
   type CameraRuntimeStatus,
   type StereoCameraRuntimeStatus,
 } from "./cameras";
@@ -167,6 +170,7 @@ function renderStatusPanel(
           <strong>${defaultLive3dConfig.artifacts.stereoCalibrationPackagePath}</strong>
         </div>
       </div>
+      ${renderCameraControls(cameraStatus)}
       <section class="camera-status" aria-label="Camera runtime status">
         ${renderCameraRuntimeStatus(cameraStatus.left)}
         ${renderCameraRuntimeStatus(cameraStatus.right)}
@@ -191,6 +195,28 @@ function renderStatusPanel(
           .join("")}
       </ol>
     </aside>
+  `;
+}
+
+function renderCameraControls(status: StereoCameraRuntimeStatus): string {
+  const startDisabled = status.state === "pending" && status.left.code === "starting";
+  const stopDisabled = status.state !== "ready";
+  const startLabel =
+    status.state === "ready"
+      ? "Restart cameras"
+      : status.state === "blocked"
+        ? "Retry cameras"
+        : "Start cameras";
+
+  return `
+    <div class="camera-controls" aria-label="Camera controls">
+      <button id="camera-start-button" type="button" ${startDisabled ? "disabled" : ""}>
+        ${startLabel}
+      </button>
+      <button id="camera-stop-button" type="button" ${stopDisabled ? "disabled" : ""}>
+        Stop cameras
+      </button>
+    </div>
   `;
 }
 
@@ -330,8 +356,8 @@ if (!app) {
   throw new Error("Missing #app mount point");
 }
 
-const [cameraStatus, yoloStatus, calibrationStatus] = await Promise.all([
-  startStereoCameraRuntime(globalThis.navigator?.mediaDevices, defaultLive3dConfig),
+const appElement = app;
+const [yoloStatus, calibrationStatus] = await Promise.all([
   loadYoloArtifactStatus(artifactReader, defaultLive3dConfig.artifacts.yoloModelPackagePath),
   loadStereoCalibrationArtifactStatus(
     artifactReader,
@@ -339,16 +365,55 @@ const [cameraStatus, yoloStatus, calibrationStatus] = await Promise.all([
   ),
 ]);
 
-app.innerHTML = renderApp(cameraStatus, yoloStatus, calibrationStatus);
+let cameraStatus: StereoCameraRuntimeStatus = createStereoCameraIdleStatus(defaultLive3dConfig);
 
-if (cameraStatus.state === "ready") {
+function renderCurrentApp(): void {
+  appElement.innerHTML = renderApp(cameraStatus, yoloStatus, calibrationStatus);
+  bindCameraControls();
+  attachReadyCameraStreams(cameraStatus);
+}
+
+function bindCameraControls(): void {
+  const startButton = document.querySelector<HTMLButtonElement>("#camera-start-button");
+  const stopButton = document.querySelector<HTMLButtonElement>("#camera-stop-button");
+
+  startButton?.addEventListener("click", () => {
+    void startCameraRuntimeFromUserAction();
+  });
+  stopButton?.addEventListener("click", stopCameraRuntimeFromUserAction);
+}
+
+async function startCameraRuntimeFromUserAction(): Promise<void> {
+  stopStereoCameraRuntime(cameraStatus);
+  cameraStatus = createStereoCameraStartingStatus(defaultLive3dConfig);
+  renderCurrentApp();
+  cameraStatus = await startStereoCameraRuntime(
+    globalThis.navigator?.mediaDevices,
+    defaultLive3dConfig,
+  );
+  renderCurrentApp();
+}
+
+function stopCameraRuntimeFromUserAction(): void {
+  stopStereoCameraRuntime(cameraStatus);
+  cameraStatus = createStereoCameraIdleStatus(defaultLive3dConfig);
+  renderCurrentApp();
+}
+
+function attachReadyCameraStreams(status: StereoCameraRuntimeStatus): void {
+  if (status.state !== "ready") {
+    return;
+  }
+
   const leftVideo = document.querySelector<HTMLVideoElement>("#left-camera-video");
   const rightVideo = document.querySelector<HTMLVideoElement>("#right-camera-video");
 
   if (leftVideo !== null) {
-    attachCameraStream(leftVideo, cameraStatus.streams.left);
+    attachCameraStream(leftVideo, status.streams.left);
   }
   if (rightVideo !== null) {
-    attachCameraStream(rightVideo, cameraStatus.streams.right);
+    attachCameraStream(rightVideo, status.streams.right);
   }
 }
+
+renderCurrentApp();

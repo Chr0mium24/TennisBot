@@ -1,4 +1,4 @@
-# Multi-Agent Refactor Wave 8 Live3D USB Camera Results
+# Multi-Agent Refactor Wave 8 Live3D USB Camera Result
 
 Date: 2026-06-29
 
@@ -13,6 +13,9 @@ Branch: `refactor/live3d-usb-camera`
 - Updated the Live3D UI to render real left/right `<video>` elements, attach
   streams after successful startup, and continue rendering fixture artifact and
   3D placeholder status when cameras are blocked.
+- Lead review changed startup from page-load permission prompts to explicit
+  Start/Stop camera controls. Stop releases both opened `MediaStream` tracks;
+  retry/restart first closes any previously opened streams.
 - Kept fixture detection overlays and the fixture scene explicitly labelled as
   non-validation placeholders until YOLO inference is added.
 - Added Bun tests for the camera runtime and stream attachment helper without
@@ -26,6 +29,9 @@ bun test
 ```
 
 Result: 15 passing tests, 0 failures.
+
+Lead review result after Start/Stop controls were added: 17 passing tests, 0
+failures.
 
 ```text
 cd apps/live3d

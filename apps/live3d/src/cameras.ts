@@ -3,6 +3,8 @@ import type { CameraDeviceConfig, Live3dConfig } from "./config";
 export type CameraSide = "left" | "right";
 
 export type CameraRuntimeStatusCode =
+  | "not-started"
+  | "starting"
   | "opened"
   | "unsupported-media-api"
   | "missing-camera"
@@ -11,7 +13,7 @@ export type CameraRuntimeStatusCode =
 
 export type CameraRuntimeStatus = {
   side: CameraSide;
-  state: "ready" | "blocked";
+  state: "ready" | "pending" | "blocked";
   code: CameraRuntimeStatusCode;
   label: string;
   detail: string;
@@ -25,6 +27,12 @@ export type StereoCameraRuntimeStatus =
       left: CameraRuntimeStatus;
       right: CameraRuntimeStatus;
       streams: StereoCameraStreams;
+      devices: CameraRuntimeDevice[];
+    }
+  | {
+      state: "pending";
+      left: CameraRuntimeStatus;
+      right: CameraRuntimeStatus;
       devices: CameraRuntimeDevice[];
     }
   | {
@@ -62,6 +70,24 @@ type SelectedCameraDevices = {
   left: CameraRuntimeDevice;
   right: CameraRuntimeDevice;
 };
+
+export function createStereoCameraIdleStatus(config: Live3dConfig): StereoCameraRuntimeStatus {
+  return pendingPair(
+    "not-started",
+    "Camera streams have not been opened. Start cameras when two USB devices are connected and browser permission can be granted.",
+    config,
+  );
+}
+
+export function createStereoCameraStartingStatus(
+  config: Live3dConfig,
+): StereoCameraRuntimeStatus {
+  return pendingPair(
+    "starting",
+    "Opening browser camera streams and waiting for permission if required.",
+    config,
+  );
+}
 
 export async function startStereoCameraRuntime(
   mediaDevices: MediaDevicesRuntime | undefined,
@@ -176,6 +202,15 @@ export function attachCameraStream(video: VideoStreamElement, stream: MediaStrea
   void video.play?.().catch(() => undefined);
 }
 
+export function stopStereoCameraRuntime(status: StereoCameraRuntimeStatus): void {
+  if (status.state !== "ready") {
+    return;
+  }
+
+  stopStream(status.streams.left);
+  stopStream(status.streams.right);
+}
+
 function selectCameraDevice(
   devices: CameraRuntimeDevice[],
   camera: CameraDeviceConfig,
@@ -221,8 +256,36 @@ function openedStatus(
   };
 }
 
+function pendingPair(
+  code: Extract<CameraRuntimeStatusCode, "not-started" | "starting">,
+  detail: string,
+  config: Live3dConfig,
+): StereoCameraRuntimeStatus {
+  return {
+    state: "pending",
+    left: pendingStatus("left", code, detail, config.cameras.left),
+    right: pendingStatus("right", code, detail, config.cameras.right),
+    devices: [],
+  };
+}
+
+function pendingStatus(
+  side: CameraSide,
+  code: Extract<CameraRuntimeStatusCode, "not-started" | "starting">,
+  detail: string,
+  config: CameraDeviceConfig,
+): CameraRuntimeStatus {
+  return {
+    side,
+    state: "pending",
+    code,
+    label: code === "starting" ? `${config.label} starting` : `${config.label} idle`,
+    detail,
+  };
+}
+
 function blockedPair(
-  code: Exclude<CameraRuntimeStatusCode, "opened">,
+  code: Exclude<CameraRuntimeStatusCode, "opened" | "not-started" | "starting">,
   detail: string,
   devices: CameraRuntimeDevice[] = [],
 ): StereoCameraRuntimeStatus {
@@ -236,7 +299,7 @@ function blockedPair(
 
 function blockedStatus(
   side: CameraSide,
-  code: Exclude<CameraRuntimeStatusCode, "opened">,
+  code: Exclude<CameraRuntimeStatusCode, "opened" | "not-started" | "starting">,
   detail: string,
 ): CameraRuntimeStatus {
   return {

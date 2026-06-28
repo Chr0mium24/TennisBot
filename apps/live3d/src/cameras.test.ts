@@ -2,12 +2,23 @@ import { describe, expect, test } from "bun:test";
 import { defaultLive3dConfig, type Live3dConfig } from "./config";
 import {
   attachCameraStream,
+  createStereoCameraIdleStatus,
   startStereoCameraRuntime,
+  stopStereoCameraRuntime,
   type MediaDevicesRuntime,
+  type StereoCameraRuntimeStatus,
   type VideoStreamElement,
 } from "./cameras";
 
 describe("Live3D browser camera runtime", () => {
+  test("idle status keeps camera permission behind explicit user action", () => {
+    const status = createStereoCameraIdleStatus(defaultLive3dConfig);
+
+    expect(status.state).toBe("pending");
+    expect(status.left.code).toBe("not-started");
+    expect(status.right.code).toBe("not-started");
+  });
+
   test("media API unsupported returns blocked status", async () => {
     const status = await startStereoCameraRuntime(undefined, defaultLive3dConfig);
 
@@ -131,6 +142,30 @@ describe("Live3D browser camera runtime", () => {
     expect(video.autoplay).toBe(true);
     expect(video.playsInline).toBe(true);
   });
+
+  test("stopStereoCameraRuntime releases both opened camera streams", () => {
+    let leftStops = 0;
+    let rightStops = 0;
+    const status: StereoCameraRuntimeStatus = {
+      state: "ready",
+      left: readyRuntimeStatus("left"),
+      right: readyRuntimeStatus("right"),
+      streams: {
+        left: fakeStream("left-stream", () => {
+          leftStops += 1;
+        }),
+        right: fakeStream("right-stream", () => {
+          rightStops += 1;
+        }),
+      },
+      devices: [],
+    };
+
+    stopStereoCameraRuntime(status);
+
+    expect(leftStops).toBe(1);
+    expect(rightStops).toBe(1);
+  });
 });
 
 function fakeMediaDevices(options: {
@@ -161,9 +196,23 @@ function videoDevice(deviceId: string, label: string): MediaDeviceInfo {
   } as MediaDeviceInfo;
 }
 
-function fakeStream(id: string): MediaStream {
+function fakeStream(id: string, onStop?: () => void): MediaStream {
   return {
     id,
-    getTracks: () => [],
+    getTracks: () => [
+      {
+        stop: () => onStop?.(),
+      },
+    ],
   } as unknown as MediaStream;
+}
+
+function readyRuntimeStatus(side: "left" | "right") {
+  return {
+    side,
+    state: "ready" as const,
+    code: "opened" as const,
+    label: `${side} opened`,
+    detail: `${side} camera opened`,
+  };
 }
