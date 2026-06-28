@@ -143,6 +143,10 @@ Import existing CameraCalibLab calibration:
 
 ```bash
 cd tools/calibration
+uv run tennisbot-calibration package scan-camera-calib-lab \
+  --root ../../CameraCalibLab/runs/calibrations \
+  --limit 12 \
+  --output-report ../../docs/calibration_candidate_scan_YYYYMMDD.md
 uv run tennisbot-calibration package import-camera-calib-lab \
   --cam1 ../../CameraCalibLab/runs/calibrations/dfoptix_charuco_auto_combined_rational_20260620_top_right_eps1e7/calibration.json \
   --cam2 ../../CameraCalibLab/runs/calibrations/dfoptix_charuco_auto_cam2/calibration.json \
@@ -216,6 +220,9 @@ Runtime artifacts have also been imported locally:
 YOLO: dry_run=false, inference_ready=true, default_model=onnx.
 YOLO static smoke: 109/109 matched labeled samples detected at threshold 0.05.
 Calibration: dry_run=false, hardware_validated=true, package verify accepted.
+Calibration candidate scan: 17 CameraCalibLab calibration files scanned,
+3 stereo candidates ranked, best stereo candidate
+dfoptix_charuco_stereo_auto_fixed_intrinsics_rational_20260622.
 Calibration quality warning: epipolar_rms=4.330 px exceeds the 2.000 px
 runtime-quality review threshold. stereo_rms=0.424 px,
 rectification_y_p95=0.830 px, baseline=0.052486 m.

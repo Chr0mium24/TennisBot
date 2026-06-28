@@ -6,6 +6,7 @@ from pathlib import Path
 
 from tennisbot_calibration.artifacts import write_mono_dry_run, write_stereo_dry_run
 from tennisbot_calibration.import_camera_calib_lab import import_camera_calib_lab_package
+from tennisbot_calibration.scan_camera_calib_lab import scan_camera_calib_lab, write_scan_report
 from tennisbot_calibration.verify import verify_package
 
 
@@ -14,7 +15,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="tennisbot-calibration",
         description="TennisBot calibration artifact tooling.",
         epilog=(
-            "Workflows: gui mono, gui stereo, package verify. "
+            "Workflows: gui mono, gui stereo, package verify, package scan-camera-calib-lab. "
             "Wave 5 GUI commands support dry-run/non-hardware output only."
         ),
     )
@@ -61,6 +62,15 @@ def configure_package(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
     importer.add_argument("--right-camera-id", default="cam2")
     importer.add_argument("--source-session", default=None)
     importer.set_defaults(handler=package_import_camera_calib_lab)
+
+    scan = package_subparsers.add_parser(
+        "scan-camera-calib-lab",
+        help="Rank existing CameraCalibLab calibration.json outputs before import.",
+    )
+    scan.add_argument("--root", required=True, help="Directory to scan recursively for calibration.json files.")
+    scan.add_argument("--limit", type=int, default=10, help="Maximum mono/stereo candidates to include in output.")
+    scan.add_argument("--output-report", default=None, help="Optional Markdown report path.")
+    scan.set_defaults(handler=package_scan_camera_calib_lab)
 
 
 def gui_mono(args: argparse.Namespace) -> int:
@@ -109,6 +119,14 @@ def package_import_camera_calib_lab(args: argparse.Namespace) -> int:
         )
     )
     return 0 if verification["accepted"] else 1
+
+
+def package_scan_camera_calib_lab(args: argparse.Namespace) -> int:
+    scan = scan_camera_calib_lab(Path(args.root), limit=args.limit)
+    if args.output_report:
+        write_scan_report(Path(args.output_report), scan)
+    print(json.dumps(scan, indent=2, sort_keys=True))
+    return 0
 
 
 def require_dry_run(dry_run: bool) -> None:

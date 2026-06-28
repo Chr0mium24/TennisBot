@@ -52,6 +52,10 @@ Import existing CameraCalibLab calibration into runtime artifacts:
 
 ```bash
 cd tools/calibration
+uv run tennisbot-calibration package scan-camera-calib-lab \
+  --root ../../CameraCalibLab/runs/calibrations \
+  --limit 12 \
+  --output-report ../../docs/calibration_candidate_scan_YYYYMMDD.md
 uv run tennisbot-calibration package import-camera-calib-lab \
   --cam1 ../../CameraCalibLab/runs/calibrations/dfoptix_charuco_auto_combined_rational_20260620_top_right_eps1e7/calibration.json \
   --cam2 ../../CameraCalibLab/runs/calibrations/dfoptix_charuco_auto_cam2/calibration.json \
@@ -90,6 +94,7 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 - [Current architecture](docs/current_architecture_20260629.md)
 - [Final runtime validation](docs/final_runtime_validation_20260629.md)
 - [Physical artifact import](docs/physical_artifact_import_20260629.md)
+- [Calibration candidate scan](docs/calibration_candidate_scan_20260629.md)
 - [Legacy board/runtime shell retirement](docs/legacy_board_retirement_20260629.md)
 - [Live3D hardware smoke](docs/live3d_hardware_smoke_20260629.md)
 - [YOLO static sample validation](docs/yolo_static_sample_validation_20260629.md)

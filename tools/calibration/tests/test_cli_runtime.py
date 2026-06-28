@@ -33,6 +33,7 @@ def test_cli_help_exposes_required_commands(capsys: pytest.CaptureFixture[str]) 
     assert "stereo" in gui_help
     assert "verify" in package_help
     assert "import-camera-calib-lab" in package_help
+    assert "scan-camera-calib-lab" in package_help
 
 
 def test_mono_dry_run_writes_required_package_files_for_cam1(tmp_path: Path) -> None:
@@ -243,6 +244,51 @@ def test_import_camera_calib_lab_writes_verified_runtime_stereo_package(tmp_path
     assert "Imported from CameraCalibLab" in (output / "summary.md").read_text(encoding="utf-8")
 
 
+def test_scan_camera_calib_lab_ranks_candidates_and_writes_markdown(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    root = tmp_path / "runs" / "calibrations"
+    source = write_camera_calib_lab_fixture(tmp_path / "source")
+    write_json_fixture(root / "cam1" / "calibration.json", read_json(source["cam1"]))
+    write_json_fixture(root / "cam2" / "calibration.json", read_json(source["cam2"]))
+    write_json_fixture(root / "selected" / "calibration.json", read_json(source["stereo"]))
+    weak = read_json(source["stereo"])
+    weak["result_id"] = "weak_stereo"
+    weak["metrics"]["stereo_rms_px"] = 5.0  # type: ignore[index]
+    weak["metrics"]["epipolar_rms_px"] = 8.0  # type: ignore[index]
+    weak["metrics"]["rectification_y_p95_px"] = 4.0  # type: ignore[index]
+    write_json_fixture(root / "weak" / "calibration.json", weak)
+    report = tmp_path / "scan.md"
+
+    assert (
+        main(
+            [
+                "package",
+                "scan-camera-calib-lab",
+                "--root",
+                str(root),
+                "--limit",
+                "3",
+                "--output-report",
+                str(report),
+            ]
+        )
+        == 0
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["counts"]["mono_candidates"] == 2
+    assert payload["counts"]["stereo_candidates"] == 2
+    assert payload["recommended_stereo"]["path"] == "selected/calibration.json"
+    assert payload["recommended_stereo"]["metrics"]["stereo_rms_px"] == pytest.approx(0.5)
+    assert payload["stereo_candidates"][1]["warning_count"] == 3
+    report_text = report.read_text(encoding="utf-8")
+    assert "# CameraCalibLab Calibration Candidate Scan" in report_text
+    assert "`selected/calibration.json`" in report_text
+    assert "`weak/calibration.json`" in report_text
+
+
 def write_camera_calib_lab_fixture(root: Path) -> dict[str, Path]:
     root.mkdir(parents=True)
     cam1 = root / "cam1.json"
@@ -318,4 +364,5 @@ def write_camera_calib_lab_fixture(root: Path) -> dict[str, Path]:
 
 
 def write_json_fixture(path: Path, payload: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
