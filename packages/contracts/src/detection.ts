@@ -1,0 +1,31 @@
+import type { PixelBoundingBox, Vector2, Vector3 } from './geometry.js';
+
+export interface YoloDetection2D {
+  detectionId: string;
+  cameraId: string;
+  frameId: string;
+  timestampUnixMs: number;
+  classId: number;
+  label: string;
+  confidence: number;
+  bboxPx: PixelBoundingBox;
+  centerPx: Vector2;
+}
+
+export interface TimestampedStereoDetectionPair {
+  pairId: string;
+  timestampUnixMs: number;
+  left: YoloDetection2D;
+  right: YoloDetection2D;
+  maxTimestampDeltaMs: number;
+  matchConfidence?: number;
+}
+
+export interface TriangulatedBallPoint3D {
+  pointId: string;
+  timestampUnixMs: number;
+  positionMeters: Vector3;
+  sourcePairId: string;
+  reprojectionErrorPx?: number;
+  covarianceMeters?: number[];
+}
