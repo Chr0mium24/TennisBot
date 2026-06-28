@@ -12,13 +12,22 @@ TypeScript and Bun frontend app that defines the intended product surface:
 
 ## Current mode
 
-The app currently runs only in fixture mode. Fixture mode builds contract-shaped
-sample detections and an in-memory stereo calibration, then runs them through
-`packages/core` stereo pairing, triangulation, and trajectory prediction before
-rendering the result.
+The app currently runs in fixture mode with a Wave 9 YOLO inference adapter
+boundary. Fixture mode builds contract-shaped sample detections and an in-memory
+stereo calibration, then runs them through `packages/core` stereo pairing,
+triangulation, and trajectory prediction before rendering the result.
 
-This still does not open real USB cameras, run real YOLO inference, load or
-validate a real calibration artifact, validate real tracking, or validate real
+The UI can open browser camera streams, validate YOLO/calibration artifact
+metadata, and run an injected `YoloInferenceBackend` against the current left and
+right video elements. The default backend is intentionally blocked because this
+wave does not implement ONNX Runtime Web preprocessing, inference, or
+postprocessing.
+
+Fixture overlays remain explicitly labelled fixture-only. Runtime overlays are
+rendered only when the injected backend returns valid detections.
+
+This still does not run real YOLO inference by default, validate real tracking,
+perform live stereo triangulation from runtime detections, or validate real
 prediction.
 
 ## Config placeholders
@@ -28,8 +37,8 @@ The initial placeholders live in `src/config.ts`:
 ```text
 left camera device: /dev/video0
 right camera device: /dev/video2
-YOLO model package: ../../artifacts/models/tennis_ball_yolo
-stereo calibration package: ../../artifacts/calibration/stereo_cam1_cam2
+YOLO model package: /artifacts/models/tennis_ball_yolo
+stereo calibration package: /artifacts/calibration/stereo_cam1_cam2
 ```
 
 These paths match the target artifact boundaries from the architecture
