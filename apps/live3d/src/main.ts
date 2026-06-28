@@ -17,15 +17,35 @@ import {
 } from "./artifacts";
 import {
   createFixture,
-  detectionToBox,
   type CameraFixture,
-  type DetectionBox,
   type Point3d,
 } from "./fixtures";
+import {
+  createBlockedYoloInferenceBackend,
+  createStereoYoloInferenceIdleStatus,
+  createYoloInferenceRunningStatus,
+  detectionToOverlayBox,
+  runYoloInferenceForFrame,
+  type DetectionBox,
+  type StereoYoloInferenceRuntimeStatus,
+  type YoloInferenceBackend,
+  type YoloInferenceRuntimeStatus,
+} from "./detections";
 import "./styles.css";
+
+declare global {
+  interface Window {
+    __tennisbotLive3dYoloBackend?: YoloInferenceBackend;
+  }
+}
 
 const fixture = createFixture(defaultLive3dConfig);
 const artifactReader = new BrowserFetchJsonReader();
+const yoloBackend =
+  window.__tennisbotLive3dYoloBackend ??
+  createBlockedYoloInferenceBackend(
+    "Wave 9 wires the injectable YOLO adapter path only. A real ONNX Runtime Web backend is deferred to a later wave.",
+  );
 
 function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
@@ -46,7 +66,34 @@ function renderDetection(box: DetectionBox): string {
   `;
 }
 
-function renderCameraPanel(camera: CameraFixture, side: "left" | "right"): string {
+function renderCameraPanel(
+  camera: CameraFixture,
+  side: "left" | "right",
+  detectionStatus: YoloInferenceRuntimeStatus,
+): string {
+  const configuredSize = defaultLive3dConfig.cameras[side].resolution;
+  const imageSize = detectionStatus.imageSize ?? {
+    widthPx: configuredSize.width,
+    heightPx: configuredSize.height,
+  };
+  const runtimeBoxes =
+    detectionStatus.state === "ready"
+      ? detectionStatus.detections.map((detection) =>
+          detectionToOverlayBox(detection, imageSize),
+        )
+      : [];
+  const fixtureBoxes = camera.detections.map((detection) =>
+    detectionToOverlayBox(detection, {
+      widthPx: configuredSize.width,
+      heightPx: configuredSize.height,
+    }),
+  );
+  const boxes = runtimeBoxes.length > 0 ? runtimeBoxes : fixtureBoxes;
+  const frameLabel =
+    runtimeBoxes.length > 0
+      ? `Runtime YOLO adapter detections from ${escapeHtml(detectionStatus.frameId ?? "current frame")}`
+      : "Fixture detections overlay only; not YOLO validation";
+
   return `
     <section class="camera-panel" aria-label="${camera.name}">
       <div class="panel-heading">
@@ -67,8 +114,8 @@ function renderCameraPanel(camera: CameraFixture, side: "left" | "right"): strin
         ></video>
         <div class="frame-grid"></div>
         <div class="frame-horizon"></div>
-        <div class="frame-label">Fixture detections overlay only; not YOLO validation</div>
-        ${camera.detections.map(detectionToBox).map(renderDetection).join("")}
+        <div class="frame-label">${frameLabel}</div>
+        ${boxes.map(renderDetection).join("")}
       </div>
     </section>
   `;
@@ -141,6 +188,7 @@ function formatPoint(point: Point3d): string {
 
 function renderStatusPanel(
   cameraStatus: StereoCameraRuntimeStatus,
+  detectionStatus: StereoYoloInferenceRuntimeStatus,
   yoloStatus: YoloArtifactLoadStatus,
   calibrationStatus: StereoCalibrationArtifactLoadStatus,
 ): string {
@@ -175,6 +223,11 @@ function renderStatusPanel(
         ${renderCameraRuntimeStatus(cameraStatus.left)}
         ${renderCameraRuntimeStatus(cameraStatus.right)}
       </section>
+      ${renderYoloControls(cameraStatus, detectionStatus, yoloStatus)}
+      <section class="camera-status" aria-label="YOLO inference runtime status">
+        ${renderYoloInferenceRuntimeStatus(detectionStatus.left)}
+        ${renderYoloInferenceRuntimeStatus(detectionStatus.right)}
+      </section>
       <section class="artifact-status" aria-label="Artifact status">
         ${renderYoloArtifactStatus(yoloStatus)}
         ${renderCalibrationArtifactStatus(calibrationStatus)}
@@ -195,6 +248,29 @@ function renderStatusPanel(
           .join("")}
       </ol>
     </aside>
+  `;
+}
+
+function renderYoloControls(
+  cameraStatus: StereoCameraRuntimeStatus,
+  detectionStatus: StereoYoloInferenceRuntimeStatus,
+  yoloStatus: YoloArtifactLoadStatus,
+): string {
+  const isRunning =
+    detectionStatus.left.state === "running" || detectionStatus.right.state === "running";
+  const startDisabled = isRunning || cameraStatus.state !== "ready" || yoloStatus.status !== "loaded";
+  const stopDisabled =
+    detectionStatus.left.state === "idle" && detectionStatus.right.state === "idle";
+
+  return `
+    <div class="camera-controls" aria-label="YOLO inference controls">
+      <button id="yolo-start-button" type="button" ${startDisabled ? "disabled" : ""}>
+        Start YOLO adapter
+      </button>
+      <button id="yolo-stop-button" type="button" ${stopDisabled ? "disabled" : ""}>
+        Stop YOLO adapter
+      </button>
+    </div>
   `;
 }
 
@@ -242,6 +318,19 @@ function renderCameraRuntimeStatus(status: CameraRuntimeStatus): string {
           ? ""
           : `<small>${escapeHtml(status.deviceLabel || status.deviceId)}</small>`
       }
+    </article>
+  `;
+}
+
+function renderYoloInferenceRuntimeStatus(status: YoloInferenceRuntimeStatus): string {
+  const stateClass = status.state === "idle" ? "pending" : status.state;
+  const warningText = status.warnings.length > 0 ? ` Warnings: ${status.warnings.join(" ")}` : "";
+
+  return `
+    <article class="runtime-card runtime-${stateClass}">
+      <h3>${escapeHtml(status.label)}</h3>
+      <p>${escapeHtml(`${status.detail}${warningText}`)}</p>
+      <small>${escapeHtml(`${status.detectionCount} detection(s)`)}</small>
     </article>
   `;
 }
@@ -326,6 +415,7 @@ function escapeHtml(value: string): string {
 
 function renderApp(
   cameraStatus: StereoCameraRuntimeStatus,
+  detectionStatus: StereoYoloInferenceRuntimeStatus,
   yoloStatus: YoloArtifactLoadStatus,
   calibrationStatus: StereoCalibrationArtifactLoadStatus,
 ): string {
@@ -340,11 +430,11 @@ function renderApp(
       </header>
       <section class="workspace">
         <div class="camera-grid">
-          ${renderCameraPanel(fixture.cameras.left, "left")}
-          ${renderCameraPanel(fixture.cameras.right, "right")}
+          ${renderCameraPanel(fixture.cameras.left, "left", detectionStatus.left)}
+          ${renderCameraPanel(fixture.cameras.right, "right", detectionStatus.right)}
           ${renderScene()}
         </div>
-        ${renderStatusPanel(cameraStatus, yoloStatus, calibrationStatus)}
+        ${renderStatusPanel(cameraStatus, detectionStatus, yoloStatus, calibrationStatus)}
       </section>
     </main>
   `;
@@ -366,10 +456,12 @@ const [yoloStatus, calibrationStatus] = await Promise.all([
 ]);
 
 let cameraStatus: StereoCameraRuntimeStatus = createStereoCameraIdleStatus(defaultLive3dConfig);
+let detectionStatus: StereoYoloInferenceRuntimeStatus = createStereoYoloInferenceIdleStatus();
 
 function renderCurrentApp(): void {
-  appElement.innerHTML = renderApp(cameraStatus, yoloStatus, calibrationStatus);
+  appElement.innerHTML = renderApp(cameraStatus, detectionStatus, yoloStatus, calibrationStatus);
   bindCameraControls();
+  bindYoloControls();
   attachReadyCameraStreams(cameraStatus);
 }
 
@@ -383,8 +475,19 @@ function bindCameraControls(): void {
   stopButton?.addEventListener("click", stopCameraRuntimeFromUserAction);
 }
 
+function bindYoloControls(): void {
+  const startButton = document.querySelector<HTMLButtonElement>("#yolo-start-button");
+  const stopButton = document.querySelector<HTMLButtonElement>("#yolo-stop-button");
+
+  startButton?.addEventListener("click", () => {
+    void startYoloInferenceFromUserAction();
+  });
+  stopButton?.addEventListener("click", stopYoloInferenceFromUserAction);
+}
+
 async function startCameraRuntimeFromUserAction(): Promise<void> {
   stopStereoCameraRuntime(cameraStatus);
+  stopYoloInferenceFromUserAction();
   cameraStatus = createStereoCameraStartingStatus(defaultLive3dConfig);
   renderCurrentApp();
   cameraStatus = await startStereoCameraRuntime(
@@ -396,8 +499,64 @@ async function startCameraRuntimeFromUserAction(): Promise<void> {
 
 function stopCameraRuntimeFromUserAction(): void {
   stopStereoCameraRuntime(cameraStatus);
+  stopYoloInferenceFromUserAction();
   cameraStatus = createStereoCameraIdleStatus(defaultLive3dConfig);
   renderCurrentApp();
+}
+
+async function startYoloInferenceFromUserAction(): Promise<void> {
+  if (cameraStatus.state !== "ready" || yoloStatus.status !== "loaded") {
+    return;
+  }
+
+  const timestampUnixMs = Date.now();
+  const leftFrameId = `left-${timestampUnixMs}`;
+  const rightFrameId = `right-${timestampUnixMs}`;
+  detectionStatus = {
+    left: createYoloInferenceRunningStatus("left", leftFrameId, timestampUnixMs),
+    right: createYoloInferenceRunningStatus("right", rightFrameId, timestampUnixMs),
+  };
+  renderCurrentApp();
+
+  const leftVideo = document.querySelector<HTMLVideoElement>("#left-camera-video");
+  const rightVideo = document.querySelector<HTMLVideoElement>("#right-camera-video");
+
+  const [left, right] = await Promise.all([
+    runYoloInferenceForFrame(yoloBackend, {
+      side: "left",
+      cameraId: cameraStatus.left.deviceId ?? defaultLive3dConfig.cameras.left.id,
+      frameId: leftFrameId,
+      timestampUnixMs,
+      imageSize: getVideoImageSize(leftVideo, defaultLive3dConfig.cameras.left.resolution),
+      source: leftVideo,
+    }),
+    runYoloInferenceForFrame(yoloBackend, {
+      side: "right",
+      cameraId: cameraStatus.right.deviceId ?? defaultLive3dConfig.cameras.right.id,
+      frameId: rightFrameId,
+      timestampUnixMs,
+      imageSize: getVideoImageSize(rightVideo, defaultLive3dConfig.cameras.right.resolution),
+      source: rightVideo,
+    }),
+  ]);
+
+  detectionStatus = { left, right };
+  renderCurrentApp();
+}
+
+function stopYoloInferenceFromUserAction(): void {
+  yoloBackend.stop?.();
+  detectionStatus = createStereoYoloInferenceIdleStatus();
+}
+
+function getVideoImageSize(
+  video: HTMLVideoElement | null,
+  fallback: { width: number; height: number },
+): { widthPx: number; heightPx: number } {
+  return {
+    widthPx: video?.videoWidth || fallback.width,
+    heightPx: video?.videoHeight || fallback.height,
+  };
 }
 
 function attachReadyCameraStreams(status: StereoCameraRuntimeStatus): void {
