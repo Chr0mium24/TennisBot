@@ -13,6 +13,10 @@ Date: 2026-06-29
 - The local Live3D server maps `/artifacts/...` to the repo-root `artifacts/`
   directory without copying artifacts into `dist`.
 
+Lead review tightened local artifact serving to resolve real paths, require
+served targets to be files, and reject symlink escapes. Artifact status text is
+HTML-escaped before rendering.
+
 ## Verification
 
 ```text
@@ -23,6 +27,15 @@ bun run build
 ```
 
 All checks passed before commit.
+
+After merge, the lead generated dry-run YOLO and stereo calibration artifacts
+with `tools/yolo` and `tools/calibration`, started the Live3D server, and
+confirmed:
+
+- `/artifacts/models/tennis_ball_yolo/package.json` served the YOLO package;
+- `/artifacts/calibration/stereo_cam1_cam2/package.json` served the calibration
+  package;
+- `/artifacts/../README.md` returned `404`.
 
 ## Scope Notes
 
