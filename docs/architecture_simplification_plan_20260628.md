@@ -317,8 +317,10 @@ Then it opens the two USB cameras and renders:
 
 ### Phase 5: Retire Legacy Shells
 
-- Remove or archive `TennisBotCV` once `apps/live3d`, `apps/sim`, contracts, and
-  core packages own the active runtime paths.
+- Status 2026-06-29: `TennisBotCV` was removed from the main repository because
+  the live runtime is now owned by `apps/live3d`, `packages/contracts`,
+  `packages/core`, `tools/calibration`, and `tools/yolo`; simulation source still
+  remains in `TennisWebSim` until it is migrated to `apps/sim`.
 - Update README and docs to describe only the active structure.
 
 ## Non-Goals

@@ -3,8 +3,9 @@
 Local-machine-first workspace for the TennisBot stereo vision runtime.
 
 The active architecture now lives in top-level `apps/`, `packages/`, and
-`tools/`. Legacy lab directories remain as reference submodules, but the live
-runtime consumes only exported artifacts from `artifacts/`.
+`tools/`. Legacy lab directories are reference submodules only where they still
+feed migration work; the live runtime consumes only exported artifacts from
+`artifacts/`.
 
 ## Projects
 
@@ -16,7 +17,7 @@ runtime consumes only exported artifacts from `artifacts/`.
 | `tools/calibration` | Standalone mono/stereo calibration package tooling |
 | `tools/yolo` | Standalone YOLO runtime model package tooling |
 | `artifacts/` | Ignored local runtime outputs for calibration and model packages |
-| Legacy submodules | `CameraCalibLab`, `TennisBallDetectorLab`, `BallTrajectoryLab`, `TennisWebSim`, `TennisBotCV` are reference/history only for the current runtime path |
+| Legacy submodules | `CameraCalibLab`, `TennisBallDetectorLab`, `BallTrajectoryLab`, and `TennisWebSim` are reference/history only for migration work |
 
 ## Common Commands
 
@@ -89,6 +90,7 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 - [Current architecture](docs/current_architecture_20260629.md)
 - [Final runtime validation](docs/final_runtime_validation_20260629.md)
 - [Physical artifact import](docs/physical_artifact_import_20260629.md)
+- [Legacy board/runtime shell retirement](docs/legacy_board_retirement_20260629.md)
 - [Live3D hardware smoke](docs/live3d_hardware_smoke_20260629.md)
 - [YOLO static sample validation](docs/yolo_static_sample_validation_20260629.md)
 - [Architecture simplification plan](docs/architecture_simplification_plan_20260628.md)
@@ -142,5 +144,6 @@ git commit -m "Update legacy submodule pointer"
 
 ## Remote Status
 
-The historical submodules use GitHub remotes under `Chr0mium24`. The current
-runtime path does not depend on board-side deployment code.
+The remaining historical submodules use GitHub remotes under `Chr0mium24`.
+`TennisBotCV` was removed from the main repo because the current runtime path
+does not depend on board-side deployment code.

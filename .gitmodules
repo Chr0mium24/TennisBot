@@ -10,10 +10,6 @@
 	path = BallTrajectoryLab
 	url = https://github.com/Chr0mium24/BallTrajectoryLab.git
 
-[submodule "TennisBotCV"]
-	path = TennisBotCV
-	url = https://github.com/Chr0mium24/TennisBotCV.git
-
 [submodule "TennisWebSim"]
 	path = TennisWebSim
 	url = https://github.com/Chr0mium24/TennisWebSim.git

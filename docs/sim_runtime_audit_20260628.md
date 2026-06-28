@@ -21,15 +21,13 @@ Core should not inherit UI rendering, report generation, ROSBridge, YOLO
 runtime service code, or dataset/session readers.
 
 `packages/contracts` should replace duplicated TypeScript contracts in
-`TennisWebSim/packages/tennis-contracts` and
-`TennisBotCV/packages/tennis-contracts`, and should also become the canonical
+`TennisWebSim/packages/tennis-contracts` and should also become the canonical
 shape for the Python detection/state/prediction dataclasses in
-`BallTrajectoryLab`.
+`BallTrajectoryLab`. The older `TennisBotCV/packages/tennis-contracts` copy was
+retired with the `TennisBotCV` submodule.
 
-`TennisBotCV` can be retired after `apps/live3d`, `apps/sim`,
-`packages/contracts`, `packages/core`, and any required board-camera successor
-cover its active responsibilities. Today it mostly duplicates split-out projects
-or contains generated/runtime artifacts.
+`TennisBotCV` was retired from the main repository on 2026-06-29. It mostly
+duplicated split-out projects or contained generated/runtime board artifacts.
 
 ## Current Runtime Inventory
 
@@ -91,7 +89,7 @@ Keep out of `packages/core`:
 
 ### TennisBotCV
 
-Retire after replacement paths exist:
+Retired from the main repository on 2026-06-29:
 
 - `TennisBotCV/packages/tennis-contracts`: duplicate of the simulation contracts
   package, with drift in `src/types.ts`.
@@ -100,9 +98,8 @@ Retire after replacement paths exist:
   This becomes redundant once `apps/sim` owns its own launch/dev workflow.
 - `TennisBotCV/web/app/dist` and `TennisBotCV/web/app/tsconfig.tsbuildinfo`:
   generated frontend artifacts.
-- `TennisBotCV/dist/board_web_rk3576*`: generated board deployment bundle. Keep
-  only if no separate board-console owner exists; otherwise archive/delete after
-  confirming artifact reproducibility.
+- `TennisBotCV/dist/board_web_rk3576*`: generated board deployment bundle that is
+  no longer part of this main repository.
 - `TennisBotCV/runs`, `captures`, `data/raw`, and `experiments`: historical
   local outputs. These should not survive as source-controlled runtime content.
 - `TennisBotCV/kernel_work`: RK3576 kernel and boot image work. This is outside
@@ -111,15 +108,15 @@ Retire after replacement paths exist:
 - `TennisBotCV/yolov8n.pt`: loose model file. Replace with the canonical
   `artifacts/models/tennis_ball_yolo/` model package contract.
 
-Preserve or archive before deletion:
+Historical references noted before deletion:
 
 - `TennisBotCV/docs/*`: useful historical split documentation. Promote still
   relevant decisions into top-level `docs/`, then archive the rest.
 - `TennisBotCV/references/*`: research references should move to top-level
   docs/references or an archive if still cited.
-- Board camera preview/recording behavior in `dist/board_web_rk3576` should not
-  be deleted until the team confirms `BoardCameraConsole` or another owner has
-  the reproducible source and deployment path.
+- Board camera preview/recording behavior in `dist/board_web_rk3576` is no
+  longer part of this main repository. Any future board-console work should live
+  in a separate owner instead of returning to the active TennisBot runtime tree.
 
 ## Target Ownership
 
@@ -181,7 +178,7 @@ against, the same schema source to avoid the current drift.
 
 Retire or archive:
 
-- `TennisBotCV` once replacement owners are merged and verified.
+- `TennisBotCV` was removed from the main repository on 2026-06-29.
 - Generated frontend builds and Python cache/build outputs inside child
   projects.
 - Loose model files and historical run outputs that are not part of the
@@ -230,7 +227,7 @@ Recommendation:
   local Pydantic/TypeScript schema duplicates after both sides consume the
   contract.
 
-### Runtime Duplicates
+### Former Runtime Duplicates
 
 1. `TennisWebSim/packages/tennis-contracts` and
    `TennisBotCV/packages/tennis-contracts`
@@ -257,27 +254,21 @@ Recommendation:
    - Generated/embed simulation UI paths overlap. Keep one generated artifact
      pipeline, not source/runtime copies in both places.
 
-## Deletion Readiness For TennisBotCV
+## TennisBotCV Retirement Result
 
-Delete after `apps/live3d` exists and is verified:
+Removed from the main repository on 2026-06-29:
 
-- `TennisBotCV/packages/tennis-contracts`, after `packages/contracts` replaces
-  both TennisBotCV and TennisWebSim copies.
-- `TennisBotCV/web/app`, after `apps/sim` provides start/status instructions for
-  sim web, Gazebo, and ROSBridge.
-- `TennisBotCV/yolov8n.pt`, after a canonical model package exists under
-  `artifacts/models/tennis_ball_yolo/` or another ignored artifact path.
-- Historical `runs`, `captures`, `data/raw`, and `experiments`, after any
-  required evidence is archived outside runtime source.
+- `TennisBotCV/packages/tennis-contracts`; `packages/contracts` is now the active
+  contract package.
+- `TennisBotCV/web/app`; simulation source remains in `TennisWebSim` until an
+  `apps/sim` migration is done.
+- `TennisBotCV/yolov8n.pt`; the active model is the ignored runtime package under
+  `artifacts/models/tennis_ball_yolo/`.
+- Historical `runs`, `captures`, `data/raw`, and `experiments`.
 - Generated web/app build outputs and caches.
-
-Delete only after separate owner confirmation:
-
-- `TennisBotCV/dist/board_web_rk3576*`, because it still contains board preview,
-  recording, snapshot, service status, and deploy scripts. It is not replaced by
-  `apps/live3d`; it is replaced only by a maintained board-console workflow.
-- `TennisBotCV/kernel_work`, because it is hardware bringup state rather than
-  live3d/sim runtime. Archive if still operationally relevant.
+- `TennisBotCV/dist/board_web_rk3576*` and `TennisBotCV/kernel_work`; board
+  deployment and hardware bringup are no longer active responsibilities of this
+  main repository.
 
 Keep as migrated documentation or references:
 
@@ -295,11 +286,12 @@ Keep as migrated documentation or references:
 4. Rewire `apps/sim` to consume `packages/contracts` and `packages/core` where
    practical.
 5. Build/verify `apps/live3d` against canonical model/calibration packages.
-6. Retire TennisBotCV duplicates and loose/generated artifacts.
+6. Completed 2026-06-29: retire TennisBotCV duplicates and loose/generated
+   artifacts from the main repository.
 
-## Verification Performed
+## Original Audit Verification
 
-Audit commands:
+Audit commands from the original 2026-06-28 report:
 
 ```bash
 git status --short --branch

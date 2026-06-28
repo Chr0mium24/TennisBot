@@ -35,11 +35,12 @@ CameraCalibLab/
 TennisBallDetectorLab/
 BallTrajectoryLab/
 TennisWebSim/
-TennisBotCV/
 ```
 
 They are not used as the main runtime architecture. `TennisBallDetectorLab`
-currently has user-owned dirty state and remains untouched.
+currently has user-owned dirty state and remains untouched. The old
+`TennisBotCV` integration/board-runtime shell was retired from the main
+repository on 2026-06-29; see `docs/legacy_board_retirement_20260629.md`.
 
 ## Boundaries
 
