@@ -25,7 +25,7 @@ git diff --name-only main..HEAD
 ## Result
 
 - `uv sync`: passed.
-- `uv run pytest -q`: passed.
+- `uv run pytest -q`: passed with 12 tests after lead review.
 - `uv run tennisbot-yolo --help`: passed and exposed `package`.
 - `uv run tennisbot-yolo package create --output-dir ../../artifacts/models/tennis_ball_yolo --dry-run`: passed.
 - `uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_yolo`: passed.
@@ -33,3 +33,12 @@ git diff --name-only main..HEAD
 
 Generated dry-run outputs are under ignored `artifacts/` and are not intended
 for commit.
+
+Lead review tightened package verification to check every declared model entry,
+not only the default model, and to reject boolean values where numeric model
+byte counts or preprocessing sizes are required.
+
+After merge, the generated dry-run package was loaded through `packages/core`'s
+`loadYoloModelArtifactMetadata` helper. The smoke check returned
+`selectedModel: onnx`, `modelPath: model.onnx`, and three pending model checks,
+confirming the package metadata is consumable by the runtime loader.
