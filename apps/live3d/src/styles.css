@@ -137,6 +137,14 @@ select {
   position: relative;
 }
 
+.camera-video {
+  height: 100%;
+  inset: 0;
+  object-fit: cover;
+  position: absolute;
+  width: 100%;
+}
+
 .frame-grid {
   background-image:
     linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
@@ -156,12 +164,18 @@ select {
 }
 
 .frame-label {
-  bottom: 12px;
-  color: rgba(255, 255, 255, 0.72);
+  background: rgba(21, 32, 30, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  bottom: 10px;
+  color: rgba(255, 255, 255, 0.86);
   font-size: 0.8rem;
   font-weight: 700;
-  left: 14px;
+  left: 10px;
+  max-width: calc(100% - 20px);
+  padding: 6px 8px;
   position: absolute;
+  overflow-wrap: anywhere;
 }
 
 .detection-box {
@@ -322,18 +336,67 @@ select {
   overflow-wrap: anywhere;
 }
 
+.camera-controls {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 14px;
+}
+
+.camera-controls button {
+  background: #1f2b28;
+  border: 1px solid #1f2b28;
+  border-radius: 6px;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 0.84rem;
+  font-weight: 800;
+  line-height: 1.2;
+  min-height: 40px;
+  padding: 8px 10px;
+}
+
+.camera-controls button:nth-child(2) {
+  background: #ffffff;
+  color: #1f2b28;
+}
+
+.camera-controls button:disabled {
+  background: #edf2ea;
+  border-color: #d2dccd;
+  color: #7b8778;
+  cursor: not-allowed;
+}
+
+.camera-status,
 .artifact-status {
   display: grid;
   gap: 10px;
   margin-bottom: 14px;
 }
 
+.runtime-card,
 .artifact-card {
   border: 1px solid #dfe5dc;
   border-radius: 6px;
   display: grid;
   gap: 8px;
   padding: 10px;
+}
+
+.runtime-ready {
+  background: #f1f8f3;
+  border-color: #acd6b7;
+}
+
+.runtime-blocked {
+  background: #fff3f3;
+  border-color: #e2bbbb;
+}
+
+.runtime-pending {
+  background: #fff8df;
+  border-color: #d4b84d;
 }
 
 .artifact-ready {
@@ -346,11 +409,26 @@ select {
   border-color: #e2bbbb;
 }
 
+.runtime-card h3,
 .artifact-card h3 {
   color: #202b1f;
   font-size: 0.9rem;
   line-height: 1.25;
   margin: 0;
+}
+
+.runtime-card p,
+.runtime-card small {
+  color: #526050;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.runtime-card small {
+  color: #687568;
+  font-weight: 800;
 }
 
 .artifact-card ul {
