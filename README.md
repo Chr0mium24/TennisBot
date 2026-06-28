@@ -40,6 +40,10 @@ cd CameraCalibLab
 uv run camera-calib-lab --help
 ```
 
+## Architecture
+
+- [Architecture simplification plan](docs/architecture_simplification_plan_20260628.md)
+
 ## Git Workflow
 
 Work inside a child project when changing its code, commit there first, then
