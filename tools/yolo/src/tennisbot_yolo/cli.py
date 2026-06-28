@@ -15,6 +15,8 @@ def cmd_package_create(args: argparse.Namespace) -> int:
             model_pt=args.model_pt,
             model_onnx=args.model_onnx,
             model_rknn=args.model_rknn,
+            eval_report=args.eval_report,
+            eval_metrics=args.eval_metrics,
             dry_run=args.dry_run,
         )
     except (FileNotFoundError, ValueError) as exc:
@@ -50,6 +52,8 @@ def build_parser() -> argparse.ArgumentParser:
     create.add_argument("--model-pt", type=Path)
     create.add_argument("--model-onnx", type=Path)
     create.add_argument("--model-rknn", type=Path)
+    create.add_argument("--eval-report", type=Path)
+    create.add_argument("--eval-metrics", type=Path)
     create.add_argument("--default-model", choices=("pt", "onnx", "rknn"), default="onnx")
     create.add_argument("--dry-run", action="store_true")
     create.set_defaults(func=cmd_package_create)

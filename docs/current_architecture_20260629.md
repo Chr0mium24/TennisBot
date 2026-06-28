@@ -166,10 +166,11 @@ Create runtime YOLO artifacts from existing local model files:
 cd tools/yolo
 uv run tennisbot-yolo package create \
   --output-dir ../../artifacts/models/tennis_ball_yolo \
-  --model-pt ../../TennisBallDetectorLab/detector_package/model.pt \
-  --model-onnx ../../TennisBallDetectorLab/detector_package/model.onnx \
-  --model-rknn ../../TennisBallDetectorLab/detector_package/model.rknn \
-  --default-model onnx
+  --model-pt ../../artifacts/model_candidates/finetune_indoor_cam1/best.pt \
+  --model-onnx ../../artifacts/model_candidates/finetune_indoor_cam1/best.onnx \
+  --default-model onnx \
+  --eval-report ../../artifacts/model_candidates/finetune_indoor_cam1/eval_report.md \
+  --eval-metrics ../../artifacts/model_candidates/finetune_indoor_cam1/eval_metrics.json
 uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_yolo
 ```
 
@@ -202,6 +203,7 @@ Runtime artifacts have also been imported locally:
 
 ```text
 YOLO: dry_run=false, inference_ready=true, default_model=onnx.
+YOLO static smoke: 109/109 matched labeled samples detected at threshold 0.05.
 Calibration: dry_run=false, hardware_validated=true, package verify accepted.
 Calibration quality warning: stereo_rms=23.487 px, epipolar_rms=30.802 px,
 rectification_y_p95=19.304 px.

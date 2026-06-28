@@ -200,6 +200,11 @@ Minimum fields:
 If full model metrics are unavailable, fields may be `null`, but the package
 must include `eval_report.md` explaining the gap.
 
+`tools/yolo package create` can copy a supplied `eval_report.md` and
+`eval_metrics.json` into the package. Runtime packages intended for hardware
+testing should include at least a static smoke report or a full validation
+report.
+
 ## Runtime Validation
 
 Before `apps/live3d` starts inference, it should validate:

@@ -54,6 +54,8 @@ def create_model_package(
     model_pt: Path | None = None,
     model_onnx: Path | None = None,
     model_rknn: Path | None = None,
+    eval_report: Path | None = None,
+    eval_metrics: Path | None = None,
     dry_run: bool = False,
 ) -> Path:
     model_sources = [
@@ -64,6 +66,8 @@ def create_model_package(
     supplied_models = [source for source in model_sources if source is not None]
     if dry_run and supplied_models:
         raise ValueError("--dry-run cannot be combined with supplied model files")
+    if dry_run and (eval_report is not None or eval_metrics is not None):
+        raise ValueError("--dry-run cannot be combined with evaluation files")
     if not dry_run and not supplied_models:
         raise ValueError("provide at least one model file or use --dry-run")
     if default_model not in RUNTIMES:
@@ -94,7 +98,16 @@ def create_model_package(
     labels = _labels_json()
     preprocessing = _preprocessing_json()
     postprocessing = _postprocessing_json()
-    eval_metrics = _eval_metrics_json(dry_run=dry_run)
+    eval_metrics_json = (
+        _load_supplied_eval_metrics(eval_metrics)
+        if eval_metrics is not None
+        else _eval_metrics_json(dry_run=dry_run)
+    )
+    eval_report_text = (
+        _load_supplied_eval_report(eval_report)
+        if eval_report is not None
+        else _eval_report(dry_run=dry_run)
+    )
     created_at = utc_now_iso()
     package_json = _package_json(
         created_at=created_at,
@@ -108,8 +121,8 @@ def create_model_package(
     write_json(output_dir / "labels.json", labels)
     write_json(output_dir / "preprocessing.json", preprocessing)
     write_json(output_dir / "postprocessing.json", postprocessing)
-    write_json(output_dir / "eval_metrics.json", eval_metrics)
-    (output_dir / "eval_report.md").write_text(_eval_report(dry_run=dry_run), encoding="utf-8")
+    write_json(output_dir / "eval_metrics.json", eval_metrics_json)
+    (output_dir / "eval_report.md").write_text(eval_report_text, encoding="utf-8")
 
     manifest = _manifest_json(output_dir=output_dir, created_at=created_at)
     write_json(output_dir / "package_manifest.json", manifest)
@@ -283,6 +296,23 @@ def _eval_report(*, dry_run: bool) -> str:
         "No evaluation report was supplied by this package command. Model metrics are null in "
         "`eval_metrics.json` until a real evaluation report is attached by a later training workflow.\n"
     )
+
+
+def _load_supplied_eval_metrics(path: Path) -> dict[str, Any]:
+    resolved = path.expanduser().resolve()
+    if not resolved.is_file():
+        raise FileNotFoundError(resolved)
+    payload = read_json(resolved)
+    if not isinstance(payload, dict):
+        raise ValueError(f"eval metrics must be a JSON object: {resolved}")
+    return payload
+
+
+def _load_supplied_eval_report(path: Path) -> str:
+    resolved = path.expanduser().resolve()
+    if not resolved.is_file():
+        raise FileNotFoundError(resolved)
+    return resolved.read_text(encoding="utf-8")
 
 
 def _manifest_json(*, output_dir: Path, created_at: str) -> dict[str, object]:

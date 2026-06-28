@@ -74,6 +74,37 @@ def test_package_creation_from_onnx_records_bytes_and_sha256(tmp_path: Path) -> 
     assert model_entry["runtime"] == "onnxruntime"
 
 
+def test_package_creation_accepts_supplied_eval_files(tmp_path: Path) -> None:
+    fixture = tmp_path / "fixture.onnx"
+    metrics = tmp_path / "eval_metrics.json"
+    report = tmp_path / "eval_report.md"
+    fixture.write_bytes(b"fake onnx bytes")
+    metrics.write_text(
+        json.dumps(
+            {
+                "dry_run": False,
+                "inference_ready": True,
+                "dataset": {"labels": 109, "positives": 109, "negatives": 0},
+                "model": {"precision": None, "recall": None, "map50": None, "map50_95": None},
+                "static_smoke": {"detected_at_threshold": 109, "threshold": 0.05},
+            }
+        ),
+        encoding="utf-8",
+    )
+    report.write_text("# Eval\n\nStatic smoke report.\n", encoding="utf-8")
+
+    output = create_model_package(
+        tmp_path / "package",
+        model_onnx=fixture,
+        default_model="onnx",
+        eval_metrics=metrics,
+        eval_report=report,
+    )
+
+    assert read_json(output / "eval_metrics.json")["static_smoke"]["detected_at_threshold"] == 109
+    assert "Static smoke report" in (output / "eval_report.md").read_text(encoding="utf-8")
+
+
 def test_package_verification_accepts_generated_packages(tmp_path: Path) -> None:
     output = create_model_package(tmp_path / "package", dry_run=True)
 

@@ -132,9 +132,11 @@ prove the ball detection or runtime 3D prediction visual.
 
 Follow-up static validation found and fixed a Live3D ONNX postprocessing issue:
 the exported ONNX model returns NMS-style `xyxy_pixels` rows, not `xywh` rows.
-After the fix, the backend can decode ONNX candidates correctly. The same
-validation also found that the current model package still produces no boxes at
-the packaged `confidence_threshold: 0.05` on 109 matched labeled samples.
+After the fix, the backend can decode ONNX candidates correctly. The initial
+`detector_package` model failed the 0.05 static threshold check, so the runtime
+artifact was rebuilt from `finetune_indoor_cam1/weights/best.pt` and exported
+ONNX. The rebuilt package detects 109/109 matched labeled samples at
+`confidence_threshold: 0.05`.
 
 ## Verification Commands
 
@@ -155,8 +157,6 @@ build passed.
 
 ## Remaining Gates
 
-- Provide a detector package that produces nonzero tennis-ball detections at an
-  acceptable threshold.
 - Put a tennis ball in both camera views and confirm nonzero runtime detections.
 - Confirm runtime 3D scene replaces the fixture fallback.
 - Confirm the prediction curve and landing marker update from multiple runtime

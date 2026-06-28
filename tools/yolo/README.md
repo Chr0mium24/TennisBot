@@ -29,8 +29,14 @@ Create a runtime package from an ONNX model:
 uv run tennisbot-yolo package create \
   --output-dir ../../artifacts/models/tennis_ball_yolo \
   --model-onnx path/to/model.onnx \
+  --eval-report path/to/eval_report.md \
+  --eval-metrics path/to/eval_metrics.json \
   --default-model onnx
 ```
+
+`--eval-report` and `--eval-metrics` are optional, but should be supplied for
+runtime packages used beyond loader smoke tests. Without them the package keeps
+null model metrics and an explicit gap in `eval_report.md`.
 
 Create a contract-only dry-run package for loader validation:
 

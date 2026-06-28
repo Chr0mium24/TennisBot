@@ -31,7 +31,7 @@ labels: 661
 nonempty labels matched to images: 109
 ```
 
-## PT Reference Scan
+## Initial PT Reference Scan
 
 Command:
 
@@ -71,10 +71,50 @@ best sample: yolo/dataset/images/cam1/device_a_indoor/indoor_ball_sample02_cam1_
 best PT confidence: 0.03673101216554642
 ```
 
-The current PT model does not produce any detection above the packaged runtime
-threshold `0.05` on the matched labeled sample set.
+The initial `detector_package/model.pt` did not produce any detection above the
+packaged runtime threshold `0.05` on the matched labeled sample set.
 
-## ONNX Output Format
+## Replacement Model Candidate
+
+The training run already contained a better candidate:
+
+```text
+TennisBallDetectorLab/yolo/runs/training/finetune_indoor_cam1/weights/best.pt
+```
+
+Static scan result for that candidate:
+
+```text
+>=0.05 confidence: 109 / 109
+>=0.01 confidence: 109 / 109
+>=0.001 confidence: 109 / 109
+max confidence: 0.9584278464317322
+min confidence: 0.06655905395746231
+```
+
+The model was copied into ignored local artifacts and exported to ONNX without
+modifying `TennisBallDetectorLab` source files:
+
+```text
+artifacts/model_candidates/finetune_indoor_cam1/best.pt
+artifacts/model_candidates/finetune_indoor_cam1/best.onnx
+```
+
+The runtime package was rebuilt with:
+
+```bash
+cd tools/yolo
+uv run tennisbot-yolo package create \
+  --output-dir ../../artifacts/models/tennis_ball_yolo \
+  --model-pt ../../artifacts/model_candidates/finetune_indoor_cam1/best.pt \
+  --model-onnx ../../artifacts/model_candidates/finetune_indoor_cam1/best.onnx \
+  --default-model onnx \
+  --eval-report ../../artifacts/model_candidates/finetune_indoor_cam1/eval_report.md \
+  --eval-metrics ../../artifacts/model_candidates/finetune_indoor_cam1/eval_metrics.json
+uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_yolo
+```
+
+## ONNX Output Format Fix
 
 The exported ONNX model returns:
 
@@ -97,7 +137,7 @@ which was wrong for this exported ONNX package. Live3D now carries
 `postprocessing.json.box_format` through `packages/core` and decodes
 `xyxy_pixels` rows correctly.
 
-## ONNX Static Result After Fix
+## Initial ONNX Static Result After Decode Fix
 
 Sample:
 
@@ -131,16 +171,48 @@ Result with the packaged runtime threshold of `0.05`:
 }
 ```
 
+## Replacement ONNX Static Result
+
+The rebuilt runtime package uses the replacement `best.onnx` as the default
+ONNX model. On the same sample, with the packaged runtime threshold `0.05`, the
+Live3D ONNX backend returned:
+
+```json
+{
+  "status": "ok",
+  "boxes": [
+    {
+      "confidence": 0.9075310230255127,
+      "xPx": 847.2093200683594,
+      "yPx": 482.6033020019531,
+      "widthPx": 70.90191650390625,
+      "heightPx": 74.40151977539062
+    }
+  ]
+}
+```
+
+The packaged `eval_metrics.json` now records:
+
+```text
+image_count: 109
+confidence_threshold: 0.05
+detected_at_threshold: 109
+detection_rate_at_threshold: 1.0
+max_confidence: 0.9584278464317322
+min_confidence: 0.06655905395746231
+```
+
 ## Conclusion
 
-The Live3D ONNX postprocessing mismatch is fixed. The remaining zero-detection
-behavior is now explained by model confidence quality and the packaged threshold:
-the current model package is structurally loadable, but it is not detection
-quality ready at `confidence_threshold: 0.05`.
+The Live3D ONNX postprocessing mismatch is fixed, and the default local runtime
+YOLO artifact has been replaced with a better ONNX-default package derived from
+`finetune_indoor_cam1/weights/best.pt`. Static sample detection now passes at
+`confidence_threshold: 0.05`.
 
 ## Next Gate
 
-- Retrain or select a better tennis-ball detector package, or explicitly create
-  a low-threshold diagnostic package for smoke testing.
-- Re-run Live3D with a ball in both camera views after the detector package can
-  produce nonzero detections at an acceptable confidence threshold.
+- Re-run Live3D with a tennis ball visible in both USB camera views.
+- Confirm nonzero runtime detections from live frames.
+- Confirm the runtime 3D scene replaces the fixture fallback and updates the
+  prediction curve.

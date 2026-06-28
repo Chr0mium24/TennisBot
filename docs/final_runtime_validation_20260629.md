@@ -21,9 +21,11 @@ warnings.
 
 Follow-up YOLO static validation found that Live3D was decoding the exported
 ONNX `xyxy_pixels` output as `xywh`. That postprocessing bug is fixed. The
-current model package still produces no detections at the packaged
-`confidence_threshold: 0.05` on the matched labeled sample set, so it is
-structurally loadable but not detection-quality ready.
+initial `detector_package` model failed the static quality check, so the local
+runtime package was rebuilt from
+`TennisBallDetectorLab/yolo/runs/training/finetune_indoor_cam1/weights/best.pt`
+and an exported ONNX model. The rebuilt package detects 109/109 matched labeled
+samples at `confidence_threshold: 0.05`.
 
 ## Verified Commands
 
@@ -127,16 +129,18 @@ uv run tennisbot-yolo package create --dry-run --output-dir ../../artifacts/mode
 uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_yolo
 uv run tennisbot-yolo package create \
   --output-dir ../../artifacts/models/tennis_ball_yolo \
-  --model-pt ../../TennisBallDetectorLab/detector_package/model.pt \
-  --model-onnx ../../TennisBallDetectorLab/detector_package/model.onnx \
-  --model-rknn ../../TennisBallDetectorLab/detector_package/model.rknn \
-  --default-model onnx
+  --model-pt ../../artifacts/model_candidates/finetune_indoor_cam1/best.pt \
+  --model-onnx ../../artifacts/model_candidates/finetune_indoor_cam1/best.onnx \
+  --default-model onnx \
+  --eval-report ../../artifacts/model_candidates/finetune_indoor_cam1/eval_report.md \
+  --eval-metrics ../../artifacts/model_candidates/finetune_indoor_cam1/eval_metrics.json
 uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_yolo
 ```
 
-Result: 12 tests passed. A real runtime YOLO package was written from
-`TennisBallDetectorLab/detector_package/` and verified with `dry_run: false`,
-`inference_ready: true`, and `default_model: onnx`.
+Result: 13 tests passed. A real runtime YOLO package was written from the
+`finetune_indoor_cam1` best model and verified with `dry_run: false`,
+`inference_ready: true`, `default_model: onnx`, and static smoke
+`detected_at_threshold: 109 / 109`.
 
 ## Current Evidence
 
@@ -144,14 +148,15 @@ Result: 12 tests passed. A real runtime YOLO package was written from
 - Live3D consumes only model/calibration artifacts under `artifacts/`.
 - Runtime core algorithms live under `packages/core`.
 - Shared data contracts live under `packages/contracts`.
-- `artifacts/models/tennis_ball_yolo` now contains a real ONNX-default package.
+- `artifacts/models/tennis_ball_yolo` now contains a real ONNX-default package
+  rebuilt from `finetune_indoor_cam1/weights/best.pt`.
 - `artifacts/calibration/stereo_cam1_cam2` now contains a real imported stereo
   package with explicit runtime quality warnings.
 - Live3D opened two real USB cameras in Chrome and ran the ONNX backend on live
   browser frames without session concurrency errors.
 - Live3D now decodes the current ONNX package's `xyxy_pixels` output correctly.
-- The current YOLO model package failed the static detection-quality check at
-  `confidence_threshold: 0.05`.
+- The current YOLO model package passed the static detection-quality smoke at
+  `confidence_threshold: 0.05` on 109 matched labeled images.
 - Board-side runtime code is not part of the current active architecture.
 - The only dirty worktree entry after validation is the pre-existing
   `TennisBallDetectorLab` submodule state, which remains untouched.
@@ -160,12 +165,10 @@ Result: 12 tests passed. A real runtime YOLO package was written from
 
 Before claiming full real-world operation:
 
-1. Retrain, replace, or create an explicitly low-threshold diagnostic YOLO
-   package that produces nonzero detections at an acceptable confidence level.
-2. Put a tennis ball in both USB camera views and confirm nonzero runtime
+1. Put a tennis ball in both USB camera views and confirm nonzero runtime
    detections.
-3. Confirm runtime 3D scene, prediction curve, and landing marker update from
+2. Confirm runtime 3D scene, prediction curve, and landing marker update from
    those detections.
-4. Re-run mono/stereo calibration if imported stereo quality remains poor.
-5. Validate ROS/Gazebo closed-loop catch behavior only after real visual
+3. Re-run mono/stereo calibration if imported stereo quality remains poor.
+4. Validate ROS/Gazebo closed-loop catch behavior only after real visual
    tracking is stable.

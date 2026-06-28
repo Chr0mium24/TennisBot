@@ -9,7 +9,9 @@ TennisBot runtime artifact layout.
 
 Imported assets:
 
-- YOLO model package from `TennisBallDetectorLab/detector_package/`.
+- YOLO model package rebuilt from
+  `TennisBallDetectorLab/yolo/runs/training/finetune_indoor_cam1/weights/best.pt`
+  and an exported ONNX model under `artifacts/model_candidates/`.
 - Stereo calibration package from `CameraCalibLab/calibration_packages/`.
 
 Runtime output paths:
@@ -27,10 +29,11 @@ Command:
 cd tools/yolo
 uv run tennisbot-yolo package create \
   --output-dir ../../artifacts/models/tennis_ball_yolo \
-  --model-pt ../../TennisBallDetectorLab/detector_package/model.pt \
-  --model-onnx ../../TennisBallDetectorLab/detector_package/model.onnx \
-  --model-rknn ../../TennisBallDetectorLab/detector_package/model.rknn \
-  --default-model onnx
+  --model-pt ../../artifacts/model_candidates/finetune_indoor_cam1/best.pt \
+  --model-onnx ../../artifacts/model_candidates/finetune_indoor_cam1/best.onnx \
+  --default-model onnx \
+  --eval-report ../../artifacts/model_candidates/finetune_indoor_cam1/eval_report.md \
+  --eval-metrics ../../artifacts/model_candidates/finetune_indoor_cam1/eval_metrics.json
 uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_yolo
 ```
 
@@ -40,9 +43,9 @@ Result:
 dry_run: false
 inference_ready: true
 default_model: onnx
-model.pt: 5,458,437 bytes
-model.onnx: 10,308,866 bytes
-model.rknn: 11,402,576 bytes
+model.pt: 5,450,181 bytes
+model.onnx: 10,261,007 bytes
+static_smoke detected_at_threshold: 109 / 109
 ```
 
 ## Calibration Package

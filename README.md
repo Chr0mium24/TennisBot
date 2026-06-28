@@ -76,10 +76,11 @@ Create a runtime YOLO package from existing local model files:
 cd tools/yolo
 uv run tennisbot-yolo package create \
   --output-dir ../../artifacts/models/tennis_ball_yolo \
-  --model-pt ../../TennisBallDetectorLab/detector_package/model.pt \
-  --model-onnx ../../TennisBallDetectorLab/detector_package/model.onnx \
-  --model-rknn ../../TennisBallDetectorLab/detector_package/model.rknn \
-  --default-model onnx
+  --model-pt ../../artifacts/model_candidates/finetune_indoor_cam1/best.pt \
+  --model-onnx ../../artifacts/model_candidates/finetune_indoor_cam1/best.onnx \
+  --default-model onnx \
+  --eval-report ../../artifacts/model_candidates/finetune_indoor_cam1/eval_report.md \
+  --eval-metrics ../../artifacts/model_candidates/finetune_indoor_cam1/eval_metrics.json
 uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_yolo
 ```
 
