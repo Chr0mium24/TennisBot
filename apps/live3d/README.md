@@ -32,6 +32,9 @@ backend returns valid detections. When both runtime YOLO sides produce detection
 and the stereo calibration package is loaded, the app selects a stereo pair,
 triangulates a runtime 3D ball point, maintains a runtime trail, and renders a
 runtime prediction/landing once at least two runtime points are available.
+The page also exposes `window.__tennisbotLive3dSnapshot` so automated hardware
+checks can read camera, artifact, detection, and runtime 3D state without
+scraping UI text.
 
 This implements the browser software path. Hardware smoke has opened two real
 USB cameras in Chrome and run the exported ONNX model on live frames. The
@@ -62,6 +65,12 @@ bun run dev
 bun run typecheck
 bun test
 bun run build
+bun run verify:hardware -- --timeout-ms 30000 --output ../../docs/live3d_hardware_loop_YYYYMMDD.md
 ```
 
 `bun run dev` builds the static bundle and serves `dist/` on port `5178`.
+`bun run verify:hardware` builds or reuses the local app server, launches
+Chrome with camera permission auto-approved, starts both USB cameras, starts
+YOLO, polls the runtime snapshot, and writes a Markdown report. A passing run
+requires the runtime status to reach `prediction-ready`; no-ball scenes are
+reported as failed hardware validation, not as software success.

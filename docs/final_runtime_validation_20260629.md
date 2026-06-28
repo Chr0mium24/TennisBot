@@ -56,9 +56,11 @@ cd apps/live3d
 bun test
 bun run typecheck
 bun run build
+bun run verify:hardware -- --timeout-ms 20000 --output ../../docs/live3d_hardware_loop_20260629.md
 ```
 
-Result: 40 tests passed, typecheck passed, browser bundle built.
+Result: 42 tests passed, typecheck passed, browser bundle built. The hardware
+verification command wrote `docs/live3d_hardware_loop_20260629.md`.
 
 Dev server smoke:
 
@@ -86,6 +88,22 @@ Result: two `USU Camera 4K` devices were enumerated, `/dev/video0` and
 live camera frames without ONNX session errors. The frames produced zero
 tennis-ball detections in the current scene, so runtime 3D remained waiting for
 a detection.
+
+Automated hardware loop:
+
+```bash
+bun apps/live3d/scripts/verify-hardware.ts \
+  --timeout-ms 20000 \
+  --output docs/live3d_hardware_loop_20260629.md
+```
+
+Result: the script reused `http://localhost:5178`, launched
+`/usr/bin/google-chrome` on CDP port `9233`, found
+`window.__tennisbotLive3dSnapshot`, opened two real `USU Camera 4K` browser
+streams, loaded the ONNX YOLO artifact, and loaded the stereo calibration
+artifact. It failed the final physical gate because both cameras produced zero
+YOLO tennis-ball detections in the current scene. Last runtime code:
+`left-detections-missing`.
 
 ### Calibration Tool
 
@@ -154,6 +172,9 @@ Result: 13 tests passed. A real runtime YOLO package was written from the
   package with explicit runtime quality warnings.
 - Live3D opened two real USB cameras in Chrome and ran the ONNX backend on live
   browser frames without session concurrency errors.
+- Live3D now has a repeatable headless hardware verifier that reads
+  `window.__tennisbotLive3dSnapshot` and records camera, YOLO, calibration,
+  detection, and runtime 3D state to Markdown.
 - Live3D now decodes the current ONNX package's `xyxy_pixels` output correctly.
 - The current YOLO model package passed the static detection-quality smoke at
   `confidence_threshold: 0.05` on 109 matched labeled images.
@@ -165,8 +186,9 @@ Result: 13 tests passed. A real runtime YOLO package was written from the
 
 Before claiming full real-world operation:
 
-1. Put a tennis ball in both USB camera views and confirm nonzero runtime
-   detections.
+1. Put a tennis ball in both USB camera views and rerun
+   `bun apps/live3d/scripts/verify-hardware.ts --timeout-ms 30000 --output docs/live3d_hardware_loop_ball_YYYYMMDD.md`
+   until the report reaches `prediction-ready`.
 2. Confirm runtime 3D scene, prediction curve, and landing marker update from
    those detections.
 3. Re-run mono/stereo calibration if imported stereo quality remains poor.

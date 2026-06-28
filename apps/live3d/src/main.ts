@@ -26,6 +26,10 @@ import {
   type Runtime3dState,
 } from "./runtime-scene";
 import {
+  createLive3dRuntimeSnapshot,
+  type Live3dRuntimeSnapshot,
+} from "./runtime-snapshot";
+import {
   createBlockedYoloInferenceBackend,
   createStereoYoloInferenceIdleStatus,
   createYoloInferenceRunningStatus,
@@ -42,6 +46,7 @@ import "./styles.css";
 declare global {
   interface Window {
     __tennisbotLive3dYoloBackend?: YoloInferenceBackend;
+    __tennisbotLive3dSnapshot?: Live3dRuntimeSnapshot;
   }
 }
 
@@ -511,6 +516,7 @@ let yoloLoopActive = false;
 let yoloLoopTimeout: ReturnType<typeof globalThis.setTimeout> | undefined;
 
 function renderCurrentApp(): void {
+  publishRuntimeSnapshot();
   appElement.innerHTML = renderApp(
     cameraStatus,
     detectionStatus,
@@ -522,6 +528,18 @@ function renderCurrentApp(): void {
   bindCameraControls();
   bindYoloControls();
   attachReadyCameraStreams(cameraStatus);
+}
+
+function publishRuntimeSnapshot(): void {
+  window.__tennisbotLive3dSnapshot = createLive3dRuntimeSnapshot({
+    generatedAtUnixMs: Date.now(),
+    cameraStatus,
+    detectionStatus,
+    yoloStatus,
+    calibrationStatus,
+    runtime3dState,
+    yoloLoopActive,
+  });
 }
 
 function bindCameraControls(): void {

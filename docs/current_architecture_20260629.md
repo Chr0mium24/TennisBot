@@ -125,6 +125,7 @@ cd apps/live3d
 bun test
 bun run typecheck
 bun run build
+bun run verify:hardware -- --timeout-ms 30000 --output ../../docs/live3d_hardware_loop_YYYYMMDD.md
 ```
 
 Create dry-run calibration artifacts:
@@ -187,7 +188,7 @@ Most recent software verification after Wave 11:
 
 ```text
 cd apps/live3d && bun test
-Result: 38 passing tests, 0 failures.
+Result: 42 passing tests, 0 failures.
 
 cd apps/live3d && bun run typecheck
 Result: passed.
@@ -198,6 +199,11 @@ Result: passed.
 
 The software path is connected through Live3D, ONNX backend boundary, core
 stereo triangulation, and prediction using synthetic tests.
+
+Live3D also exposes `window.__tennisbotLive3dSnapshot` for repeatable hardware
+checks. The verifier command can launch Chrome, start both USB cameras, start
+YOLO, and poll the snapshot until runtime 3D reaches `prediction-ready` or a
+Markdown report records the failed gate.
 
 Runtime artifacts have also been imported locally:
 
@@ -214,9 +220,11 @@ rectification_y_p95=19.304 px.
 The architecture is implemented in software. These items still require real
 hardware validation:
 
-- run Live3D with two real USB cameras in the target browser;
-- verify ONNX detections on live frames;
-- verify runtime 3D point stability and prediction quality;
+- rerun the Live3D hardware verifier with a tennis ball visible in both USB
+  camera views;
+- verify nonzero ONNX detections on both live frames;
+- verify runtime 3D reaches `prediction-ready` with stable point and prediction
+  updates;
 - re-run mono/stereo calibration if imported stereo error remains high;
 - validate ROS/Gazebo closed-loop catch behavior only after the real visual
   tracking path is stable.
