@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { resolveStaticRequestPath } from "./serve.js";
@@ -17,6 +17,10 @@ describe("Live3D dev server path mapping", () => {
       mkdirSync(outsideDir, { recursive: true });
       writeFileSync(join(artifactsDir, "models", "tennis_ball_yolo", "package.json"), "{}");
       writeFileSync(join(outsideDir, "secret.json"), "{}");
+      symlinkSync(
+        join(outsideDir, "secret.json"),
+        join(artifactsDir, "models", "tennis_ball_yolo", "secret-link.json"),
+      );
 
       const resolved = resolveStaticRequestPath(
         "/artifacts/models/tennis_ball_yolo/package.json",
@@ -40,6 +44,12 @@ describe("Live3D dev server path mapping", () => {
       ).toBeNull();
       expect(
         resolveStaticRequestPath("/models/tennis_ball_yolo/package.json", {
+          distDir,
+          artifactsDir,
+        }),
+      ).toBeNull();
+      expect(
+        resolveStaticRequestPath("/artifacts/models/tennis_ball_yolo/secret-link.json", {
           distDir,
           artifactsDir,
         }),

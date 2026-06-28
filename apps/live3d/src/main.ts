@@ -231,17 +231,26 @@ function renderArtifactCard(options: {
 }): string {
   return `
     <article class="artifact-card artifact-${options.state}">
-      <h3>${options.title}</h3>
+      <h3>${escapeHtml(options.title)}</h3>
       <ul>
-        ${options.detail.map((line) => `<li>${line}</li>`).join("")}
+        ${options.detail.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}
       </ul>
       ${
         options.warnings.length > 0
-          ? `<p class="artifact-warning">${options.warnings.join(" ")}</p>`
+          ? `<p class="artifact-warning">${escapeHtml(options.warnings.join(" "))}</p>`
           : ""
       }
     </article>
   `;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function renderApp(

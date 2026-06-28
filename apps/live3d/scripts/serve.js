@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync, statSync } from "node:fs";
 import { resolve, sep } from "node:path";
 
 const distDir = resolve(import.meta.dirname, "..", "dist");
@@ -9,6 +9,7 @@ function contentType(pathname) {
   if (pathname.endsWith(".html")) return "text/html; charset=utf-8";
   if (pathname.endsWith(".js")) return "text/javascript; charset=utf-8";
   if (pathname.endsWith(".css")) return "text/css; charset=utf-8";
+  if (pathname.endsWith(".json")) return "application/json; charset=utf-8";
   return "application/octet-stream";
 }
 
@@ -28,7 +29,7 @@ export function resolveStaticRequestPath(
   if (decodedPathname.startsWith("/artifacts/")) {
     const relativePath = decodedPathname.slice("/artifacts/".length);
     const filePath = resolve(roots.artifactsDir, relativePath);
-    return isInsideRoot(filePath, roots.artifactsDir) && existsSync(filePath)
+    return isServableFileInRoot(filePath, roots.artifactsDir)
       ? { filePath, contentPath: decodedPathname }
       : null;
   }
@@ -36,7 +37,7 @@ export function resolveStaticRequestPath(
   const contentPath = decodedPathname === "/" ? "/index.html" : decodedPathname;
   const relativePath = contentPath.replace(/^\/+/, "");
   const filePath = resolve(roots.distDir, relativePath);
-  return isInsideRoot(filePath, roots.distDir) && existsSync(filePath)
+  return isServableFileInRoot(filePath, roots.distDir)
     ? { filePath, contentPath }
     : null;
 }
@@ -73,6 +74,16 @@ function decodePathname(pathname) {
 function isInsideRoot(filePath, root) {
   const resolvedRoot = resolve(root);
   return filePath === resolvedRoot || filePath.startsWith(`${resolvedRoot}${sep}`);
+}
+
+function isServableFileInRoot(filePath, root) {
+  if (!existsSync(root) || !existsSync(filePath)) {
+    return false;
+  }
+
+  const realRoot = realpathSync(root);
+  const realFilePath = realpathSync(filePath);
+  return statSync(realFilePath).isFile() && isInsideRoot(realFilePath, realRoot);
 }
 
 if (import.meta.main) {
