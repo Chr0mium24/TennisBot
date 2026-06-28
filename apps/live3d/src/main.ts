@@ -21,6 +21,11 @@ import {
   type Point3d,
 } from "./fixtures";
 import {
+  createInitialRuntime3dState,
+  updateRuntime3dState,
+  type Runtime3dState,
+} from "./runtime-scene";
+import {
   createBlockedYoloInferenceBackend,
   createStereoYoloInferenceIdleStatus,
   createYoloInferenceRunningStatus,
@@ -124,32 +129,55 @@ function projectPoint(x: number, z: number): { left: number; top: number } {
   };
 }
 
-function renderScene(): string {
-  const trailPoints = fixture.scene.trail.map((point) =>
+function renderScene(runtime3dState: Runtime3dState): string {
+  const hasRuntimeScene = runtime3dState.latestPoint !== null;
+  const runtimeBall = runtime3dState.latestPoint ?? fixture.scene.ball;
+  const scene = hasRuntimeScene
+    ? {
+        ball: runtimeBall,
+        trail: runtime3dState.trail,
+        prediction: runtime3dState.prediction,
+        landing: runtime3dState.landingPoint,
+        selectedPair: runtime3dState.selectedPair,
+        eyebrow: "runtime 3D scene",
+        title: runtime3dState.status.label,
+        pill: runtime3dState.prediction?.model ?? "runtime triangulation",
+      }
+    : {
+        ball: fixture.scene.ball,
+        trail: fixture.scene.trail,
+        prediction: fixture.scene.prediction,
+        landing: fixture.scene.landing,
+        selectedPair: fixture.selectedPair,
+        eyebrow: "fixture-only fallback 3D scene",
+        title: "Fixture ball trail and prediction; not runtime 3D validation",
+        pill: fixture.scene.prediction.model,
+      };
+  const trailPoints = scene.trail.map((point) =>
     projectPoint(point.positionMeters.x, point.positionMeters.z),
   );
-  const predictionPoints = fixture.scene.prediction.samples.map((sample) =>
+  const predictionPoints = scene.prediction?.samples.map((sample) =>
     projectPoint(sample.positionMeters.x, sample.positionMeters.z),
-  );
-  const landing = projectPoint(
-    fixture.scene.landing.positionMeters.x,
-    fixture.scene.landing.positionMeters.z,
-  );
+  ) ?? [];
+  const landing =
+    scene.landing === null
+      ? null
+      : projectPoint(scene.landing.positionMeters.x, scene.landing.positionMeters.z);
   const ball = projectPoint(
-    fixture.scene.ball.positionMeters.x,
-    fixture.scene.ball.positionMeters.z,
+    scene.ball.positionMeters.x,
+    scene.ball.positionMeters.z,
   );
   const toPolyline = (points: Array<{ left: number; top: number }>) =>
     points.map((point) => `${point.left},${point.top}`).join(" ");
 
   return `
-    <section class="scene-panel" aria-label="3D scene placeholder">
+    <section class="scene-panel" aria-label="${hasRuntimeScene ? "Runtime 3D scene" : "Fixture 3D fallback scene"}">
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">fixture-only non-validation 3D scene</p>
-          <h2>Ball trail and prediction placeholder until runtime detections feed 3D</h2>
+          <p class="eyebrow">${scene.eyebrow}</p>
+          <h2>${escapeHtml(scene.title)}</h2>
         </div>
-        <span class="device-pill">${fixture.scene.prediction.model}</span>
+        <span class="device-pill">${escapeHtml(scene.pill)}</span>
       </div>
       <div class="scene-stage">
         <div class="court-plane"></div>
@@ -157,21 +185,25 @@ function renderScene(): string {
           <polyline class="trail-line" points="${toPolyline(trailPoints)}" />
           <polyline class="prediction-line" points="${toPolyline(predictionPoints)}" />
         </svg>
-        <div class="landing-marker" style="left:${landing.left}%;top:${landing.top}%">landing</div>
+        ${
+          landing === null
+            ? ""
+            : `<div class="landing-marker" style="left:${landing.left}%;top:${landing.top}%">landing</div>`
+        }
         <div class="ball-marker" style="left:${ball.left}%;top:${ball.top}%"></div>
       </div>
       <dl class="scene-metrics">
         <div>
           <dt>match</dt>
-          <dd>${fixture.selectedPair.left.detectionId} / ${fixture.selectedPair.right.detectionId}</dd>
+          <dd>${escapeHtml(formatMatch(scene.selectedPair))}</dd>
         </div>
         <div>
           <dt>3D point</dt>
-          <dd>${formatPoint(fixture.scene.ball.positionMeters)}</dd>
+          <dd>${formatPoint(scene.ball.positionMeters)}</dd>
         </div>
         <div>
           <dt>landing</dt>
-          <dd>${formatPoint(fixture.scene.landing.positionMeters)}</dd>
+          <dd>${scene.landing === null ? "waiting for prediction landing" : formatPoint(scene.landing.positionMeters)}</dd>
         </div>
       </dl>
     </section>
@@ -187,6 +219,7 @@ function renderStatusPanel(
   detectionStatus: StereoYoloInferenceRuntimeStatus,
   yoloStatus: YoloArtifactLoadStatus,
   calibrationStatus: StereoCalibrationArtifactLoadStatus,
+  runtime3dState: Runtime3dState,
 ): string {
   return `
     <aside class="status-panel" aria-label="Runtime status">
@@ -227,6 +260,7 @@ function renderStatusPanel(
       <section class="artifact-status" aria-label="Artifact status">
         ${renderYoloArtifactStatus(yoloStatus)}
         ${renderCalibrationArtifactStatus(calibrationStatus)}
+        ${renderRuntime3dStatus(runtime3dState)}
       </section>
       <ol class="status-list">
         ${fixture.status
@@ -379,6 +413,16 @@ function renderCalibrationArtifactStatus(status: StereoCalibrationArtifactLoadSt
   });
 }
 
+function renderRuntime3dStatus(status: Runtime3dState): string {
+  return `
+    <article class="runtime-card runtime-${status.status.state}">
+      <h3>${escapeHtml(status.status.label)}</h3>
+      <p>${escapeHtml(status.status.detail)}</p>
+      <small>${escapeHtml(`Trail points: ${status.trail.length}; selected pair: ${formatMatch(status.selectedPair)}`)}</small>
+    </article>
+  `;
+}
+
 function renderArtifactCard(options: {
   title: string;
   state: "ready" | "blocked";
@@ -414,6 +458,7 @@ function renderApp(
   detectionStatus: StereoYoloInferenceRuntimeStatus,
   yoloStatus: YoloArtifactLoadStatus,
   calibrationStatus: StereoCalibrationArtifactLoadStatus,
+  runtime3dState: Runtime3dState,
 ): string {
   return `
     <main class="app-shell">
@@ -428,9 +473,9 @@ function renderApp(
         <div class="camera-grid">
           ${renderCameraPanel(fixture.cameras.left, "left", detectionStatus.left)}
           ${renderCameraPanel(fixture.cameras.right, "right", detectionStatus.right)}
-          ${renderScene()}
+          ${renderScene(runtime3dState)}
         </div>
-        ${renderStatusPanel(cameraStatus, detectionStatus, yoloStatus, calibrationStatus)}
+        ${renderStatusPanel(cameraStatus, detectionStatus, yoloStatus, calibrationStatus, runtime3dState)}
       </section>
     </main>
   `;
@@ -455,10 +500,17 @@ const yoloBackend =
 
 let cameraStatus: StereoCameraRuntimeStatus = createStereoCameraIdleStatus(defaultLive3dConfig);
 let detectionStatus: StereoYoloInferenceRuntimeStatus = createStereoYoloInferenceIdleStatus();
+let runtime3dState: Runtime3dState = createInitialRuntime3dState();
 let yoloRunSerial = 0;
 
 function renderCurrentApp(): void {
-  appElement.innerHTML = renderApp(cameraStatus, detectionStatus, yoloStatus, calibrationStatus);
+  appElement.innerHTML = renderApp(
+    cameraStatus,
+    detectionStatus,
+    yoloStatus,
+    calibrationStatus,
+    runtime3dState,
+  );
   bindCameraControls();
   bindYoloControls();
   attachReadyCameraStreams(cameraStatus);
@@ -549,6 +601,14 @@ async function startYoloInferenceFromUserAction(): Promise<void> {
   }
 
   detectionStatus = { left, right };
+  runtime3dState = updateRuntime3dState({
+    previousState: runtime3dState,
+    left,
+    right,
+    calibrationStatus,
+    frameId: String(runSerial),
+    timestampUnixMs,
+  });
   renderCurrentApp();
 }
 
@@ -556,6 +616,14 @@ function stopYoloInferenceFromUserAction(): void {
   yoloRunSerial += 1;
   yoloBackend.stop?.();
   detectionStatus = createStereoYoloInferenceIdleStatus();
+}
+
+function formatMatch(pair: Runtime3dState["selectedPair"]): string {
+  if (pair === null) {
+    return "none";
+  }
+
+  return `${pair.left.detectionId} / ${pair.right.detectionId}`;
 }
 
 function createDefaultYoloBackend(status: YoloArtifactLoadStatus): YoloInferenceBackend {
