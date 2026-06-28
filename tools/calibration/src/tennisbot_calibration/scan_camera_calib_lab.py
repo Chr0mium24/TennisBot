@@ -59,6 +59,44 @@ def scan_camera_calib_lab(root: Path, *, limit: int = 10) -> dict[str, Any]:
     }
 
 
+def select_candidate(
+    scan: dict[str, Any],
+    *,
+    topology: str,
+    pattern: str | None,
+) -> dict[str, Any]:
+    if topology == "stereo" and pattern is None:
+        candidate = scan.get("recommended_stereo")
+        if isinstance(candidate, dict):
+            return candidate
+        raise ValueError("no recommended stereo candidate found")
+
+    if not pattern:
+        raise ValueError(f"{topology} selection requires a path pattern")
+
+    key = "stereo_candidates" if topology == "stereo" else "mono_candidates"
+    candidates = scan.get(key)
+    if not isinstance(candidates, list):
+        raise ValueError(f"scan payload does not contain {key}")
+    matches = [
+        candidate
+        for candidate in candidates
+        if isinstance(candidate, dict)
+        and str(candidate.get("topology")) == topology
+        and pattern in str(candidate.get("path"))
+    ]
+    if not matches:
+        raise ValueError(f"no {topology} candidate path contains pattern {pattern!r}")
+    return sorted(matches, key=lambda candidate: (not bool(candidate.get("accepted")), float(candidate.get("score", 0.0))))[0]
+
+
+def candidate_path(root: Path, candidate: dict[str, Any]) -> Path:
+    path = Path(str(candidate["path"]))
+    if path.is_absolute():
+        return path
+    return root / path
+
+
 def candidate_summary(path: Path, root: Path, payload: dict[str, Any]) -> dict[str, Any]:
     metrics = payload.get("metrics", {})
     if not isinstance(metrics, dict):

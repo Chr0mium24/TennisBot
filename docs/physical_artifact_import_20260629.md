@@ -55,14 +55,15 @@ Command:
 
 ```bash
 cd tools/calibration
-uv run tennisbot-calibration package import-camera-calib-lab \
-  --cam1 ../../CameraCalibLab/runs/calibrations/dfoptix_charuco_auto_combined_rational_20260620_top_right_eps1e7/calibration.json \
-  --cam2 ../../CameraCalibLab/runs/calibrations/dfoptix_charuco_auto_cam2/calibration.json \
-  --stereo ../../CameraCalibLab/runs/calibrations/dfoptix_charuco_stereo_auto_fixed_intrinsics_rational_20260622/calibration.json \
+uv run tennisbot-calibration package import-scanned-camera-calib-lab \
+  --root ../../CameraCalibLab/runs/calibrations \
+  --cam1-pattern dfoptix_charuco_auto_combined_rational_20260620_top_right_eps1e7 \
+  --cam2-pattern dfoptix_charuco_auto_cam2 \
   --output ../../artifacts/calibration/stereo_cam1_cam2 \
   --left-camera-id cam1 \
   --right-camera-id cam2 \
-  --source-session CameraCalibLab/runs/calibrations/dfoptix_charuco_stereo_auto_fixed_intrinsics_rational_20260622
+  --limit 12 \
+  --output-report ../../docs/calibration_candidate_scan_20260629.md
 uv run tennisbot-calibration package verify --path ../../artifacts/calibration/stereo_cam1_cam2
 ```
 
@@ -73,6 +74,9 @@ accepted: true
 dry_run: false
 hardware_validated: true
 runtime_quality_warning: true
+candidate_files_scanned: 17
+stereo_candidates_ranked: 3
+selected_stereo: dfoptix_charuco_stereo_auto_fixed_intrinsics_rational_20260622
 baseline_m: 0.05248616443700974
 accepted_pair_count: 33
 stereo_rms_reprojection_px: 0.42365210023675176
@@ -100,7 +104,7 @@ uv run tennisbot-calibration package verify --path ../../artifacts/calibration/s
 Result:
 
 ```text
-9 tests passed.
+11 tests passed.
 Calibration package verification accepted with no missing files.
 ```
 

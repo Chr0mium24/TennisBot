@@ -102,24 +102,22 @@ CameraCalibLab internals:
 
 ```bash
 cd tools/calibration
-uv run tennisbot-calibration package scan-camera-calib-lab \
+uv run tennisbot-calibration package import-scanned-camera-calib-lab \
   --root ../../CameraCalibLab/runs/calibrations \
-  --limit 12 \
-  --output-report ../../docs/calibration_candidate_scan_YYYYMMDD.md
-uv run tennisbot-calibration package import-camera-calib-lab \
-  --cam1 ../../CameraCalibLab/runs/calibrations/dfoptix_charuco_auto_combined_rational_20260620_top_right_eps1e7/calibration.json \
-  --cam2 ../../CameraCalibLab/runs/calibrations/dfoptix_charuco_auto_cam2/calibration.json \
-  --stereo ../../CameraCalibLab/runs/calibrations/dfoptix_charuco_stereo_auto_fixed_intrinsics_rational_20260622/calibration.json \
+  --cam1-pattern dfoptix_charuco_auto_combined_rational_20260620_top_right_eps1e7 \
+  --cam2-pattern dfoptix_charuco_auto_cam2 \
   --output ../../artifacts/calibration/stereo_cam1_cam2 \
   --left-camera-id cam1 \
   --right-camera-id cam2 \
-  --source-session CameraCalibLab/runs/calibrations/dfoptix_charuco_stereo_auto_fixed_intrinsics_rational_20260622
+  --limit 12 \
+  --output-report ../../docs/calibration_candidate_scan_YYYYMMDD.md
 uv run tennisbot-calibration package verify --path ../../artifacts/calibration/stereo_cam1_cam2
 ```
 
-`scan-camera-calib-lab` is read-only. It ranks mono and stereo candidates from
-existing `CameraCalibLab` outputs and can write a Markdown report before the
-chosen files are imported into the runtime artifact contract.
+`import-scanned-camera-calib-lab` is scan-first: it ranks existing
+`CameraCalibLab` outputs, selects mono candidates by path pattern, uses the best
+ranked stereo candidate unless `--stereo-pattern` is supplied, writes an optional
+Markdown scan report, imports the chosen files, and verifies the runtime artifact.
 
 The imported package is marked `dry_run: false` and `hardware_validated: true`.
 If stereo quality metrics exceed runtime warning thresholds, the package remains

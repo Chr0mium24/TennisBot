@@ -34,6 +34,7 @@ def test_cli_help_exposes_required_commands(capsys: pytest.CaptureFixture[str]) 
     assert "verify" in package_help
     assert "import-camera-calib-lab" in package_help
     assert "scan-camera-calib-lab" in package_help
+    assert "import-scanned-camera-calib-lab" in package_help
 
 
 def test_mono_dry_run_writes_required_package_files_for_cam1(tmp_path: Path) -> None:
@@ -287,6 +288,53 @@ def test_scan_camera_calib_lab_ranks_candidates_and_writes_markdown(
     assert "# CameraCalibLab Calibration Candidate Scan" in report_text
     assert "`selected/calibration.json`" in report_text
     assert "`weak/calibration.json`" in report_text
+
+
+def test_import_scanned_camera_calib_lab_selects_candidates_before_import(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    root = tmp_path / "runs" / "calibrations"
+    source = write_camera_calib_lab_fixture(tmp_path / "source")
+    write_json_fixture(root / "cam1_current" / "calibration.json", read_json(source["cam1"]))
+    write_json_fixture(root / "cam2_current" / "calibration.json", read_json(source["cam2"]))
+    write_json_fixture(root / "stereo_current" / "calibration.json", read_json(source["stereo"]))
+    output = tmp_path / "artifact"
+    report = tmp_path / "scan.md"
+
+    assert (
+        main(
+            [
+                "package",
+                "import-scanned-camera-calib-lab",
+                "--root",
+                str(root),
+                "--cam1-pattern",
+                "cam1_current",
+                "--cam2-pattern",
+                "cam2_current",
+                "--output",
+                str(output),
+                "--left-camera-id",
+                "cam1",
+                "--right-camera-id",
+                "cam2",
+                "--output-report",
+                str(report),
+            ]
+        )
+        == 0
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["accepted"] is True
+    assert payload["selected"]["cam1"]["path"] == "cam1_current/calibration.json"
+    assert payload["selected"]["cam2"]["path"] == "cam2_current/calibration.json"
+    assert payload["selected"]["stereo"]["path"] == "stereo_current/calibration.json"
+    assert main(["package", "verify", "--path", str(output)]) == 0
+    package = read_json(output / "package.json")
+    assert package["source_session"].endswith("stereo_current")
+    assert report.is_file()
 
 
 def write_camera_calib_lab_fixture(root: Path) -> dict[str, Path]:

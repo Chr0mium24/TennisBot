@@ -144,21 +144,24 @@ uv run tennisbot-calibration gui mono --camera-id cam1 --dry-run --output ../../
 uv run tennisbot-calibration gui mono --camera-id cam2 --dry-run --output ../../artifacts/calibration/cam2
 uv run tennisbot-calibration gui stereo --left-camera-id cam1 --right-camera-id cam2 --dry-run --output ../../artifacts/calibration/stereo_cam1_cam2
 uv run tennisbot-calibration package verify --path ../../artifacts/calibration/stereo_cam1_cam2
-uv run tennisbot-calibration package import-camera-calib-lab \
-  --cam1 ../../CameraCalibLab/runs/calibrations/dfoptix_charuco_auto_combined_rational_20260620_top_right_eps1e7/calibration.json \
-  --cam2 ../../CameraCalibLab/runs/calibrations/dfoptix_charuco_auto_cam2/calibration.json \
-  --stereo ../../CameraCalibLab/runs/calibrations/dfoptix_charuco_stereo_auto_fixed_intrinsics_rational_20260622/calibration.json \
+uv run tennisbot-calibration package import-scanned-camera-calib-lab \
+  --root ../../CameraCalibLab/runs/calibrations \
+  --cam1-pattern dfoptix_charuco_auto_combined_rational_20260620_top_right_eps1e7 \
+  --cam2-pattern dfoptix_charuco_auto_cam2 \
   --output ../../artifacts/calibration/stereo_cam1_cam2 \
   --left-camera-id cam1 \
   --right-camera-id cam2 \
-  --source-session CameraCalibLab/runs/calibrations/dfoptix_charuco_stereo_auto_fixed_intrinsics_rational_20260622
+  --limit 12 \
+  --output-report ../../docs/calibration_candidate_scan_20260629.md
 uv run tennisbot-calibration package verify --path ../../artifacts/calibration/stereo_cam1_cam2
 ```
 
-Result: 9 tests passed. Dry-run mono and stereo package generation still works.
-The selected CameraCalibLab rational fixed-intrinsics stereo output was imported
-into `artifacts/calibration/stereo_cam1_cam2` and verified with `accepted: true`,
-`dry_run: false`, and `hardware_validated: true`.
+Result: 11 tests passed. Dry-run mono and stereo package generation still works.
+The scanned import command selected cam1/cam2 mono candidates by path pattern,
+ranked 3 stereo candidates, imported the best ranked CameraCalibLab rational
+fixed-intrinsics stereo output into `artifacts/calibration/stereo_cam1_cam2`, and
+verified it with `accepted: true`, `dry_run: false`, and `hardware_validated:
+true`.
 
 Imported calibration quality warning:
 
