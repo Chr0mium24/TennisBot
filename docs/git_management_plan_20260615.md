@@ -16,7 +16,6 @@ TennisBot/
   CameraCalibLab/
   TennisBallDetectorLab/
   BallTrajectoryLab/
-  BoardCameraConsole/
   TennisWebSim/
   TennisBotCV/
 ```
@@ -28,8 +27,8 @@ stores the child commit ids as gitlinks.
 
 - `CameraCalibLab`: keep `https://github.com/Chr0mium24/CameraCalibLab.git`.
 - `TennisBotCV`: keep `https://github.com/Chr0mium24/TennisBotCV.git`.
-- `TennisBallDetectorLab`, `BoardCameraConsole`, `BallTrajectoryLab`, and
-  `TennisWebSim`: GitHub remotes created with `gh repo create` and used by the
+- `TennisBallDetectorLab`, `BallTrajectoryLab`, and `TennisWebSim`: GitHub
+  remotes created with `gh repo create` and used by the
   top-level `.gitmodules`.
 
 ## Verification Plan
@@ -51,7 +50,6 @@ Completed.
   ```text
   CameraCalibLab          178a8626ad896f951857d3d670dc153c5a03dcaf
   TennisBallDetectorLab   b57c95880c382fdaf657d1b50e3f989e12d38712
-  BoardCameraConsole      3cbfdf2b2df1c81e353cfc1cec812a2373dda64b
   BallTrajectoryLab       40669113a4d822369b74f88835f76bf84a717b3f
   TennisBotCV             73e08dc8722afa57a366ca555a79510e5786bc3b
   TennisWebSim            972a13eb5e9f6a277e6685c7f00fe06e9a77fda9
@@ -63,6 +61,5 @@ Completed.
 ## GitHub Repositories Created
 
 - `https://github.com/Chr0mium24/TennisBallDetectorLab`
-- `https://github.com/Chr0mium24/BoardCameraConsole`
 - `https://github.com/Chr0mium24/BallTrajectoryLab`
 - `https://github.com/Chr0mium24/TennisWebSim`

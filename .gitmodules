@@ -6,10 +6,6 @@
 	path = TennisBallDetectorLab
 	url = https://github.com/Chr0mium24/TennisBallDetectorLab.git
 
-[submodule "BoardCameraConsole"]
-	path = BoardCameraConsole
-	url = https://github.com/Chr0mium24/BoardCameraConsole.git
-
 [submodule "BallTrajectoryLab"]
 	path = BallTrajectoryLab
 	url = https://github.com/Chr0mium24/BallTrajectoryLab.git

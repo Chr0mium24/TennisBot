@@ -3,8 +3,8 @@
 Top-level integration repository for the TennisBot workspace.
 
 This repository records the exact commits for the standalone projects that make
-up the robot, vision, calibration, trajectory, board-console, and simulation
-stack. The child directories remain independent git repositories and are tracked
+up the robot, vision, calibration, trajectory, and simulation stack. The child
+directories remain independent git repositories and are tracked
 here as submodules/gitlinks.
 
 ## Projects
@@ -14,8 +14,7 @@ here as submodules/gitlinks.
 | `CameraCalibLab` | Camera calibration, capture, simulation, comparison, and runtime package export |
 | `TennisBallDetectorLab` | YOLO annotation, dataset validation, training, evaluation, RKNN/export, and detector package handoff |
 | `BallTrajectoryLab` | Stereo trajectory reconstruction, landing prediction, and trajectory reports |
-| `BoardCameraConsole` | Board-side camera preview, recording, file management, services, and deployment helpers |
-| `TennisWebSim` | Browser simulation, ROSBridge integration, board embed, YOLO service, and vendored Omni3 ROS workspace |
+| `TennisWebSim` | Browser simulation, ROSBridge integration, YOLO service, and vendored Omni3 ROS workspace |
 | `TennisBotCV` | Lightweight integration shell and shared contracts |
 
 ## Common Commands
