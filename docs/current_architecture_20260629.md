@@ -139,6 +139,22 @@ uv run tennisbot-calibration gui stereo --left-camera-id cam1 --right-camera-id 
 uv run tennisbot-calibration package verify --path ../../artifacts/calibration/stereo_cam1_cam2
 ```
 
+Capture local calibration sessions:
+
+```bash
+cd tools/calibration
+uv run tennisbot-calibration capture mono \
+  --camera-id cam1 \
+  --device /dev/video0 \
+  --output ../../artifacts/calibration_sessions/cam1_session
+uv run tennisbot-calibration capture stereo \
+  --left-camera-id cam1 \
+  --right-camera-id cam2 \
+  --left-device /dev/video0 \
+  --right-device /dev/video2 \
+  --output ../../artifacts/calibration_sessions/stereo_session
+```
+
 Import existing CameraCalibLab calibration:
 
 ```bash
@@ -223,6 +239,9 @@ best stereo candidate dfoptix_charuco_stereo_auto_fixed_intrinsics_rational_2026
 Calibration quality warning: epipolar_rms=4.330 px exceeds the 2.000 px
 runtime-quality review threshold. stereo_rms=0.424 px,
 rectification_y_p95=0.830 px, baseline=0.052486 m.
+Calibration capture sessions: dry-run mono/stereo sessions wrote manifests,
+frames, summary, and review files; a real 1-pair stereo hardware probe opened
+/dev/video0 and /dev/video2 at 1280x720 MJPG.
 ```
 
 Latest recalibrated hardware smoke:

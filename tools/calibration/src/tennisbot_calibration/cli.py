@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from tennisbot_calibration.artifacts import write_mono_dry_run, write_stereo_dry_run
+from tennisbot_calibration.capture_sessions import capture_mono_session, capture_stereo_session
 from tennisbot_calibration.import_camera_calib_lab import import_camera_calib_lab_package
 from tennisbot_calibration.scan_camera_calib_lab import (
     candidate_path,
@@ -20,15 +21,49 @@ def build_parser() -> argparse.ArgumentParser:
         prog="tennisbot-calibration",
         description="TennisBot calibration artifact tooling.",
         epilog=(
-            "Workflows: gui mono, gui stereo, package verify, package scan-camera-calib-lab, "
+            "Workflows: capture mono, capture stereo, gui mono, gui stereo, package verify, package scan-camera-calib-lab, "
             "package import-scanned-camera-calib-lab. "
             "Wave 5 GUI commands support dry-run/non-hardware output only."
         ),
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
+    configure_capture(subparsers)
     configure_gui(subparsers)
     configure_package(subparsers)
     return parser
+
+
+def configure_capture(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    capture = subparsers.add_parser("capture", help="Capture calibration image sessions from local cameras.")
+    capture_subparsers = capture.add_subparsers(dest="capture_command", required=True)
+
+    mono = capture_subparsers.add_parser("mono", help="Capture a mono calibration image session.")
+    mono.add_argument("--camera-id", required=True)
+    mono.add_argument("--device", default="/dev/video0")
+    mono.add_argument("--output", required=True)
+    mono.add_argument("--frame-count", type=int, default=20)
+    mono.add_argument("--interval-ms", type=int, default=500)
+    mono.add_argument("--width", type=int, default=1280)
+    mono.add_argument("--height", type=int, default=720)
+    mono.add_argument("--fourcc", default="MJPG")
+    mono.add_argument("--fps", type=int, default=30)
+    mono.add_argument("--dry-run", action="store_true", help="Write deterministic synthetic frames instead of opening hardware.")
+    mono.set_defaults(handler=capture_mono)
+
+    stereo = capture_subparsers.add_parser("stereo", help="Capture a stereo calibration image-pair session.")
+    stereo.add_argument("--left-camera-id", required=True)
+    stereo.add_argument("--right-camera-id", required=True)
+    stereo.add_argument("--left-device", default="/dev/video0")
+    stereo.add_argument("--right-device", default="/dev/video2")
+    stereo.add_argument("--output", required=True)
+    stereo.add_argument("--pair-count", type=int, default=20)
+    stereo.add_argument("--interval-ms", type=int, default=500)
+    stereo.add_argument("--width", type=int, default=1280)
+    stereo.add_argument("--height", type=int, default=720)
+    stereo.add_argument("--fourcc", default="MJPG")
+    stereo.add_argument("--fps", type=int, default=30)
+    stereo.add_argument("--dry-run", action="store_true", help="Write deterministic synthetic frame pairs instead of opening hardware.")
+    stereo.set_defaults(handler=capture_stereo)
 
 
 def configure_gui(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -97,6 +132,42 @@ def configure_package(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
     scanned_import.add_argument("--output-report", default=None, help="Optional Markdown scan report path.")
     scanned_import.add_argument("--source-session", default=None)
     scanned_import.set_defaults(handler=package_import_scanned_camera_calib_lab)
+
+
+def capture_mono(args: argparse.Namespace) -> int:
+    manifest = capture_mono_session(
+        camera_id=args.camera_id,
+        device=args.device,
+        output=Path(args.output),
+        frame_count=args.frame_count,
+        interval_ms=args.interval_ms,
+        width=args.width,
+        height=args.height,
+        fourcc=args.fourcc,
+        fps=args.fps,
+        dry_run=args.dry_run,
+    )
+    print(json.dumps({"accepted": True, "output": args.output, "session": manifest}, indent=2, sort_keys=True))
+    return 0
+
+
+def capture_stereo(args: argparse.Namespace) -> int:
+    manifest = capture_stereo_session(
+        left_camera_id=args.left_camera_id,
+        right_camera_id=args.right_camera_id,
+        left_device=args.left_device,
+        right_device=args.right_device,
+        output=Path(args.output),
+        pair_count=args.pair_count,
+        interval_ms=args.interval_ms,
+        width=args.width,
+        height=args.height,
+        fourcc=args.fourcc,
+        fps=args.fps,
+        dry_run=args.dry_run,
+    )
+    print(json.dumps({"accepted": True, "output": args.output, "session": manifest}, indent=2, sort_keys=True))
+    return 0
 
 
 def gui_mono(args: argparse.Namespace) -> int:

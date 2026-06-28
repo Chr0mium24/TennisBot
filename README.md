@@ -48,6 +48,22 @@ uv run tennisbot-calibration gui stereo --left-camera-id cam1 --right-camera-id 
 uv run tennisbot-calibration package verify --path ../../artifacts/calibration/stereo_cam1_cam2
 ```
 
+Capture calibration sessions from local USB cameras:
+
+```bash
+cd tools/calibration
+uv run tennisbot-calibration capture mono \
+  --camera-id cam1 \
+  --device /dev/video0 \
+  --output ../../artifacts/calibration_sessions/cam1_session
+uv run tennisbot-calibration capture stereo \
+  --left-camera-id cam1 \
+  --right-camera-id cam2 \
+  --left-device /dev/video0 \
+  --right-device /dev/video2 \
+  --output ../../artifacts/calibration_sessions/stereo_session
+```
+
 Import existing CameraCalibLab calibration into runtime artifacts:
 
 ```bash
@@ -92,6 +108,7 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 - [Final runtime validation](docs/final_runtime_validation_20260629.md)
 - [Physical artifact import](docs/physical_artifact_import_20260629.md)
 - [Calibration candidate scan](docs/calibration_candidate_scan_20260629.md)
+- [Calibration capture session flow](docs/calibration_capture_session_flow_20260629.md)
 - [Legacy board/runtime shell retirement](docs/legacy_board_retirement_20260629.md)
 - [Live3D hardware smoke](docs/live3d_hardware_smoke_20260629.md)
 - [YOLO static sample validation](docs/yolo_static_sample_validation_20260629.md)

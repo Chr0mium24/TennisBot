@@ -104,7 +104,7 @@ uv run tennisbot-calibration package verify --path ../../artifacts/calibration/s
 Result:
 
 ```text
-11 tests passed.
+13 tests passed.
 Calibration package verification accepted with no missing files.
 ```
 

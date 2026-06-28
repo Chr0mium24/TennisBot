@@ -21,20 +21,114 @@ def help_text(args: list[str], capsys: pytest.CaptureFixture[str]) -> str:
 
 def test_cli_help_exposes_required_commands(capsys: pytest.CaptureFixture[str]) -> None:
     top_help = help_text([], capsys)
+    capture_help = help_text(["capture"], capsys)
     gui_help = help_text(["gui"], capsys)
     package_help = help_text(["package"], capsys)
 
+    assert "capture" in top_help
     assert "gui" in top_help
     assert "package" in top_help
+    assert "capture mono" in top_help
+    assert "capture stereo" in top_help
     assert "gui mono" in top_help
     assert "gui stereo" in top_help
     assert "package verify" in top_help
+    assert "mono" in capture_help
+    assert "stereo" in capture_help
     assert "mono" in gui_help
     assert "stereo" in gui_help
     assert "verify" in package_help
     assert "import-camera-calib-lab" in package_help
     assert "scan-camera-calib-lab" in package_help
     assert "import-scanned-camera-calib-lab" in package_help
+
+
+def test_capture_mono_dry_run_writes_session_frames_and_manifest(tmp_path: Path) -> None:
+    output = tmp_path / "cam1_session"
+
+    assert (
+        main(
+            [
+                "capture",
+                "mono",
+                "--camera-id",
+                "cam1",
+                "--device",
+                "/dev/video0",
+                "--output",
+                str(output),
+                "--frame-count",
+                "3",
+                "--interval-ms",
+                "0",
+                "--width",
+                "64",
+                "--height",
+                "48",
+                "--dry-run",
+            ]
+        )
+        == 0
+    )
+
+    manifest = read_json(output / "manifest.json")
+    assert manifest["topology"] == "mono"
+    assert manifest["camera_id"] == "cam1"
+    assert manifest["dry_run"] is True
+    assert manifest["hardware_validated"] is False
+    assert manifest["frame_count"] == 3
+    assert len(manifest["files"]) == 3
+    for rel_path in manifest["files"]:  # type: ignore[union-attr]
+        assert (output / str(rel_path)).is_file()
+    assert (output / "summary.md").is_file()
+    assert (output / "review.html").is_file()
+
+
+def test_capture_stereo_dry_run_writes_pair_session(tmp_path: Path) -> None:
+    output = tmp_path / "stereo_session"
+
+    assert (
+        main(
+            [
+                "capture",
+                "stereo",
+                "--left-camera-id",
+                "cam1",
+                "--right-camera-id",
+                "cam2",
+                "--left-device",
+                "/dev/video0",
+                "--right-device",
+                "/dev/video2",
+                "--output",
+                str(output),
+                "--pair-count",
+                "2",
+                "--interval-ms",
+                "0",
+                "--width",
+                "64",
+                "--height",
+                "48",
+                "--dry-run",
+            ]
+        )
+        == 0
+    )
+
+    manifest = read_json(output / "manifest.json")
+    assert manifest["topology"] == "stereo"
+    assert manifest["camera_ids"] == ["cam1", "cam2"]
+    assert manifest["dry_run"] is True
+    assert manifest["hardware_validated"] is False
+    assert manifest["pair_count"] == 2
+    pairs = manifest["pairs"]
+    assert isinstance(pairs, list)
+    for pair in pairs:
+        assert (output / str(pair["left"])).is_file()
+        assert (output / str(pair["right"])).is_file()
+    assert (output / "summary.md").is_file()
+    assert (output / "review.html").is_file()
 
 
 def test_mono_dry_run_writes_required_package_files_for_cam1(tmp_path: Path) -> None:

@@ -94,6 +94,31 @@ artifacts/calibration/stereo_cam1_cam2/
 Mono and stereo package contracts are defined in
 [`artifact_contracts.md`](artifact_contracts.md).
 
+## Capture Sessions
+
+`tools/calibration` can now create local capture sessions independently of
+`CameraCalibLab`. The capture commands write a session manifest, PNG frames,
+`summary.md`, and `review.html` under an ignored artifact directory:
+
+```bash
+cd tools/calibration
+uv run tennisbot-calibration capture mono \
+  --camera-id cam1 \
+  --device /dev/video0 \
+  --output ../../artifacts/calibration_sessions/cam1_session
+uv run tennisbot-calibration capture stereo \
+  --left-camera-id cam1 \
+  --right-camera-id cam2 \
+  --left-device /dev/video0 \
+  --right-device /dev/video2 \
+  --output ../../artifacts/calibration_sessions/stereo_session
+```
+
+Defaults are `1280x720`, `MJPG`, 30 fps, and 20 frames or pairs. Add
+`--dry-run` to generate deterministic synthetic frames for CI and review
+without opening hardware. Captured sessions are not calibration packages yet;
+the next tool step is target detection and mono/stereo solve.
+
 ## Import Existing CameraCalibLab Output
 
 Existing CameraCalibLab mono/stereo `calibration.json` files can be converted
