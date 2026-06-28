@@ -19,6 +19,17 @@ export interface TimestampedStereoDetectionPair {
   right: YoloDetection2D;
   maxTimestampDeltaMs: number;
   matchConfidence?: number;
+  disparityPx?: number;
+  epipolarErrorPx?: number;
+  matchCost?: number;
+}
+
+export interface StereoPairingDiagnostics {
+  evaluatedCandidateCount: number;
+  rejectedByTimestampCount: number;
+  rejectedByEpipolarCount: number;
+  rejectedByDisparityCount: number;
+  bestCost: number | null;
 }
 
 export interface TriangulatedBallPoint3D {
@@ -27,5 +38,14 @@ export interface TriangulatedBallPoint3D {
   positionMeters: Vector3;
   sourcePairId: string;
   reprojectionErrorPx?: number;
+  diagnostics?: TriangulationDiagnostics;
   covarianceMeters?: number[];
+}
+
+export interface TriangulationDiagnostics {
+  disparityPx: number;
+  epipolarErrorPx: number;
+  leftReprojectionErrorPx: number;
+  rightReprojectionErrorPx: number;
+  averageReprojectionErrorPx: number;
 }

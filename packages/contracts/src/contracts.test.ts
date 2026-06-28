@@ -3,7 +3,9 @@ import type {
   CameraIntrinsics,
   LandingPoint,
   Matrix3x3,
+  RectifiedStereoProjectionMatrices,
   PredictionCurve,
+  StereoPairingDiagnostics,
   StereoExtrinsics,
   TimestampedStereoDetectionPair,
   TriangulatedBallPoint3D,
@@ -41,6 +43,25 @@ describe('runtime data contracts', () => {
     expect(extrinsics.translationLeftToRightMeters.x).toBe(0.18);
   });
 
+  test('represents row-major rectified stereo projection matrices', () => {
+    const projections: RectifiedStereoProjectionMatrices = {
+      leftCameraId: 'cam-left',
+      rightCameraId: 'cam-right',
+      leftProjectionMatrix: {
+        values: [1000, 0, 640, 0, 0, 1000, 360, 0, 0, 0, 1, 0],
+        storage: 'row-major',
+      },
+      rightProjectionMatrix: {
+        values: [1000, 0, 640, -200, 0, 1000, 360, 0, 0, 0, 1, 0],
+        storage: 'row-major',
+      },
+      baselineMeters: 0.2,
+    };
+
+    expect(projections.leftProjectionMatrix.values).toHaveLength(12);
+    expect(projections.rightProjectionMatrix.storage).toBe('row-major');
+  });
+
   test('represents YOLO detections, stereo pairs, and triangulated points', () => {
     const left: YoloDetection2D = {
       detectionId: 'det-left-1',
@@ -69,6 +90,9 @@ describe('runtime data contracts', () => {
       right,
       maxTimestampDeltaMs: 8,
       matchConfidence: 0.88,
+      disparityPx: 32,
+      epipolarErrorPx: 0,
+      matchCost: -0.7,
     };
 
     const point: TriangulatedBallPoint3D = {
@@ -77,10 +101,26 @@ describe('runtime data contracts', () => {
       positionMeters: { x: 0.2, y: 0.4, z: 3.1 },
       sourcePairId: pair.pairId,
       reprojectionErrorPx: 1.2,
+      diagnostics: {
+        disparityPx: 32,
+        epipolarErrorPx: 0,
+        leftReprojectionErrorPx: 1.1,
+        rightReprojectionErrorPx: 1.3,
+        averageReprojectionErrorPx: 1.2,
+      },
     };
 
     expect(pair.left.label).toBe('tennis_ball');
     expect(point.sourcePairId).toBe(pair.pairId);
+
+    const pairingDiagnostics: StereoPairingDiagnostics = {
+      evaluatedCandidateCount: 4,
+      rejectedByTimestampCount: 1,
+      rejectedByEpipolarCount: 1,
+      rejectedByDisparityCount: 1,
+      bestCost: -0.7,
+    };
+    expect(pairingDiagnostics.rejectedByTimestampCount).toBe(1);
   });
 
   test('represents prediction curves and landing points', () => {

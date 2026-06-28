@@ -25,3 +25,8 @@ export interface Matrix3x3 {
   values: [number, number, number, number, number, number, number, number, number];
   storage: 'row-major';
 }
+
+export interface Matrix3x4 {
+  values: [number, number, number, number, number, number, number, number, number, number, number, number];
+  storage: 'row-major';
+}
