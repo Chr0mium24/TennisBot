@@ -1,4 +1,4 @@
-import type { ImageSize, Matrix3x3, Vector3 } from './geometry.js';
+import type { ImageSize, Matrix3x3, Matrix3x4, Vector3 } from './geometry.js';
 
 export type DistortionModel = 'none' | 'opencv-radtan' | 'opencv-fisheye';
 
@@ -28,4 +28,14 @@ export interface StereoCalibration {
   left: CameraIntrinsics;
   right: CameraIntrinsics;
   extrinsics: StereoExtrinsics;
+  rectifiedProjection?: RectifiedStereoProjectionMatrices;
+}
+
+export interface RectifiedStereoProjectionMatrices {
+  leftCameraId: string;
+  rightCameraId: string;
+  leftProjectionMatrix: Matrix3x4;
+  rightProjectionMatrix: Matrix3x4;
+  imageSize?: ImageSize;
+  baselineMeters?: number;
 }
