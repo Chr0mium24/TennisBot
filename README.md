@@ -59,6 +59,7 @@ uv run camera-calib-lab --help
 - [Multi-agent refactor Wave 6 YOLO tool plan](docs/multi_agent_refactor_wave6_yolo_tool_plan_20260629.md)
 - [Multi-agent refactor Wave 6 YOLO tool result](docs/multi_agent_refactor_wave6_yolo_tool_result_20260629.md)
 - [Multi-agent refactor Wave 6 YOLO tool review](docs/multi_agent_refactor_wave6_yolo_tool_review_20260629.md)
+- [Multi-agent refactor Wave 7 Live3D artifacts plan](docs/multi_agent_refactor_wave7_live3d_artifacts_plan_20260629.md)
 
 ## Git Workflow
 
