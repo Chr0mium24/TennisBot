@@ -1,47 +1,63 @@
 # TennisBot
 
-Top-level integration repository for the TennisBot workspace.
+Local-machine-first workspace for the TennisBot stereo vision runtime.
 
-This repository records the exact commits for the standalone projects that make
-up the robot, vision, calibration, trajectory, and simulation stack. The child
-directories remain independent git repositories and are tracked
-here as submodules/gitlinks.
+The active architecture now lives in top-level `apps/`, `packages/`, and
+`tools/`. Legacy lab directories remain as reference submodules, but the live
+runtime consumes only exported artifacts from `artifacts/`.
 
 ## Projects
 
 | Project | Purpose |
 | --- | --- |
-| `CameraCalibLab` | Camera calibration, capture, simulation, comparison, and runtime package export |
-| `TennisBallDetectorLab` | YOLO annotation, dataset validation, training, evaluation, RKNN/export, and detector package handoff |
-| `BallTrajectoryLab` | Stereo trajectory reconstruction, landing prediction, and trajectory reports |
-| `TennisWebSim` | Browser simulation, ROSBridge integration, YOLO service, and vendored Omni3 ROS workspace |
-| `TennisBotCV` | Lightweight integration shell and shared contracts |
+| `apps/live3d` | Browser USB stereo camera UI, ONNX YOLO inference, runtime 3D visualization |
+| `packages/contracts` | Shared TypeScript data contracts |
+| `packages/core` | Artifact validation, stereo pairing, triangulation, trajectory prediction |
+| `tools/calibration` | Standalone mono/stereo calibration package tooling |
+| `tools/yolo` | Standalone YOLO runtime model package tooling |
+| `artifacts/` | Ignored local runtime outputs for calibration and model packages |
+| Legacy submodules | `CameraCalibLab`, `TennisBallDetectorLab`, `BallTrajectoryLab`, `TennisWebSim`, `TennisBotCV` are reference/history only for the current runtime path |
 
 ## Common Commands
 
-Run the full WebSim + ROS/Gazebo helper:
+Run Live3D:
 
 ```bash
-cd TennisWebSim/apps/tennisweb
-bun run dev:all
+cd apps/live3d
+bun install
+bun run dev
 ```
 
-Run the YOLO annotator:
+Verify Live3D:
 
 ```bash
-cd TennisBallDetectorLab
-uv run tbl annotate
+cd apps/live3d
+bun test
+bun run typecheck
+bun run build
 ```
 
-Run calibration tools:
+Create dry-run calibration artifacts:
 
 ```bash
-cd CameraCalibLab
-uv run camera-calib-lab --help
+cd tools/calibration
+uv run tennisbot-calibration gui mono --camera-id cam1 --dry-run --output-dir ../../artifacts/calibration/cam1
+uv run tennisbot-calibration gui mono --camera-id cam2 --dry-run --output-dir ../../artifacts/calibration/cam2
+uv run tennisbot-calibration gui stereo --dry-run --output-dir ../../artifacts/calibration/stereo_cam1_cam2
+uv run tennisbot-calibration package verify --path ../../artifacts/calibration/stereo_cam1_cam2
+```
+
+Create dry-run YOLO artifacts:
+
+```bash
+cd tools/yolo
+uv run tennisbot-yolo package create --dry-run --output-dir ../../artifacts/models/tennis_ball_yolo
+uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_yolo
 ```
 
 ## Architecture
 
+- [Current architecture](docs/current_architecture_20260629.md)
 - [Architecture simplification plan](docs/architecture_simplification_plan_20260628.md)
 - [Multi-agent refactor task plan](docs/multi_agent_refactor_tasks_20260628.md)
 - [Multi-agent refactor Wave 1 result](docs/multi_agent_refactor_wave1_result_20260628.md)
@@ -77,20 +93,21 @@ uv run camera-calib-lab --help
 
 ## Git Workflow
 
-Work inside a child project when changing its code, commit there first, then
-come back to this top-level repository and commit the updated submodule pointer.
+For active code in `apps/`, `packages/`, `tools/`, and `docs/`, commit directly
+in this repository.
+
+Legacy submodule edits are out of scope for the current runtime path. If a
+legacy submodule must be changed, commit inside that submodule first, then
+commit the updated gitlink from the top-level repository.
 
 ```bash
-git -C TennisWebSim status
-git -C TennisWebSim commit -am "..."
-git add TennisWebSim
-git commit -m "Update TennisWebSim pointer"
+git -C <legacy-submodule> status
+git -C <legacy-submodule> commit -am "..."
+git add <legacy-submodule>
+git commit -m "Update legacy submodule pointer"
 ```
-
-The top-level repository should only contain integration docs, `.gitmodules`,
-and submodule pointers.
 
 ## Remote Status
 
-All tracked projects use GitHub remotes under `Chr0mium24`. `TennisWebSim`
-also contains the upstream `Tennis_Robot_Chassis` submodule.
+The historical submodules use GitHub remotes under `Chr0mium24`. The current
+runtime path does not depend on board-side deployment code.
