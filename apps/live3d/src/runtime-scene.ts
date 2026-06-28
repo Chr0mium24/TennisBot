@@ -181,7 +181,7 @@ export function updateRuntime3dState(options: UpdateRuntime3dStateOptions): Runt
   const trail = appendTrail(
     options.previousState.trail,
     triangulation.point,
-    options.maxTrailPoints ?? DEFAULT_MAX_TRAIL_POINTS,
+    Math.max(1, options.maxTrailPoints ?? DEFAULT_MAX_TRAIL_POINTS),
   );
   const prediction = predictTrajectory(trail, {
     generatedAtUnixMs: options.timestampUnixMs,

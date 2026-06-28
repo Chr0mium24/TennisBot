@@ -99,6 +99,30 @@ describe("Live3D runtime 3D scene state", () => {
     expect(state.trail).toEqual([]);
   });
 
+  test("preserves existing trail while waiting for a missing detection", () => {
+    const first = updateRuntime3dState({
+      previousState: createInitialRuntime3dState(),
+      left: yoloStatus("left", [detectionFromPoint("browser-left", "left-1", point(0.1, 0.04, 2))]),
+      right: yoloStatus("right", [detectionFromPoint("browser-right", "right-1", point(0.1, 0.04, 2))]),
+      calibrationStatus: loadedCalibrationStatus(),
+      frameId: "frame-1",
+      timestampUnixMs,
+    });
+
+    const waiting = updateRuntime3dState({
+      previousState: first,
+      left: yoloStatus("left", []),
+      right: yoloStatus("right", [detectionFromPoint("browser-right", "right-2", point(0.1, 0.04, 2))]),
+      calibrationStatus: loadedCalibrationStatus(),
+      frameId: "frame-2",
+      timestampUnixMs: timestampUnixMs + 100,
+    });
+
+    expect(waiting.status.code).toBe("left-detections-missing");
+    expect(waiting.trail).toHaveLength(1);
+    expect(waiting.latestPoint).toBeNull();
+  });
+
   test("reports no stereo pair when candidates fail epipolar pairing", () => {
     const state = updateRuntime3dState({
       previousState: createInitialRuntime3dState(),

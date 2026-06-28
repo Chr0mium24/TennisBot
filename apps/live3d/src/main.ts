@@ -606,7 +606,7 @@ async function startYoloInferenceFromUserAction(): Promise<void> {
     left,
     right,
     calibrationStatus,
-    frameId: String(runSerial),
+    frameId: `${leftFrameId}:${rightFrameId}`,
     timestampUnixMs,
   });
   renderCurrentApp();
@@ -616,6 +616,7 @@ function stopYoloInferenceFromUserAction(): void {
   yoloRunSerial += 1;
   yoloBackend.stop?.();
   detectionStatus = createStereoYoloInferenceIdleStatus();
+  runtime3dState = createInitialRuntime3dState();
 }
 
 function formatMatch(pair: Runtime3dState["selectedPair"]): string {

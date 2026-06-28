@@ -27,6 +27,10 @@ It then:
 - reports explicit statuses for blocked calibration, missing detections, missing
   stereo pairs, triangulation failures, one-point tracking, and prediction-ready
   tracking.
+- Lead review reset runtime 3D state when YOLO/camera runtime is stopped, used
+  the left/right frame ids in runtime pair ids, preserved prior trail while
+  waiting for a missing detection, and clamped configured trail length to at
+  least one point.
 
 ## Files Changed
 
@@ -53,6 +57,8 @@ cd apps/live3d && bun run typecheck
 cd apps/live3d && bun run build
 git diff --check
 ```
+
+Lead review result after runtime-state fixes: 38 passing tests, 0 failures.
 
 ## Residual Risk
 
