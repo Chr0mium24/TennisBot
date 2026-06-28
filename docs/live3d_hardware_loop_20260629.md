@@ -1,7 +1,7 @@
 # Live3D Hardware Loop Verification
 
-- Started: 2026-06-28T21:12:56.657Z
-- Finished: 2026-06-28T21:13:18.873Z
+- Started: 2026-06-28T21:26:09.199Z
+- Finished: 2026-06-28T21:26:32.773Z
 - App URL: http://localhost:5178
 - Result: failed
 - Error: Runtime 3D prediction did not reach ready.
@@ -14,6 +14,8 @@
 - passed: page snapshot - window.__tennisbotLive3dSnapshot is available.
 - passed: camera startup - 2 video input(s); left=USU Camera 4K: (a000:b111); right=USU Camera 4K: (a000:b111).
 - failed: runtime 3D prediction - Left YOLO never produced a tennis-ball detection.
+- passed: frame capture - Saved 2 video frame capture(s) under /home/cr/Codes/TennisBot/artifacts/hardware_smoke/20260629/live3d_hardware_loop_frames.
+- failed: frame quality - left, right capture(s) are near-black; check camera exposure, lens cover, or browser capture backend before judging YOLO.
 
 ## Observations
 
@@ -24,11 +26,28 @@
 - Max prediction samples: 0
 - Runtime 3D codes: idle, left-detections-missing
 
+## Frame Captures
+
+- saved: left - 1280x720 PNG frame via image-capture; mean luma 0.00, max luma 0.00, non-black 0.00%. (/home/cr/Codes/TennisBot/artifacts/hardware_smoke/20260629/live3d_hardware_loop_frames/left.png)
+- saved: right - 1280x720 PNG frame via image-capture; mean luma 0.00, max luma 0.00, non-black 0.00%. (/home/cr/Codes/TennisBot/artifacts/hardware_smoke/20260629/live3d_hardware_loop_frames/right.png)
+
+## Direct V4L2 Cross-Check
+
+- `timeout 5s ffmpeg ... -i /dev/video0 -frames:v 1 .../video0.jpg`: exit `124`, no JPEG written.
+- `timeout 5s ffmpeg ... -i /dev/video2 -frames:v 1 .../video2.jpg`: exit `124`, no JPEG written.
+- `timeout 5s v4l2-ctl -d /dev/video0 --stream-mmap --stream-count=1 --stream-to=.../video0.raw`: exit `124`, 0-byte raw file.
+- `timeout 5s v4l2-ctl -d /dev/video2 --stream-mmap --stream-count=1 --stream-to=.../video2.raw`: exit `124`, 0-byte raw file.
+- `v4l2-ctl --all` still reports both devices as `USU Camera 4K` UVC capture devices at `1280x720 YUYV`, 30 fps.
+
+Interpretation: the current blocker is camera frame output/quality, not YOLO
+model quality. Resolve the black/timeout frame issue before judging ball
+detection or runtime 3D behavior.
+
 ## Last Snapshot
 
 ```json
 {
-  "generatedAtUnixMs": 1782681198366,
+  "generatedAtUnixMs": 1782681990920,
   "camera": {
     "state": "ready",
     "left": {
@@ -37,7 +56,7 @@
       "code": "opened",
       "label": "Left USB camera opened",
       "detail": "1280x720 @ 60 fps requested from browser device USU Camera 4K: (a000:b111).",
-      "deviceId": "e215d4050feadc95afb524b489a096557aec6fb25fd878fed31cc43a8a3b231c",
+      "deviceId": "6baa89dcf9826d6b6bde39d8700e754459200d678658fa93dcc8ef39d38d1d8a",
       "deviceLabel": "USU Camera 4K: (a000:b111)"
     },
     "right": {
@@ -46,18 +65,18 @@
       "code": "opened",
       "label": "Right USB camera opened",
       "detail": "1280x720 @ 60 fps requested from browser device USU Camera 4K: (a000:b111).",
-      "deviceId": "054b322394b3520be4fe13075f51c08603f397592f89e8c7bc75ddcda43d7083",
+      "deviceId": "1e06335e308a62ca74e01506b3ae0f05cdf99c122bd88d1bcdaf5f740a72bf13",
       "deviceLabel": "USU Camera 4K: (a000:b111)"
     },
     "deviceCount": 2,
     "devices": [
       {
-        "deviceId": "e215d4050feadc95afb524b489a096557aec6fb25fd878fed31cc43a8a3b231c",
+        "deviceId": "6baa89dcf9826d6b6bde39d8700e754459200d678658fa93dcc8ef39d38d1d8a",
         "label": "USU Camera 4K: (a000:b111)",
         "kind": "videoinput"
       },
       {
-        "deviceId": "054b322394b3520be4fe13075f51c08603f397592f89e8c7bc75ddcda43d7083",
+        "deviceId": "1e06335e308a62ca74e01506b3ae0f05cdf99c122bd88d1bcdaf5f740a72bf13",
         "label": "USU Camera 4K: (a000:b111)",
         "kind": "videoinput"
       }
@@ -87,8 +106,8 @@
       "code": "updated",
       "label": "Left YOLO updated",
       "detail": "onnxruntime-web-yolo produced no tennis-ball detections for this frame.",
-      "frameId": "left-1782681196851",
-      "timestampUnixMs": 1782681196851,
+      "frameId": "left-1782681989413",
+      "timestampUnixMs": 1782681989413,
       "imageSize": {
         "widthPx": 1280,
         "heightPx": 720
@@ -104,8 +123,8 @@
       "code": "updated",
       "label": "Right YOLO updated",
       "detail": "onnxruntime-web-yolo produced no tennis-ball detections for this frame.",
-      "frameId": "right-1782681196851",
-      "timestampUnixMs": 1782681196851,
+      "frameId": "right-1782681989413",
+      "timestampUnixMs": 1782681989413,
       "imageSize": {
         "widthPx": 1280,
         "heightPx": 720

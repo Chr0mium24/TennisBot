@@ -15,9 +15,9 @@ This validation covers the current local-machine software architecture:
 It does not claim ROS/Gazebo catch control or final physical 3D accuracy. A
 real local YOLO package and an imported real calibration package are available
 for runtime smoke testing. Live3D has also opened two real USB cameras in
-Chrome and run the ONNX backend on live frames, but the current scene did not
-contain a detectable tennis ball and the imported stereo calibration has quality
-warnings.
+Chrome and run the ONNX backend loop, but the latest captured browser frames are
+near-black and direct V4L2 frame reads timed out. The imported stereo
+calibration also has quality warnings.
 
 Follow-up YOLO static validation found that Live3D was decoding the exported
 ONNX `xyxy_pixels` output as `xywh`. That postprocessing bug is fixed. The
@@ -85,9 +85,10 @@ google-chrome --headless=new --use-fake-ui-for-media-stream ...
 Result: two `USU Camera 4K` devices were enumerated, `/dev/video0` and
 `/dev/video2` were opened simultaneously, Chrome opened distinct left/right
 `MediaStream` tracks at 1280x720, and the ONNX backend ran continuously against
-live camera frames without ONNX session errors. The frames produced zero
-tennis-ball detections in the current scene, so runtime 3D remained waiting for
-a detection.
+browser camera sources without ONNX session errors. The latest verifier saved
+left/right browser frame captures, but both were fully near-black
+(`mean_luma=0.00`, `max_luma=0.00`), so runtime 3D remained waiting for a
+detection.
 
 Automated hardware loop:
 
@@ -101,9 +102,23 @@ Result: the script reused `http://localhost:5178`, launched
 `/usr/bin/google-chrome` on CDP port `9233`, found
 `window.__tennisbotLive3dSnapshot`, opened two real `USU Camera 4K` browser
 streams, loaded the ONNX YOLO artifact, and loaded the stereo calibration
-artifact. It failed the final physical gate because both cameras produced zero
-YOLO tennis-ball detections in the current scene. Last runtime code:
-`left-detections-missing`.
+artifact. It failed the final physical gate because both browser frame captures
+were near-black and both cameras produced zero YOLO tennis-ball detections. Last
+runtime code: `left-detections-missing`.
+
+Direct V4L2 cross-check:
+
+```bash
+timeout 5s ffmpeg -hide_banner -loglevel error -y -f v4l2 -video_size 1280x720 -i /dev/video0 -frames:v 1 artifacts/hardware_smoke/20260629/direct_v4l2_frames/video0.jpg
+timeout 5s ffmpeg -hide_banner -loglevel error -y -f v4l2 -video_size 1280x720 -i /dev/video2 -frames:v 1 artifacts/hardware_smoke/20260629/direct_v4l2_frames/video2.jpg
+timeout 5s v4l2-ctl -d /dev/video0 --stream-mmap --stream-count=1 --stream-to=artifacts/hardware_smoke/20260629/direct_v4l2_frames/video0.raw
+timeout 5s v4l2-ctl -d /dev/video2 --stream-mmap --stream-count=1 --stream-to=artifacts/hardware_smoke/20260629/direct_v4l2_frames/video2.raw
+```
+
+Result: both `ffmpeg` reads exited with timeout code `124` and produced no JPEG
+file. Both `v4l2-ctl --stream-mmap` reads exited with timeout code `124` and
+left 0-byte raw files. `v4l2-ctl --all` still reports `/dev/video0` and
+`/dev/video2` as UVC capture devices at `1280x720 YUYV`, 30 fps.
 
 ### Calibration Tool
 
@@ -170,11 +185,12 @@ Result: 13 tests passed. A real runtime YOLO package was written from the
   rebuilt from `finetune_indoor_cam1/weights/best.pt`.
 - `artifacts/calibration/stereo_cam1_cam2` now contains a real imported stereo
   package with explicit runtime quality warnings.
-- Live3D opened two real USB cameras in Chrome and ran the ONNX backend on live
-  browser frames without session concurrency errors.
+- Live3D opened two real USB cameras in Chrome and ran the ONNX backend loop
+  without session concurrency errors.
 - Live3D now has a repeatable headless hardware verifier that reads
   `window.__tennisbotLive3dSnapshot` and records camera, YOLO, calibration,
-  detection, and runtime 3D state to Markdown.
+  detection, runtime 3D state, frame captures, and frame brightness statistics
+  to Markdown.
 - Live3D now decodes the current ONNX package's `xyxy_pixels` output correctly.
 - The current YOLO model package passed the static detection-quality smoke at
   `confidence_threshold: 0.05` on 109 matched labeled images.
@@ -186,11 +202,13 @@ Result: 13 tests passed. A real runtime YOLO package was written from the
 
 Before claiming full real-world operation:
 
-1. Put a tennis ball in both USB camera views and rerun
+1. Resolve the current camera frame-output issue: browser ImageCapture frames
+   are near-black and direct V4L2 one-frame reads time out.
+2. Put a tennis ball in both USB camera views and rerun
    `bun apps/live3d/scripts/verify-hardware.ts --timeout-ms 30000 --output docs/live3d_hardware_loop_ball_YYYYMMDD.md`
    until the report reaches `prediction-ready`.
-2. Confirm runtime 3D scene, prediction curve, and landing marker update from
+3. Confirm runtime 3D scene, prediction curve, and landing marker update from
    those detections.
-3. Re-run mono/stereo calibration if imported stereo quality remains poor.
-4. Validate ROS/Gazebo closed-loop catch behavior only after real visual
+4. Re-run mono/stereo calibration if imported stereo quality remains poor.
+5. Validate ROS/Gazebo closed-loop catch behavior only after real visual
    tracking is stable.

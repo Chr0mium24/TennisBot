@@ -202,8 +202,9 @@ stereo triangulation, and prediction using synthetic tests.
 
 Live3D also exposes `window.__tennisbotLive3dSnapshot` for repeatable hardware
 checks. The verifier command can launch Chrome, start both USB cameras, start
-YOLO, and poll the snapshot until runtime 3D reaches `prediction-ready` or a
-Markdown report records the failed gate.
+YOLO, capture left/right frame PNGs with brightness statistics, and poll the
+snapshot until runtime 3D reaches `prediction-ready` or a Markdown report
+records the failed gate.
 
 Runtime artifacts have also been imported locally:
 
@@ -220,8 +221,10 @@ rectification_y_p95=19.304 px.
 The architecture is implemented in software. These items still require real
 hardware validation:
 
-- rerun the Live3D hardware verifier with a tennis ball visible in both USB
-  camera views;
+- fix the current camera frame-output issue: the latest browser captures are
+  fully near-black and direct V4L2 one-frame reads time out;
+- rerun the Live3D hardware verifier with a tennis ball visible in both
+  non-black USB camera views;
 - verify nonzero ONNX detections on both live frames;
 - verify runtime 3D reaches `prediction-ready` with stable point and prediction
   updates;

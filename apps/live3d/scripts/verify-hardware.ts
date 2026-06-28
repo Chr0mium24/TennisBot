@@ -1,6 +1,7 @@
+import { Buffer } from "node:buffer";
 import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, extname, join, resolve } from "node:path";
 
 import type { Live3dRuntimeSnapshot } from "../src/runtime-snapshot";
 
@@ -12,6 +13,7 @@ type Options = {
   chromeBin?: string;
   keepChrome: boolean;
   outputPath: string;
+  captureDir: string;
 };
 
 type StepStatus = "passed" | "failed" | "skipped";
@@ -32,6 +34,16 @@ type Observation = {
   lastSnapshot: Live3dRuntimeSnapshot | null;
 };
 
+type CaptureArtifact = {
+  label: "left" | "right";
+  path?: string;
+  status: "saved" | "failed";
+  detail: string;
+  meanLuma?: number;
+  maxLuma?: number;
+  nonBlackPixelPercent?: number;
+};
+
 type VerificationResult = {
   status: "passed" | "failed" | "error";
   startedAt: Date;
@@ -39,6 +51,7 @@ type VerificationResult = {
   appUrl: string;
   steps: VerificationStep[];
   observation: Observation;
+  captures: CaptureArtifact[];
   error?: string;
 };
 
@@ -83,6 +96,7 @@ try {
     appUrl: options.appUrl,
     steps: [],
     observation: createEmptyObservation(),
+    captures: [],
     error: formatUnknownError(error),
   };
   writeReport(result, options.outputPath);
@@ -120,10 +134,18 @@ async function runVerification(startedAt: Date, opts: Options): Promise<Verifica
     });
 
     if (initialSnapshot.yoloArtifact.status !== "loaded") {
-      return failed(startedAt, opts, steps, observation, "YOLO artifact is blocked.");
+      return await finalizeResult(
+        failed(startedAt, opts, steps, observation, "YOLO artifact is blocked."),
+        cdp,
+        opts,
+      );
     }
     if (initialSnapshot.calibrationArtifact.status !== "loaded") {
-      return failed(startedAt, opts, steps, observation, "Stereo calibration artifact is blocked.");
+      return await finalizeResult(
+        failed(startedAt, opts, steps, observation, "Stereo calibration artifact is blocked."),
+        cdp,
+        opts,
+      );
     }
 
     await evaluate(cdp, `document.querySelector("#camera-start-button")?.click(); true`);
@@ -136,7 +158,11 @@ async function runVerification(startedAt: Date, opts: Options): Promise<Verifica
         status: "failed",
         detail: cameraSnapshot.camera.left.detail + " " + cameraSnapshot.camera.right.detail,
       });
-      return failed(startedAt, opts, steps, observation, "Two real USB camera streams did not reach ready.");
+      return await finalizeResult(
+        failed(startedAt, opts, steps, observation, "Two real USB camera streams did not reach ready."),
+        cdp,
+        opts,
+      );
     }
     steps.push({
       name: "camera startup",
@@ -154,7 +180,11 @@ async function runVerification(startedAt: Date, opts: Options): Promise<Verifica
         status: "failed",
         detail: failureDetail(observation),
       });
-      return failed(startedAt, opts, steps, observation, "Runtime 3D prediction did not reach ready.");
+      return await finalizeResult(
+        failed(startedAt, opts, steps, observation, "Runtime 3D prediction did not reach ready."),
+        cdp,
+        opts,
+      );
     }
 
     steps.push({
@@ -163,14 +193,19 @@ async function runVerification(startedAt: Date, opts: Options): Promise<Verifica
       detail: `left max detections=${observation.maxLeftDetections}, right max detections=${observation.maxRightDetections}, trail=${observation.maxTrailLength}, samples=${observation.maxPredictionSamples}.`,
     });
 
-    return {
-      status: "passed",
-      startedAt,
-      finishedAt: new Date(),
-      appUrl: opts.appUrl,
-      steps,
-      observation,
-    };
+    return await finalizeResult(
+      {
+        status: "passed",
+        startedAt,
+        finishedAt: new Date(),
+        appUrl: opts.appUrl,
+        steps,
+        observation,
+        captures: [],
+      },
+      cdp,
+      opts,
+    );
   } finally {
     if (cdp !== undefined) {
       cdp.close();
@@ -185,6 +220,66 @@ async function runVerification(startedAt: Date, opts: Options): Promise<Verifica
       serverProcess.kill();
     }
   }
+}
+
+async function finalizeResult(
+  result: VerificationResult,
+  cdp: CdpClient | undefined,
+  opts: Options,
+): Promise<VerificationResult> {
+  if (cdp === undefined) {
+    return result;
+  }
+
+  try {
+    result.captures = await captureVideoFrames(cdp, opts.captureDir);
+    const savedCount = result.captures.filter((capture) => capture.status === "saved").length;
+    const darkCaptures = result.captures.filter(
+      (capture) => capture.status === "saved" && (capture.maxLuma ?? 0) <= 8,
+    );
+    result.steps.push({
+      name: "frame capture",
+      status: savedCount > 0 ? "passed" : "failed",
+      detail:
+        savedCount > 0
+          ? `Saved ${savedCount} video frame capture(s) under ${opts.captureDir}.`
+          : "No video frames could be captured from the page.",
+    });
+    if (darkCaptures.length > 0) {
+      result.steps.push({
+        name: "frame quality",
+        status: "failed",
+        detail: `${darkCaptures.map((capture) => capture.label).join(", ")} capture(s) are near-black; check camera exposure, lens cover, or browser capture backend before judging YOLO.`,
+      });
+    } else if (savedCount > 0) {
+      result.steps.push({
+        name: "frame quality",
+        status: "passed",
+        detail: "Captured frames are not near-black.",
+      });
+    }
+  } catch (error) {
+    result.captures = [
+      {
+        label: "left",
+        status: "failed",
+        detail: `Frame capture failed: ${formatUnknownError(error)}`,
+      },
+      {
+        label: "right",
+        status: "failed",
+        detail: `Frame capture failed: ${formatUnknownError(error)}`,
+      },
+    ];
+    result.steps.push({
+      name: "frame capture",
+      status: "failed",
+      detail: formatUnknownError(error),
+    });
+  }
+
+  result.finishedAt = new Date();
+  return result;
 }
 
 async function ensureLive3dServer(
@@ -332,6 +427,90 @@ async function readSnapshot(cdp: CdpClient): Promise<Live3dRuntimeSnapshot | nul
   return value as Live3dRuntimeSnapshot;
 }
 
+async function captureVideoFrames(cdp: CdpClient, captureDir: string): Promise<CaptureArtifact[]> {
+  const captures = await evaluate(cdp, `
+    (async () => {
+      const drawImageSource = (label, source, width, height, method) => {
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d");
+        if (context === null) {
+          return { label, ok: false, message: "2D canvas context is unavailable." };
+        }
+        context.drawImage(source, 0, 0, canvas.width, canvas.height);
+        const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+        let lumaSum = 0;
+        let maxLuma = 0;
+        let nonBlackPixels = 0;
+        for (let index = 0; index < pixels.length; index += 4) {
+          const luma =
+            0.2126 * pixels[index] +
+            0.7152 * pixels[index + 1] +
+            0.0722 * pixels[index + 2];
+          lumaSum += luma;
+          maxLuma = Math.max(maxLuma, luma);
+          if (luma > 8) {
+            nonBlackPixels += 1;
+          }
+        }
+        const pixelCount = canvas.width * canvas.height;
+        return {
+          label,
+          ok: true,
+          width: canvas.width,
+          height: canvas.height,
+          method,
+          meanLuma: lumaSum / pixelCount,
+          maxLuma,
+          nonBlackPixelPercent: (nonBlackPixels / pixelCount) * 100,
+          dataUrl: canvas.toDataURL("image/png"),
+        };
+      };
+      const waitForVideoFrame = (video) =>
+        new Promise((resolve) => {
+          if (typeof video.requestVideoFrameCallback === "function") {
+            video.requestVideoFrameCallback(() => resolve());
+          } else {
+            setTimeout(resolve, 250);
+          }
+        });
+      const capture = async (label, selector) => {
+        const video = document.querySelector(selector);
+        if (!(video instanceof HTMLVideoElement)) {
+          return { label, ok: false, message: selector + " is not a video element." };
+        }
+        const stream = video.srcObject instanceof MediaStream ? video.srcObject : null;
+        const track = stream?.getVideoTracks()[0];
+        if (track !== undefined && typeof ImageCapture !== "undefined") {
+          try {
+            const bitmap = await new ImageCapture(track).grabFrame();
+            return drawImageSource(label, bitmap, bitmap.width, bitmap.height, "image-capture");
+          } catch {
+            // Fall back to drawing the video element below.
+          }
+        }
+        await waitForVideoFrame(video);
+        if (video.videoWidth <= 0 || video.videoHeight <= 0) {
+          return { label, ok: false, message: selector + " has no decoded video frame." };
+        }
+        return drawImageSource(label, video, video.videoWidth, video.videoHeight, "video-canvas");
+      };
+      return await Promise.all([
+        capture("left", "#left-camera-video"),
+        capture("right", "#right-camera-video"),
+      ]);
+    })()
+  `);
+
+  if (!Array.isArray(captures)) {
+    throw new Error("Frame capture did not return an array.");
+  }
+
+  mkdirSync(captureDir, { recursive: true });
+  return captures.map((capture, index) => saveCaptureArtifact(capture, captureDir, index));
+}
+
 async function evaluate(cdp: CdpClient, expression: string): Promise<unknown> {
   const result = (await cdp.send("Runtime.evaluate", {
     expression,
@@ -433,8 +612,87 @@ function failed(
     appUrl: opts.appUrl,
     steps,
     observation,
+    captures: [],
     error,
   };
+}
+
+function saveCaptureArtifact(capture: unknown, captureDir: string, index: number): CaptureArtifact {
+  if (!isRawCapture(capture)) {
+    return {
+      label: index === 0 ? "left" : "right",
+      status: "failed",
+      detail: "Frame capture returned an invalid payload.",
+    };
+  }
+
+  if (!capture.ok) {
+    return {
+      label: capture.label,
+      status: "failed",
+      detail: capture.message,
+    };
+  }
+
+  const match = /^data:image\/png;base64,(.+)$/u.exec(capture.dataUrl);
+  if (match === null) {
+    return {
+      label: capture.label,
+      status: "failed",
+      detail: "Frame capture did not return a PNG data URL.",
+    };
+  }
+
+  const path = join(captureDir, `${capture.label}.png`);
+  writeFileSync(path, Buffer.from(match[1], "base64"));
+  return {
+    label: capture.label,
+    path,
+    status: "saved",
+    detail: `${capture.width}x${capture.height} PNG frame via ${capture.method ?? "unknown"}; mean luma ${capture.meanLuma.toFixed(2)}, max luma ${capture.maxLuma.toFixed(2)}, non-black ${capture.nonBlackPixelPercent.toFixed(2)}%.`,
+    meanLuma: capture.meanLuma,
+    maxLuma: capture.maxLuma,
+    nonBlackPixelPercent: capture.nonBlackPixelPercent,
+  };
+}
+
+function isRawCapture(
+  value: unknown,
+): value is
+  | {
+      label: "left" | "right";
+      ok: true;
+      width: number;
+      height: number;
+      method?: string;
+      meanLuma: number;
+      maxLuma: number;
+      nonBlackPixelPercent: number;
+      dataUrl: string;
+    }
+  | {
+      label: "left" | "right";
+      ok: false;
+      message: string;
+    } {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const raw = value as Record<string, unknown>;
+  if (raw.label !== "left" && raw.label !== "right") {
+    return false;
+  }
+  if (raw.ok === true) {
+    return (
+      typeof raw.width === "number" &&
+      typeof raw.height === "number" &&
+      typeof raw.meanLuma === "number" &&
+      typeof raw.maxLuma === "number" &&
+      typeof raw.nonBlackPixelPercent === "number" &&
+      typeof raw.dataUrl === "string"
+    );
+  }
+  return raw.ok === false && typeof raw.message === "string";
 }
 
 function failureDetail(observation: Observation): string {
@@ -478,6 +736,16 @@ function renderReport(result: VerificationResult): string {
       : result.steps
           .map((step) => `- ${step.status}: ${step.name} - ${step.detail}`)
           .join("\n") + "\n";
+  const captures =
+    result.captures.length === 0
+      ? "- No frame captures were written.\n"
+      : result.captures
+          .map((capture) =>
+            capture.path === undefined
+              ? `- ${capture.status}: ${capture.label} - ${capture.detail}`
+              : `- ${capture.status}: ${capture.label} - ${capture.detail} (${capture.path})`,
+          )
+          .join("\n") + "\n";
 
   return `# Live3D Hardware Loop Verification
 
@@ -499,6 +767,10 @@ ${steps}
 - Max prediction samples: ${result.observation.maxPredictionSamples}
 - Runtime 3D codes: ${result.observation.runtimeCodes.join(", ") || "none"}
 
+## Frame Captures
+
+${captures}
+
 ## Last Snapshot
 
 \`\`\`json
@@ -515,6 +787,7 @@ function parseArgs(args: string[]): Options {
   let chromeBin = process.env.CHROME_BIN;
   let keepChrome = false;
   let outputPath = resolve(repoRoot, "docs", `live3d_hardware_loop_${timestampForFilename(new Date())}.md`);
+  let captureDir = process.env.LIVE3D_VERIFY_CAPTURE_DIR;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -532,6 +805,8 @@ function parseArgs(args: string[]): Options {
       keepChrome = true;
     } else if (arg === "--output") {
       outputPath = resolve(requireValue(args, (index += 1), arg));
+    } else if (arg === "--capture-dir") {
+      captureDir = resolve(requireValue(args, (index += 1), arg));
     } else if (arg === "--help" || arg === "-h") {
       printHelp();
       process.exit(0);
@@ -558,6 +833,7 @@ function parseArgs(args: string[]): Options {
     chromeBin,
     keepChrome,
     outputPath,
+    captureDir: captureDir ?? defaultCaptureDir(outputPath),
   };
 }
 
@@ -580,6 +856,7 @@ Options:
   --chrome-bin <path>          Chrome/Chromium executable. Also supports CHROME_BIN.
   --keep-chrome                Leave Chrome and profile directory running for manual inspection.
   --output <path>              Markdown report path.
+  --capture-dir <path>         Directory for left/right video PNG captures.
 `);
 }
 
@@ -652,6 +929,12 @@ function chromeDebugUrl(opts: Options, path: string): string {
 
 function timestampForFilename(date: Date): string {
   return date.toISOString().replaceAll(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+}
+
+function defaultCaptureDir(outputPath: string): string {
+  const extension = extname(outputPath);
+  const base = extension === "" ? outputPath : outputPath.slice(0, -extension.length);
+  return `${base}_frames`;
 }
 
 function formatUnknownError(error: unknown): string {

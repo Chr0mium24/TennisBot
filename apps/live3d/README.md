@@ -37,10 +37,11 @@ checks can read camera, artifact, detection, and runtime 3D state without
 scraping UI text.
 
 This implements the browser software path. Hardware smoke has opened two real
-USB cameras in Chrome and run the exported ONNX model on live frames. The
-current scene did not contain a detectable tennis ball, so runtime ball
-detections, 3D point stability, and prediction updates still need a ball-in-view
-validation pass.
+USB cameras in Chrome and run the exported ONNX model on browser frames. The
+latest hardware-loop report saved left/right frame captures and found both
+captures were near-black, while direct V4L2 frame reads also timed out. Resolve
+camera frame output before judging YOLO detection quality or rerunning the
+ball-in-view validation pass.
 
 ## Config placeholders
 
@@ -71,6 +72,7 @@ bun run verify:hardware -- --timeout-ms 30000 --output ../../docs/live3d_hardwar
 `bun run dev` builds the static bundle and serves `dist/` on port `5178`.
 `bun run verify:hardware` builds or reuses the local app server, launches
 Chrome with camera permission auto-approved, starts both USB cameras, starts
-YOLO, polls the runtime snapshot, and writes a Markdown report. A passing run
-requires the runtime status to reach `prediction-ready`; no-ball scenes are
+YOLO, polls the runtime snapshot, captures left/right video PNG frames with
+brightness statistics, and writes a Markdown report. A passing run requires the
+runtime status to reach `prediction-ready`; no-ball or near-black scenes are
 reported as failed hardware validation, not as software success.
