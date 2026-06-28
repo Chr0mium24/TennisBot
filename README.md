@@ -43,6 +43,7 @@ uv run camera-calib-lab --help
 ## Architecture
 
 - [Architecture simplification plan](docs/architecture_simplification_plan_20260628.md)
+- [Multi-agent refactor task plan](docs/multi_agent_refactor_tasks_20260628.md)
 
 ## Git Workflow
 
