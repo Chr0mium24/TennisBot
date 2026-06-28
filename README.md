@@ -71,6 +71,7 @@ uv run camera-calib-lab --help
 - [Multi-agent refactor Wave 10 Live3D ONNX backend plan](docs/multi_agent_refactor_wave10_live3d_onnx_backend_plan_20260629.md)
 - [Multi-agent refactor Wave 10 Live3D ONNX backend result](docs/multi_agent_refactor_wave10_live3d_onnx_backend_result_20260629.md)
 - [Multi-agent refactor Wave 10 Live3D ONNX backend review](docs/multi_agent_refactor_wave10_live3d_onnx_backend_review_20260629.md)
+- [Multi-agent refactor Wave 11 Live3D runtime 3D plan](docs/multi_agent_refactor_wave11_live3d_runtime_3d_plan_20260629.md)
 
 ## Git Workflow
 
