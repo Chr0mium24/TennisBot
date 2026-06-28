@@ -130,6 +130,12 @@ The ONNX backend now loads and runs against live browser camera frames. The
 current scene did not contain a detectable tennis ball, so this smoke does not
 prove the ball detection or runtime 3D prediction visual.
 
+Follow-up static validation found and fixed a Live3D ONNX postprocessing issue:
+the exported ONNX model returns NMS-style `xyxy_pixels` rows, not `xywh` rows.
+After the fix, the backend can decode ONNX candidates correctly. The same
+validation also found that the current model package still produces no boxes at
+the packaged `confidence_threshold: 0.05` on 109 matched labeled samples.
+
 ## Verification Commands
 
 ```bash
@@ -142,13 +148,15 @@ bun run build
 Result:
 
 ```text
-39 tests passed.
+40 tests passed.
 typecheck passed.
 build passed.
 ```
 
 ## Remaining Gates
 
+- Provide a detector package that produces nonzero tennis-ball detections at an
+  acceptable threshold.
 - Put a tennis ball in both camera views and confirm nonzero runtime detections.
 - Confirm runtime 3D scene replaces the fixture fallback.
 - Confirm the prediction curve and landing marker update from multiple runtime

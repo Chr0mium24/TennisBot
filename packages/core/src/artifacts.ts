@@ -33,6 +33,8 @@ export interface YoloModelArtifactMetadata {
   labels: string[];
   inputSizePx: ImageSize;
   inputColor: string;
+  boxFormat: string;
+  sourceBoxFormat?: string;
   confidenceThreshold: number;
   classId: number;
   modelPath: string;
@@ -375,6 +377,8 @@ export function convertYoloModelArtifactMetadata(parts: YoloArtifactParts): Yolo
       .map((cls) => cls.name),
     inputSizePx: convertImageSize(parts.preprocessingJson.input_size),
     inputColor: parts.preprocessingJson.input_color,
+    boxFormat: parts.postprocessingJson.box_format,
+    sourceBoxFormat: parts.postprocessingJson.source_box_format,
     confidenceThreshold: parts.postprocessingJson.confidence_threshold,
     classId: parts.postprocessingJson.class_id,
     modelPath: model.path,

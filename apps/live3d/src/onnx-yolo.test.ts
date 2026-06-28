@@ -182,6 +182,47 @@ describe("Live3D ONNX YOLO backend", () => {
     }
   });
 
+  test("postprocesses NMS-style xyxy score class output from exported ONNX", () => {
+    const result = postprocessYoloOutput(
+      {
+        dims: [1, 2, 6],
+        data: new Float32Array([
+          572, 607, 612, 647, 0.036, 0,
+          200, 200, 250, 250, 0.9, 1,
+        ]),
+      },
+      createLetterboxTransform({
+        sourceWidth: 1920,
+        sourceHeight: 1080,
+        inputWidth: 1280,
+        inputHeight: 1280,
+      }),
+      {
+        classId: 0,
+        boxFormat: "xyxy_pixels",
+        confidenceThreshold: 0.01,
+        nmsIouThreshold: 0.5,
+        maxDetections: 10,
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.boxes).toHaveLength(1);
+    expect(result.boxes[0]).toMatchObject({
+      classId: 0,
+      label: "tennis_ball",
+      confidence: expect.closeTo(0.036, 6),
+      xPx: expect.closeTo(858, 1),
+      yPx: expect.closeTo(490.5, 1),
+      widthPx: expect.closeTo(60, 1),
+      heightPx: expect.closeTo(60, 1),
+    });
+  });
+
   test("returns blocked status for unsupported runtime before loading a session", async () => {
     const backend = new OnnxYoloInferenceBackend({
       packagePath: "/artifacts/models/tennis_ball_yolo",
@@ -303,6 +344,8 @@ function metadata(): YoloModelArtifactMetadata {
     labels: ["tennis_ball"],
     inputSizePx: { widthPx: 320, heightPx: 320 },
     inputColor: "RGB",
+    boxFormat: "xywh_pixels",
+    sourceBoxFormat: "YOLO normalized xywh",
     confidenceThreshold: 0.05,
     classId: 0,
     modelPath: "model.onnx",

@@ -33,6 +33,7 @@ describe("Live3D artifact adapter", () => {
       expect(yoloStatus.value.packageName).toBe("tennis_ball_yolo");
       expect(yoloStatus.value.selectedModel).toBe("onnx");
       expect(yoloStatus.value.modelPath).toBe("model.onnx");
+      expect(yoloStatus.value.boxFormat).toBe("xyxy_pixels");
       expect(yoloStatus.value.confidenceThreshold).toBe(0.05);
       expect(yoloStatus.value.modelChecks).toContainEqual({
         kind: "sha256",

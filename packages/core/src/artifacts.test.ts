@@ -32,6 +32,8 @@ describe('artifact loaders', () => {
         classId: 0,
         labels: ['tennis_ball'],
         inputColor: 'RGB',
+        boxFormat: 'xyxy_pixels',
+        sourceBoxFormat: 'YOLO normalized xywh',
       });
       expect(result.value.inputSizePx).toEqual({ widthPx: 1280, heightPx: 1280 });
       expect(result.value.modelChecks).toContainEqual({

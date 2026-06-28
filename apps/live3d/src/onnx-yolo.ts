@@ -148,6 +148,7 @@ export class OnnxYoloInferenceBackend implements YoloInferenceBackend {
 
     const parsed = postprocessYoloOutput(outputTensor, prepared.letterbox, {
       classId: this.options.metadata.classId,
+      boxFormat: this.options.metadata.boxFormat,
       confidenceThreshold: this.confidenceThreshold,
       nmsIouThreshold: this.nmsIouThreshold,
       maxDetections: this.maxDetections,
@@ -250,6 +251,7 @@ export function postprocessYoloOutput(
   letterbox: LetterboxTransform,
   options: {
     classId: number;
+    boxFormat?: string;
     confidenceThreshold: number;
     nmsIouThreshold: number;
     maxDetections: number;
@@ -270,7 +272,7 @@ export function postprocessYoloOutput(
   }
 
   const boxes = rows.rows
-    .map((row) => decodeYoloRow(row, letterbox, options.classId))
+    .map((row) => decodeYoloRow(row, letterbox, options.classId, options.boxFormat))
     .filter((box): box is BackendYoloBox => box !== null)
     .filter((box) => box.confidence >= options.confidenceThreshold)
     .sort((left, right) => right.confidence - left.confidence);
@@ -472,29 +474,27 @@ function decodeYoloRow(
   row: number[],
   letterbox: LetterboxTransform,
   classId: number,
+  boxFormat = "xywh_pixels",
 ): BackendYoloBox | null {
   if (row.length < 5) {
     return null;
   }
 
-  const [xCenter, yCenter, width, height] = row;
-  const confidence = decodeSingleClassConfidence(row);
-  if (![xCenter, yCenter, width, height, confidence].every(Number.isFinite)) {
+  const confidence = decodeSingleClassConfidence(row, boxFormat);
+  const decoded = boxFormat === "xyxy_pixels"
+    ? decodeXyxyRow(row, letterbox)
+    : decodeXywhRow(row, letterbox);
+  if (decoded === null || !Number.isFinite(confidence)) {
     return null;
   }
 
-  const xMin = (xCenter - width / 2 - letterbox.padX) / letterbox.scale;
-  const yMin = (yCenter - height / 2 - letterbox.padY) / letterbox.scale;
-  const xMax = (xCenter + width / 2 - letterbox.padX) / letterbox.scale;
-  const yMax = (yCenter + height / 2 - letterbox.padY) / letterbox.scale;
-  const clippedXMin = clamp(xMin, 0, letterbox.sourceWidth);
-  const clippedYMin = clamp(yMin, 0, letterbox.sourceHeight);
-  const clippedXMax = clamp(xMax, 0, letterbox.sourceWidth);
-  const clippedYMax = clamp(yMax, 0, letterbox.sourceHeight);
-  const boxWidth = clippedXMax - clippedXMin;
-  const boxHeight = clippedYMax - clippedYMin;
-
+  const { clippedXMin, clippedYMin, boxWidth, boxHeight } = decoded;
   if (boxWidth <= 0 || boxHeight <= 0) {
+    return null;
+  }
+
+  const rowClassId = row.length >= 6 && boxFormat === "xyxy_pixels" ? Number(row[5]) : classId;
+  if (Number.isFinite(rowClassId) && rowClassId !== classId) {
     return null;
   }
 
@@ -509,11 +509,60 @@ function decodeYoloRow(
   };
 }
 
-function decodeSingleClassConfidence(row: number[]): number {
+function decodeXywhRow(
+  row: number[],
+  letterbox: LetterboxTransform,
+): { clippedXMin: number; clippedYMin: number; boxWidth: number; boxHeight: number } | null {
+  const [xCenter, yCenter, width, height] = row;
+  if (![xCenter, yCenter, width, height].every(Number.isFinite)) {
+    return null;
+  }
+  const xMin = (xCenter - width / 2 - letterbox.padX) / letterbox.scale;
+  const yMin = (yCenter - height / 2 - letterbox.padY) / letterbox.scale;
+  const xMax = (xCenter + width / 2 - letterbox.padX) / letterbox.scale;
+  const yMax = (yCenter + height / 2 - letterbox.padY) / letterbox.scale;
+  return clipDecodedBox(xMin, yMin, xMax, yMax, letterbox);
+}
+
+function decodeXyxyRow(
+  row: number[],
+  letterbox: LetterboxTransform,
+): { clippedXMin: number; clippedYMin: number; boxWidth: number; boxHeight: number } | null {
+  const [rawXMin, rawYMin, rawXMax, rawYMax] = row;
+  if (![rawXMin, rawYMin, rawXMax, rawYMax].every(Number.isFinite)) {
+    return null;
+  }
+  const xMin = (rawXMin - letterbox.padX) / letterbox.scale;
+  const yMin = (rawYMin - letterbox.padY) / letterbox.scale;
+  const xMax = (rawXMax - letterbox.padX) / letterbox.scale;
+  const yMax = (rawYMax - letterbox.padY) / letterbox.scale;
+  return clipDecodedBox(xMin, yMin, xMax, yMax, letterbox);
+}
+
+function clipDecodedBox(
+  xMin: number,
+  yMin: number,
+  xMax: number,
+  yMax: number,
+  letterbox: LetterboxTransform,
+): { clippedXMin: number; clippedYMin: number; boxWidth: number; boxHeight: number } {
+  const clippedXMin = clamp(xMin, 0, letterbox.sourceWidth);
+  const clippedYMin = clamp(yMin, 0, letterbox.sourceHeight);
+  const clippedXMax = clamp(xMax, 0, letterbox.sourceWidth);
+  const clippedYMax = clamp(yMax, 0, letterbox.sourceHeight);
+  const boxWidth = clippedXMax - clippedXMin;
+  const boxHeight = clippedYMax - clippedYMin;
+  return { clippedXMin, clippedYMin, boxWidth, boxHeight };
+}
+
+function decodeSingleClassConfidence(row: number[], boxFormat: string): number {
   if (row.length === 5) {
     return row[4] ?? Number.NaN;
   }
   if (row.length === 6) {
+    if (boxFormat === "xyxy_pixels") {
+      return row[4] ?? Number.NaN;
+    }
     return (row[4] ?? Number.NaN) * (row[5] ?? Number.NaN);
   }
   return Number.NaN;

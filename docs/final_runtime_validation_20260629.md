@@ -19,6 +19,12 @@ Chrome and run the ONNX backend on live frames, but the current scene did not
 contain a detectable tennis ball and the imported stereo calibration has quality
 warnings.
 
+Follow-up YOLO static validation found that Live3D was decoding the exported
+ONNX `xyxy_pixels` output as `xywh`. That postprocessing bug is fixed. The
+current model package still produces no detections at the packaged
+`confidence_threshold: 0.05` on the matched labeled sample set, so it is
+structurally loadable but not detection-quality ready.
+
 ## Verified Commands
 
 ### Contracts
@@ -50,7 +56,7 @@ bun run typecheck
 bun run build
 ```
 
-Result: 39 tests passed, typecheck passed, browser bundle built.
+Result: 40 tests passed, typecheck passed, browser bundle built.
 
 Dev server smoke:
 
@@ -143,6 +149,9 @@ Result: 12 tests passed. A real runtime YOLO package was written from
   package with explicit runtime quality warnings.
 - Live3D opened two real USB cameras in Chrome and ran the ONNX backend on live
   browser frames without session concurrency errors.
+- Live3D now decodes the current ONNX package's `xyxy_pixels` output correctly.
+- The current YOLO model package failed the static detection-quality check at
+  `confidence_threshold: 0.05`.
 - Board-side runtime code is not part of the current active architecture.
 - The only dirty worktree entry after validation is the pre-existing
   `TennisBallDetectorLab` submodule state, which remains untouched.
@@ -151,10 +160,12 @@ Result: 12 tests passed. A real runtime YOLO package was written from
 
 Before claiming full real-world operation:
 
-1. Put a tennis ball in both USB camera views and confirm nonzero runtime
+1. Retrain, replace, or create an explicitly low-threshold diagnostic YOLO
+   package that produces nonzero detections at an acceptable confidence level.
+2. Put a tennis ball in both USB camera views and confirm nonzero runtime
    detections.
-2. Confirm runtime 3D scene, prediction curve, and landing marker update from
+3. Confirm runtime 3D scene, prediction curve, and landing marker update from
    those detections.
-3. Re-run mono/stereo calibration if imported stereo quality remains poor.
-4. Validate ROS/Gazebo closed-loop catch behavior only after real visual
+4. Re-run mono/stereo calibration if imported stereo quality remains poor.
+5. Validate ROS/Gazebo closed-loop catch behavior only after real visual
    tracking is stable.
