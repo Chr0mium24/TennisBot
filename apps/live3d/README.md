@@ -12,10 +12,14 @@ TypeScript and Bun frontend app that defines the intended product surface:
 
 ## Current mode
 
-The app currently runs only in fixture mode. Fixture mode renders static UI data
-for frontend development and layout review. It does not open real USB cameras,
-load a YOLO model, load stereo calibration, validate tracking, triangulate a
-ball, or validate prediction.
+The app currently runs only in fixture mode. Fixture mode builds contract-shaped
+sample detections and an in-memory stereo calibration, then runs them through
+`packages/core` stereo pairing, triangulation, and trajectory prediction before
+rendering the result.
+
+This still does not open real USB cameras, run real YOLO inference, load or
+validate a real calibration artifact, validate real tracking, or validate real
+prediction.
 
 ## Config placeholders
 
