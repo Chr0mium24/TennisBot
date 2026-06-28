@@ -41,9 +41,9 @@ Create dry-run calibration artifacts:
 
 ```bash
 cd tools/calibration
-uv run tennisbot-calibration gui mono --camera-id cam1 --dry-run --output-dir ../../artifacts/calibration/cam1
-uv run tennisbot-calibration gui mono --camera-id cam2 --dry-run --output-dir ../../artifacts/calibration/cam2
-uv run tennisbot-calibration gui stereo --dry-run --output-dir ../../artifacts/calibration/stereo_cam1_cam2
+uv run tennisbot-calibration gui mono --camera-id cam1 --dry-run --output ../../artifacts/calibration/cam1
+uv run tennisbot-calibration gui mono --camera-id cam2 --dry-run --output ../../artifacts/calibration/cam2
+uv run tennisbot-calibration gui stereo --left-camera-id cam1 --right-camera-id cam2 --dry-run --output ../../artifacts/calibration/stereo_cam1_cam2
 uv run tennisbot-calibration package verify --path ../../artifacts/calibration/stereo_cam1_cam2
 ```
 
