@@ -49,6 +49,18 @@ bun run build
 
 Result: 38 tests passed, typecheck passed, browser bundle built.
 
+Dev server smoke:
+
+```bash
+PORT=5178 bun ./scripts/serve.js
+curl -I http://localhost:5178/
+curl -I http://localhost:5178/assets/main.js
+curl -I http://localhost:5178/artifacts/models/tennis_ball_yolo/package.json
+curl -I http://localhost:5178/artifacts/calibration/stereo_cam1_cam2/package.json
+```
+
+Result: all HTTP checks returned `200 OK`.
+
 ### Calibration Tool
 
 ```bash
