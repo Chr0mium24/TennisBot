@@ -69,6 +69,8 @@ uv run camera-calib-lab --help
 - [Multi-agent refactor Wave 9 Live3D YOLO inference result](docs/multi_agent_refactor_wave9_live3d_yolo_inference_result_20260629.md)
 - [Multi-agent refactor Wave 9 Live3D YOLO inference review](docs/multi_agent_refactor_wave9_live3d_yolo_inference_review_20260629.md)
 - [Multi-agent refactor Wave 10 Live3D ONNX backend plan](docs/multi_agent_refactor_wave10_live3d_onnx_backend_plan_20260629.md)
+- [Multi-agent refactor Wave 10 Live3D ONNX backend result](docs/multi_agent_refactor_wave10_live3d_onnx_backend_result_20260629.md)
+- [Multi-agent refactor Wave 10 Live3D ONNX backend review](docs/multi_agent_refactor_wave10_live3d_onnx_backend_review_20260629.md)
 
 ## Git Workflow
 
