@@ -12,6 +12,7 @@ from tennisbot_calibration.capture_sessions import (
 )
 from tennisbot_calibration.charuco_detection import detect_charuco_session
 from tennisbot_calibration.import_camera_calib_lab import import_camera_calib_lab_package
+from tennisbot_calibration.mono_solve import solve_mono_calibration
 from tennisbot_calibration.scan_camera_calib_lab import (
     candidate_path,
     scan_camera_calib_lab,
@@ -26,13 +27,14 @@ def build_parser() -> argparse.ArgumentParser:
         prog="tennisbot-calibration",
         description="TennisBot calibration artifact tooling.",
         epilog=(
-            "Workflows: capture mono, capture stereo, capture inspect, capture detect-charuco, gui mono, gui stereo, "
-            "package verify, package scan-camera-calib-lab, package import-scanned-camera-calib-lab. "
+            "Workflows: capture mono, capture stereo, capture inspect, capture detect-charuco, calibrate mono, "
+            "gui mono, gui stereo, package verify, package scan-camera-calib-lab, package import-scanned-camera-calib-lab. "
             "Wave 5 GUI commands support dry-run/non-hardware output only."
         ),
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
     configure_capture(subparsers)
+    configure_calibrate(subparsers)
     configure_gui(subparsers)
     configure_package(subparsers)
     return parser
@@ -94,6 +96,19 @@ def configure_capture(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
     detect_charuco.add_argument("--output-report", default=None, help="Optional Markdown detection report path.")
     detect_charuco.add_argument("--min-corners", type=int, default=6, help="Minimum ChArUco corners required per view.")
     detect_charuco.set_defaults(handler=capture_detect_charuco)
+
+
+def configure_calibrate(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    calibrate = subparsers.add_parser("calibrate", help="Solve calibration packages from accepted observations.")
+    calibrate_subparsers = calibrate.add_subparsers(dest="calibrate_command", required=True)
+
+    mono = calibrate_subparsers.add_parser("mono", help="Solve a mono camera calibration package.")
+    mono.add_argument("--observations", required=True, help="ChArUco observations JSON from capture detect-charuco.")
+    mono.add_argument("--output", required=True, help="Output mono package directory under artifacts/calibration.")
+    mono.add_argument("--camera-id", default=None, help="Camera id to solve when observations contain multiple cameras.")
+    mono.add_argument("--min-views", type=int, default=8)
+    mono.add_argument("--max-rms-px", type=float, default=1.0)
+    mono.set_defaults(handler=calibrate_mono)
 
 
 def configure_gui(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -247,6 +262,33 @@ def charuco_detection_summary(result: dict[str, object]) -> dict[str, object]:
             for view in views
         ],
     }
+
+
+def calibrate_mono(args: argparse.Namespace) -> int:
+    result = solve_mono_calibration(
+        observations_path=Path(args.observations),
+        output=Path(args.output),
+        camera_id=args.camera_id,
+        min_views=args.min_views,
+        max_rms_px=args.max_rms_px,
+    )
+    verification = verify_package(Path(args.output))
+    print(
+        json.dumps(
+            {
+                "accepted": verification["accepted"],
+                "output": args.output,
+                "camera_id": result["package"]["camera_id"],
+                "rms_reprojection_px": result["package"]["quality"]["rms_reprojection_px"],
+                "accepted_view_count": result["package"]["quality"]["accepted_view_count"],
+                "package": result["package"],
+                "verification": verification,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+    return 0 if verification["accepted"] else 1
 
 
 def gui_mono(args: argparse.Namespace) -> int:

@@ -100,6 +100,35 @@ uv run tennisbot-calibration capture detect-charuco \
   --output-report ../../docs/calibration_charuco_detection_20260629.md
 ```
 
+Rendered ChArUco mono solve dry-run:
+
+```bash
+cd tools/calibration
+uv run tennisbot-calibration capture mono \
+  --camera-id cam1 \
+  --output ../../artifacts/calibration_sessions/20260629_cam1_mono_solve_dry_run \
+  --frame-count 5 \
+  --interval-ms 0 \
+  --width 960 \
+  --height 640 \
+  --dry-run
+# Replace the dry-run frames with rendered/perspective-warped DFOptix ChArUco boards.
+uv run tennisbot-calibration capture inspect \
+  --session ../../artifacts/calibration_sessions/20260629_cam1_mono_solve_dry_run \
+  --output-report ../../docs/calibration_mono_solve_capture_quality_20260629.md
+uv run tennisbot-calibration capture detect-charuco \
+  --session ../../artifacts/calibration_sessions/20260629_cam1_mono_solve_dry_run \
+  --output ../../artifacts/calibration_sessions/20260629_cam1_mono_solve_dry_run/observations.json \
+  --output-report ../../docs/calibration_charuco_detection_mono_solve_20260629.md
+uv run tennisbot-calibration calibrate mono \
+  --observations ../../artifacts/calibration_sessions/20260629_cam1_mono_solve_dry_run/observations.json \
+  --output ../../artifacts/calibration/cam1_mono_solve_dry_run \
+  --min-views 3 \
+  --max-rms-px 5
+uv run tennisbot-calibration package verify \
+  --path ../../artifacts/calibration/cam1_mono_solve_dry_run
+```
+
 Quality-gated real stereo hardware probe:
 
 ```bash
@@ -137,6 +166,7 @@ quality dry-run inspection: accepted=true, 4/4 images read, no issues.
 quality hardware inspection: accepted=false, 2/2 images read, both frames rejected as low contrast / likely blank.
 rendered ChArUco detection dry-run: accepted=true, 104 corners and 63 markers detected.
 hardware ChArUco detection: accepted=false, 0/2 views accepted, 0/1 stereo pairs accepted.
+rendered mono solve dry-run: accepted=true, rms_reprojection_px=3.551100557082021, package verify accepted.
 ```
 
 The hardware probe proves this tool can open and save frames from the two local
@@ -149,7 +179,7 @@ for a mono or stereo solve.
 
 - Capture real mono and stereo sessions with visible ChArUco targets that pass
   `capture inspect` and `capture detect-charuco`.
-- Add mono calibration solving from accepted mono observations.
+- Validate mono calibration solving from accepted real mono observations.
 - Add stereo calibration solving from accepted stereo observations and mono
   intrinsics.
 - Add a richer review GUI for accepting/rejecting captured frames before solve.

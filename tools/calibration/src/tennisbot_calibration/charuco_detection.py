@@ -53,6 +53,8 @@ def detect_charuco_session(
         "created_at": now_utc(),
         "session_path": str(session),
         "output_path": str(output_path),
+        "dry_run": manifest.get("dry_run") is True,
+        "hardware_validated": manifest.get("hardware_validated") is True,
         "target": target,
         "detector": {"id": "charuco.opencv", "min_corners": min_corners},
         "accepted": accepted,

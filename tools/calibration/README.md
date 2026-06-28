@@ -120,6 +120,10 @@ uv run tennisbot-calibration capture detect-charuco \
   --session ../../artifacts/calibration_sessions/stereo_session \
   --output ../../artifacts/calibration_sessions/stereo_session/observations.json \
   --output-report ../../docs/calibration_charuco_detection_YYYYMMDD.md
+uv run tennisbot-calibration calibrate mono \
+  --observations ../../artifacts/calibration_sessions/cam1_session/observations.json \
+  --output ../../artifacts/calibration/cam1 \
+  --camera-id cam1
 ```
 
 Defaults are `1280x720`, `MJPG`, 30 fps, and 20 frames or pairs. Add
@@ -135,6 +139,11 @@ images, wrong image sizes, near-black frames, and low-contrast/blank frames.
 14x9, `DICT_5X5_100`, 15 mm target profile and writes an observations JSON plus
 optional Markdown report. Captured sessions are not calibration packages yet;
 the next tool step after accepted observations is mono/stereo solve.
+
+`calibrate mono` consumes accepted ChArUco observations and writes a mono runtime
+calibration package (`package.json`, `camera.json`, OpenCV YAML, verification,
+summary, and review HTML). It can solve a mono capture session directly, or a
+single camera selected by `--camera-id` from stereo observations.
 
 ## Import Existing CameraCalibLab Output
 
