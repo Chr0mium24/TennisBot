@@ -1,7 +1,8 @@
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { resolve, sep } from "node:path";
 
-const distDir = join(import.meta.dirname, "..", "dist");
+const distDir = resolve(import.meta.dirname, "..", "dist");
+const artifactsDir = resolve(import.meta.dirname, "..", "..", "..", "artifacts");
 const port = Number(process.env.PORT ?? 5178);
 
 function contentType(pathname) {
@@ -11,21 +12,69 @@ function contentType(pathname) {
   return "application/octet-stream";
 }
 
-Bun.serve({
-  port,
-  async fetch(request) {
-    const url = new URL(request.url);
-    const pathname = url.pathname === "/" ? "/index.html" : url.pathname;
-    const filePath = join(distDir, pathname);
+export function resolveStaticRequestPath(
+  pathname,
+  roots = { distDir, artifactsDir },
+) {
+  const decodedPathname = decodePathname(pathname);
+  if (decodedPathname === null) {
+    return null;
+  }
 
-    if (!filePath.startsWith(distDir) || !existsSync(filePath)) {
-      return new Response("Not found", { status: 404 });
-    }
+  if (decodedPathname === "/artifacts" || decodedPathname === "/artifacts/") {
+    return null;
+  }
 
-    return new Response(Bun.file(filePath), {
-      headers: { "content-type": contentType(pathname) },
-    });
-  },
-});
+  if (decodedPathname.startsWith("/artifacts/")) {
+    const relativePath = decodedPathname.slice("/artifacts/".length);
+    const filePath = resolve(roots.artifactsDir, relativePath);
+    return isInsideRoot(filePath, roots.artifactsDir) && existsSync(filePath)
+      ? { filePath, contentPath: decodedPathname }
+      : null;
+  }
 
-console.log(`Live3D fixture UI available at http://localhost:${port}`);
+  const contentPath = decodedPathname === "/" ? "/index.html" : decodedPathname;
+  const relativePath = contentPath.replace(/^\/+/, "");
+  const filePath = resolve(roots.distDir, relativePath);
+  return isInsideRoot(filePath, roots.distDir) && existsSync(filePath)
+    ? { filePath, contentPath }
+    : null;
+}
+
+export function startServer() {
+  Bun.serve({
+    port,
+    async fetch(request) {
+      const url = new URL(request.url);
+      const resolvedPath = resolveStaticRequestPath(url.pathname);
+
+      if (resolvedPath === null) {
+        return new Response("Not found", { status: 404 });
+      }
+
+      return new Response(Bun.file(resolvedPath.filePath), {
+        headers: { "content-type": contentType(resolvedPath.contentPath) },
+      });
+    },
+  });
+
+  console.log(`Live3D fixture UI available at http://localhost:${port}`);
+}
+
+function decodePathname(pathname) {
+  try {
+    const decoded = decodeURIComponent(pathname);
+    return decoded.includes("\0") ? null : decoded;
+  } catch {
+    return null;
+  }
+}
+
+function isInsideRoot(filePath, root) {
+  const resolvedRoot = resolve(root);
+  return filePath === resolvedRoot || filePath.startsWith(`${resolvedRoot}${sep}`);
+}
+
+if (import.meta.main) {
+  startServer();
+}

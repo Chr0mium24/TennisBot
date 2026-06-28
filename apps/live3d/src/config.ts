@@ -44,9 +44,8 @@ export const defaultLive3dConfig: Live3dConfig = {
     },
   },
   artifacts: {
-    yoloModelPackagePath: "../../artifacts/models/tennis_ball_yolo",
-    stereoCalibrationPackagePath:
-      "../../artifacts/calibration/stereo_cam1_cam2",
+    yoloModelPackagePath: "/artifacts/models/tennis_ball_yolo",
+    stereoCalibrationPackagePath: "/artifacts/calibration/stereo_cam1_cam2",
   },
 };
 

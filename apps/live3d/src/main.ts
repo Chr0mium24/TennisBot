@@ -1,5 +1,12 @@
 import { defaultLive3dConfig, describeFixtureMode } from "./config";
 import {
+  BrowserFetchJsonReader,
+  loadStereoCalibrationArtifactStatus,
+  loadYoloArtifactStatus,
+  type StereoCalibrationArtifactLoadStatus,
+  type YoloArtifactLoadStatus,
+} from "./artifacts";
+import {
   createFixture,
   detectionToBox,
   type CameraFixture,
@@ -9,6 +16,7 @@ import {
 import "./styles.css";
 
 const fixture = createFixture(defaultLive3dConfig);
+const artifactReader = new BrowserFetchJsonReader();
 
 function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
@@ -78,8 +86,8 @@ function renderScene(): string {
     <section class="scene-panel" aria-label="3D scene placeholder">
       <div class="panel-heading">
         <div>
-          <p class="eyebrow">3D scene</p>
-          <h2>Ball trail and prediction</h2>
+          <p class="eyebrow">fixture-only 3D scene</p>
+          <h2>Ball trail and prediction placeholder</h2>
         </div>
         <span class="device-pill">${fixture.scene.prediction.model}</span>
       </div>
@@ -114,7 +122,10 @@ function formatPoint(point: Point3d): string {
   return `${point.x.toFixed(2)}, ${point.y.toFixed(2)}, ${point.z.toFixed(2)} m`;
 }
 
-function renderStatusPanel(): string {
+function renderStatusPanel(
+  yoloStatus: YoloArtifactLoadStatus,
+  calibrationStatus: StereoCalibrationArtifactLoadStatus,
+): string {
   return `
     <aside class="status-panel" aria-label="Runtime status">
       <div class="panel-heading">
@@ -141,6 +152,10 @@ function renderStatusPanel(): string {
           <strong>${defaultLive3dConfig.artifacts.stereoCalibrationPackagePath}</strong>
         </div>
       </div>
+      <section class="artifact-status" aria-label="Artifact status">
+        ${renderYoloArtifactStatus(yoloStatus)}
+        ${renderCalibrationArtifactStatus(calibrationStatus)}
+      </section>
       <ol class="status-list">
         ${fixture.status
           .map(
@@ -160,7 +175,79 @@ function renderStatusPanel(): string {
   `;
 }
 
-function renderApp(): string {
+function renderYoloArtifactStatus(status: YoloArtifactLoadStatus): string {
+  if (status.status === "loaded") {
+    const metadata = status.value;
+    return renderArtifactCard({
+      title: "YOLO artifact loaded",
+      state: "ready",
+      detail: [
+        `Selected model: ${metadata.selectedModel}`,
+        `Model path: ${metadata.modelPath}`,
+        `Confidence threshold: ${formatPercent(metadata.confidenceThreshold)}`,
+        `Pending checks: ${metadata.modelChecks
+          .map((check) => `${check.kind} ${check.path}${check.expected === undefined ? "" : `=${check.expected}`}`)
+          .join(", ")}`,
+      ],
+      warnings: status.warnings,
+    });
+  }
+
+  return renderArtifactCard({
+    title: "YOLO artifact blocked",
+    state: "blocked",
+    detail: status.errors.length > 0 ? status.errors : [status.message],
+    warnings: status.warnings,
+  });
+}
+
+function renderCalibrationArtifactStatus(status: StereoCalibrationArtifactLoadStatus): string {
+  if (status.status === "loaded") {
+    return renderArtifactCard({
+      title: "Stereo calibration loaded",
+      state: "ready",
+      detail: [
+        `Left camera: ${status.value.left.cameraId}`,
+        `Right camera: ${status.value.right.cameraId}`,
+        `Baseline: ${status.value.extrinsics.baselineMeters?.toFixed(3) ?? "unknown"} m`,
+      ],
+      warnings: status.warnings,
+    });
+  }
+
+  return renderArtifactCard({
+    title: "Stereo calibration blocked",
+    state: "blocked",
+    detail: status.errors.length > 0 ? status.errors : [status.message],
+    warnings: status.warnings,
+  });
+}
+
+function renderArtifactCard(options: {
+  title: string;
+  state: "ready" | "blocked";
+  detail: string[];
+  warnings: string[];
+}): string {
+  return `
+    <article class="artifact-card artifact-${options.state}">
+      <h3>${options.title}</h3>
+      <ul>
+        ${options.detail.map((line) => `<li>${line}</li>`).join("")}
+      </ul>
+      ${
+        options.warnings.length > 0
+          ? `<p class="artifact-warning">${options.warnings.join(" ")}</p>`
+          : ""
+      }
+    </article>
+  `;
+}
+
+function renderApp(
+  yoloStatus: YoloArtifactLoadStatus,
+  calibrationStatus: StereoCalibrationArtifactLoadStatus,
+): string {
   return `
     <main class="app-shell">
       <header class="top-bar">
@@ -176,7 +263,7 @@ function renderApp(): string {
           ${renderCameraPanel(fixture.cameras.right, "right")}
           ${renderScene()}
         </div>
-        ${renderStatusPanel()}
+        ${renderStatusPanel(yoloStatus, calibrationStatus)}
       </section>
     </main>
   `;
@@ -188,4 +275,12 @@ if (!app) {
   throw new Error("Missing #app mount point");
 }
 
-app.innerHTML = renderApp();
+const [yoloStatus, calibrationStatus] = await Promise.all([
+  loadYoloArtifactStatus(artifactReader, defaultLive3dConfig.artifacts.yoloModelPackagePath),
+  loadStereoCalibrationArtifactStatus(
+    artifactReader,
+    defaultLive3dConfig.artifacts.stereoCalibrationPackagePath,
+  ),
+]);
+
+app.innerHTML = renderApp(yoloStatus, calibrationStatus);

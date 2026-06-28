@@ -5,11 +5,11 @@ import { createFixture } from "./fixtures";
 test("default config exposes runtime placeholders", () => {
   expect(defaultLive3dConfig.cameras.left.devicePath).toBe("/dev/video0");
   expect(defaultLive3dConfig.cameras.right.devicePath).toBe("/dev/video2");
-  expect(defaultLive3dConfig.artifacts.yoloModelPackagePath).toContain(
-    "artifacts/models",
+  expect(defaultLive3dConfig.artifacts.yoloModelPackagePath).toBe(
+    "/artifacts/models/tennis_ball_yolo",
   );
-  expect(defaultLive3dConfig.artifacts.stereoCalibrationPackagePath).toContain(
-    "artifacts/calibration",
+  expect(defaultLive3dConfig.artifacts.stereoCalibrationPackagePath).toBe(
+    "/artifacts/calibration/stereo_cam1_cam2",
   );
 });
 
