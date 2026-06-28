@@ -52,7 +52,7 @@ export const defaultLive3dConfig: Live3dConfig = {
 
 export function describeFixtureMode(mode: Live3dMode): string {
   if (mode === "fixture") {
-    return "Fixture mode: static UI data only. This does not validate live cameras, YOLO inference, stereo tracking, triangulation, or prediction.";
+    return "Fixture mode: contract-shaped sample data only. This does not validate USB cameras, real YOLO inference, real calibration, real stereo tracking, real triangulation, or real prediction.";
   }
 
   const exhaustive: never = mode;

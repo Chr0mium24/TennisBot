@@ -1,5 +1,11 @@
 import { defaultLive3dConfig, describeFixtureMode } from "./config";
-import { createFixture, type CameraFixture, type DetectionBox } from "./fixtures";
+import {
+  createFixture,
+  detectionToBox,
+  type CameraFixture,
+  type DetectionBox,
+  type Point3d,
+} from "./fixtures";
 import "./styles.css";
 
 const fixture = createFixture(defaultLive3dConfig);
@@ -37,7 +43,7 @@ function renderCameraPanel(camera: CameraFixture, side: "left" | "right"): strin
         <div class="frame-grid"></div>
         <div class="frame-horizon"></div>
         <div class="frame-label">USB camera frame placeholder</div>
-        ${camera.detections.map(renderDetection).join("")}
+        ${camera.detections.map(detectionToBox).map(renderDetection).join("")}
       </div>
     </section>
   `;
@@ -51,12 +57,20 @@ function projectPoint(x: number, z: number): { left: number; top: number } {
 }
 
 function renderScene(): string {
-  const trailPoints = fixture.scene.trail.map((point) => projectPoint(point.x, point.z));
-  const predictionPoints = fixture.scene.prediction.map((point) =>
-    projectPoint(point.x, point.z),
+  const trailPoints = fixture.scene.trail.map((point) =>
+    projectPoint(point.positionMeters.x, point.positionMeters.z),
   );
-  const landing = projectPoint(fixture.scene.landing.x, fixture.scene.landing.z);
-  const ball = projectPoint(fixture.scene.ball.x, fixture.scene.ball.z);
+  const predictionPoints = fixture.scene.prediction.samples.map((sample) =>
+    projectPoint(sample.positionMeters.x, sample.positionMeters.z),
+  );
+  const landing = projectPoint(
+    fixture.scene.landing.positionMeters.x,
+    fixture.scene.landing.positionMeters.z,
+  );
+  const ball = projectPoint(
+    fixture.scene.ball.positionMeters.x,
+    fixture.scene.ball.positionMeters.z,
+  );
   const toPolyline = (points: Array<{ left: number; top: number }>) =>
     points.map((point) => `${point.left},${point.top}`).join(" ");
 
@@ -67,7 +81,7 @@ function renderScene(): string {
           <p class="eyebrow">3D scene</p>
           <h2>Ball trail and prediction</h2>
         </div>
-        <span class="device-pill">runtime scene area</span>
+        <span class="device-pill">${fixture.scene.prediction.model}</span>
       </div>
       <div class="scene-stage">
         <div class="court-plane"></div>
@@ -78,8 +92,26 @@ function renderScene(): string {
         <div class="landing-marker" style="left:${landing.left}%;top:${landing.top}%">landing</div>
         <div class="ball-marker" style="left:${ball.left}%;top:${ball.top}%"></div>
       </div>
+      <dl class="scene-metrics">
+        <div>
+          <dt>match</dt>
+          <dd>${fixture.selectedPair.left.detectionId} / ${fixture.selectedPair.right.detectionId}</dd>
+        </div>
+        <div>
+          <dt>3D point</dt>
+          <dd>${formatPoint(fixture.scene.ball.positionMeters)}</dd>
+        </div>
+        <div>
+          <dt>landing</dt>
+          <dd>${formatPoint(fixture.scene.landing.positionMeters)}</dd>
+        </div>
+      </dl>
     </section>
   `;
+}
+
+function formatPoint(point: Point3d): string {
+  return `${point.x.toFixed(2)}, ${point.y.toFixed(2)}, ${point.z.toFixed(2)} m`;
 }
 
 function renderStatusPanel(): string {
