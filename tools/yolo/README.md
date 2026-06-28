@@ -2,14 +2,54 @@
 
 Date: 2026-06-28
 
-`tools/yolo` is the future home for TennisBot tennis-ball detector tooling:
+`tools/yolo` is the home for TennisBot tennis-ball detector tooling:
 annotation, dataset validation, training, evaluation, model export, and model
-package publication. In Wave 1 this directory is documentation only. The
-working implementation remains in `TennisBallDetectorLab`.
+package publication. In Wave 6 this directory owns the standalone runtime
+model package creation and verification surface. The remaining training,
+annotation, and dataset workflows still live in `TennisBallDetectorLab` until a
+later migration wave.
 
 The live runtime must consume exported model packages from `artifacts/models/`.
 It must not import training, annotation, dataset, or export internals from this
 tool.
+
+## Runtime Package Commands
+
+Install and test the standalone `uv` package:
+
+```bash
+cd tools/yolo
+uv sync
+uv run pytest -q
+```
+
+Create a runtime package from an ONNX model:
+
+```bash
+uv run tennisbot-yolo package create \
+  --output-dir ../../artifacts/models/tennis_ball_yolo \
+  --model-onnx path/to/model.onnx \
+  --default-model onnx
+```
+
+Create a contract-only dry-run package for loader validation:
+
+```bash
+uv run tennisbot-yolo package create \
+  --output-dir ../../artifacts/models/tennis_ball_yolo \
+  --dry-run
+```
+
+Dry-run packages include a deterministic placeholder file and are marked as
+non-inference in `package.json`, `metadata.json`, `eval_report.md`, and
+`eval_metrics.json`. They do not claim training, inference, or accuracy.
+
+Verify a package before runtime use:
+
+```bash
+uv run tennisbot-yolo package verify \
+  --path ../../artifacts/models/tennis_ball_yolo
+```
 
 ## Current To Target Command Map
 
@@ -51,8 +91,8 @@ tools/yolo/
   README.md
   MODEL_PACKAGE_CONTRACT.md
   MIGRATION_CHECKLIST.md
-  src/                         # future Python package
-  tests/                       # future tool tests
+  src/                         # Python package
+  tests/                       # tool tests
   web/yolo-annotator/          # future TypeScript annotator
   dataset_configs/             # lightweight generated/curated configs only
   configs/                     # model and experiment configs

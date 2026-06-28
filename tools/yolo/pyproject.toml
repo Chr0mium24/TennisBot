@@ -1,0 +1,30 @@
+[project]
+name = "tennisbot-yolo"
+version = "0.1.0"
+description = "Standalone TennisBot YOLO runtime package tooling."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+tennisbot-yolo = "tennisbot_yolo.cli:main"
+pytest = "tennisbot_yolo.pytest_main:main"
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
