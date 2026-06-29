@@ -7,8 +7,10 @@ import {
   collectCurrentCalibrationArtifacts,
   contentType,
   handleCalibrationRunRequest,
+  handleCameraDevicesStatusRequest,
   handleCurrentArtifactsRequest,
   handlePhysicalStatusRequest,
+  parseV4l2DeviceList,
   resolveStaticRequestPath,
 } from "./serve";
 
@@ -85,6 +87,41 @@ describe("calibration review server", () => {
 
     expect(response.status).toBe(405);
     expect(payload.error).toBe("Use GET.");
+  });
+
+  test("camera devices status endpoint is read-only", async () => {
+    const response = await handleCameraDevicesStatusRequest(
+      new Request("http://localhost/api/camera-devices/status", {
+        method: "POST",
+      }),
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(405);
+    expect(payload.error).toBe("Use GET.");
+  });
+
+  test("parses v4l2 camera device groups", () => {
+    expect(
+      parseV4l2DeviceList(`USB Camera: USB Camera (usb-0000:00:14.0-8):
+\t/dev/video0
+\t/dev/video1
+\t/dev/media0
+
+USB 2.0 Camera: USB Camera (usb-0000:00:14.0-9):
+    /dev/video2
+    /dev/video3
+`),
+    ).toEqual([
+      {
+        label: "USB Camera: USB Camera (usb-0000:00:14.0-8)",
+        paths: ["/dev/video0", "/dev/video1"],
+      },
+      {
+        label: "USB 2.0 Camera: USB Camera (usb-0000:00:14.0-9)",
+        paths: ["/dev/video2", "/dev/video3"],
+      },
+    ]);
   });
 
   test("collects canonical current calibration artifacts", () => {

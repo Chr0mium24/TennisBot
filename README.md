@@ -192,6 +192,7 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 - [Calibration GUI target print check](docs/calibration_gui_target_print_check_20260629.md)
 - [Calibration GUI physical status panel](docs/calibration_gui_physical_status_panel_20260629.md)
 - [Calibration GUI current artifacts loader](docs/calibration_gui_current_artifacts_loader_20260629.md)
+- [Calibration GUI camera devices status](docs/calibration_gui_camera_devices_status_20260629.md)
 - [Tool boundary audit](docs/tool_boundary_audit_20260629.md)
 - [Legacy board/runtime shell retirement](docs/legacy_board_retirement_20260629.md)
 - [Live3D hardware smoke](docs/live3d_hardware_smoke_20260629.md)

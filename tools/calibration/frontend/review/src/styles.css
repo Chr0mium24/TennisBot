@@ -231,6 +231,11 @@ input {
   border-radius: 8px;
 }
 
+.secondary.compact {
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
 .panel-grid,
 .panel-stack {
   display: grid;
@@ -348,6 +353,65 @@ pre {
 .command-result.passed {
   border-color: #5eead4;
   background: #ecfdf5;
+}
+
+.status-panel {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.status-panel.passed {
+  border-color: #5eead4;
+  background: #ecfdf5;
+}
+
+.status-panel.failed,
+.status-panel.error {
+  border-color: #fca5a5;
+  background: #fff1f2;
+}
+
+.status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.status-panel p {
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.compact-metrics {
+  font-size: 13px;
+}
+
+.device-list {
+  display: grid;
+  gap: 8px;
+}
+
+.device-row {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  color: #475569;
+  font-size: 13px;
+}
+
+.device-row strong {
+  color: #17202a;
+}
+
+.device-row span {
+  overflow-wrap: anywhere;
 }
 
 .command-result.failed,

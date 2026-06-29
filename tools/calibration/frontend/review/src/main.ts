@@ -49,11 +49,31 @@ type PhysicalGateView = {
   next: string;
 };
 
+type CameraDeviceStatusView = {
+  status: "loading" | "ready" | "error";
+  result: string;
+  detail: string;
+  expected: ExpectedCameraDeviceView[];
+  devices: CameraDeviceView[];
+};
+
+type ExpectedCameraDeviceView = {
+  role: string;
+  path: string;
+  present: boolean;
+};
+
+type CameraDeviceView = {
+  label: string;
+  paths: string[];
+};
+
 type AppState = {
   artifacts: ImportedArtifact[];
   activeTab: Tab;
   activePreset: FlowPreset;
   physicalStatus: PhysicalStatusView;
+  cameraStatus: CameraDeviceStatusView;
   targetOptions: TargetCommandOptions;
   targetPrintCheckOptions: TargetPrintCheckCommandOptions;
   captureOptions: CaptureCommandOptions;
@@ -76,6 +96,13 @@ const state: AppState = {
     nextAction: "Loading physical validation status.",
     detail: "",
     gates: [],
+  },
+  cameraStatus: {
+    status: "loading",
+    result: "loading",
+    detail: "Loading USB camera device status.",
+    expected: [],
+    devices: [],
   },
   sessionPath: "../../artifacts/calibration_sessions/stereo_session",
   observationsPath: "../../artifacts/calibration_sessions/stereo_session/observations.json",
@@ -132,6 +159,7 @@ if (app === null) {
 
 render();
 void refreshPhysicalStatus();
+void refreshCameraStatus();
 
 function render(): void {
   const targetSheet = latest(state.artifacts, "targetSheet")?.payload;
@@ -326,6 +354,10 @@ function renderCapturePanel(): string {
           <span>Prepare UVC controls</span>
         </label>
       </article>
+      <article class="panel">
+        <h2>Camera Devices</h2>
+        ${renderCameraStatus()}
+      </article>
       <article class="panel command-panel">
         <h2>Commands</h2>
         ${commandBlock("capture", "Capture frames", buildCommand("capture"))}
@@ -333,6 +365,47 @@ function renderCapturePanel(): string {
         ${commandBlock("detect", "Detect ChArUco", buildCommand("detect"))}
       </article>
     </section>
+  `;
+}
+
+function renderCameraStatus(): string {
+  const expectedRows = state.cameraStatus.expected;
+  return `
+    <div class="status-panel ${state.cameraStatus.result}">
+      <div class="status-header">
+        <strong>${escapeHtml(state.cameraStatus.status === "loading" ? "Loading" : state.cameraStatus.result)}</strong>
+        <button class="secondary compact" id="refresh-camera-status" type="button">${state.cameraStatus.status === "loading" ? "..." : "Refresh"}</button>
+      </div>
+      <p>${escapeHtml(state.cameraStatus.detail)}</p>
+      ${
+        expectedRows.length === 0
+          ? ""
+          : `<dl class="metrics compact-metrics">
+              ${expectedRows
+                .map((device) => `<dt>${escapeHtml(device.role)}</dt><dd>${escapeHtml(device.path)} ${device.present ? "present" : "missing"}</dd>`)
+                .join("")}
+            </dl>`
+      }
+      ${renderCameraDeviceList(state.cameraStatus.devices)}
+    </div>
+  `;
+}
+
+function renderCameraDeviceList(devices: CameraDeviceView[]): string {
+  if (devices.length === 0) return `<p class="empty">No camera device list loaded.</p>`;
+  return `
+    <div class="device-list">
+      ${devices
+        .map(
+          (device) => `
+            <section class="device-row">
+              <strong>${escapeHtml(device.label)}</strong>
+              <span>${escapeHtml(device.paths.join(", "))}</span>
+            </section>
+          `,
+        )
+        .join("")}
+    </div>
   `;
 }
 
@@ -635,6 +708,9 @@ function wireEvents(): void {
   });
   document.querySelector("#refresh-physical-status")?.addEventListener("click", () => {
     void refreshPhysicalStatus();
+  });
+  document.querySelector("#refresh-camera-status")?.addEventListener("click", () => {
+    void refreshCameraStatus();
   });
   document.querySelectorAll<HTMLButtonElement>("[data-flow-preset]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -1007,6 +1083,50 @@ async function refreshPhysicalStatus(): Promise<void> {
   render();
 }
 
+async function refreshCameraStatus(): Promise<void> {
+  state.cameraStatus = {
+    ...state.cameraStatus,
+    status: "loading",
+    detail: "Loading USB camera device status.",
+  };
+  render();
+  try {
+    const response = await fetch("/api/camera-devices/status");
+    const payload = (await response.json()) as {
+      result?: unknown;
+      expected?: unknown[];
+      devices?: unknown[];
+      error?: unknown;
+      stderr?: unknown;
+    };
+    if (!response.ok) {
+      throw new Error(typeof payload.error === "string" ? payload.error : `Camera status request failed with ${response.status}.`);
+    }
+    const expected = Array.isArray(payload.expected) ? payload.expected.map(expectedCameraDeviceFromPayload).filter(isExpectedCameraDeviceView) : [];
+    const devices = Array.isArray(payload.devices) ? payload.devices.map(cameraDeviceFromPayload).filter(isCameraDeviceView) : [];
+    const missing = expected.filter((device) => !device.present).map((device) => device.path);
+    state.cameraStatus = {
+      status: "ready",
+      result: typeof payload.result === "string" ? payload.result : "unknown",
+      detail:
+        missing.length === 0
+          ? "Default cam1 and cam2 USB camera devices are present."
+          : `Missing expected device(s): ${missing.join(", ")}.`,
+      expected,
+      devices,
+    };
+  } catch (error) {
+    state.cameraStatus = {
+      status: "error",
+      result: "error",
+      detail: error instanceof Error ? error.message : String(error),
+      expected: [],
+      devices: [],
+    };
+  }
+  render();
+}
+
 function physicalGateFromPayload(value: unknown): PhysicalGateView | null {
   if (!isJsonObject(value)) return null;
   return {
@@ -1025,6 +1145,36 @@ function isPhysicalGateView(value: PhysicalGateView | null): value is PhysicalGa
 
 function physicalGateStatusClass(status: string): string {
   return ["passed", "blocked", "failed"].includes(status) ? status : "unknown";
+}
+
+function expectedCameraDeviceFromPayload(value: unknown): ExpectedCameraDeviceView | null {
+  if (!isJsonObject(value)) return null;
+  const role = stringValue(value.role);
+  const path = stringValue(value.path);
+  if (role === "" || path === "") return null;
+  return {
+    role,
+    path,
+    present: value.present === true,
+  };
+}
+
+function isExpectedCameraDeviceView(value: ExpectedCameraDeviceView | null): value is ExpectedCameraDeviceView {
+  return value !== null;
+}
+
+function cameraDeviceFromPayload(value: unknown): CameraDeviceView | null {
+  if (!isJsonObject(value)) return null;
+  const paths = Array.isArray(value.paths) ? value.paths.filter((item): item is string => typeof item === "string") : [];
+  if (paths.length === 0) return null;
+  return {
+    label: stringValue(value.label) || "Camera device",
+    paths,
+  };
+}
+
+function isCameraDeviceView(value: CameraDeviceView | null): value is CameraDeviceView {
+  return value !== null;
 }
 
 function stringValue(value: unknown): string {

@@ -26,6 +26,28 @@ type CurrentCalibrationArtifact = {
   payload: Record<string, unknown>;
 };
 
+export type CameraDeviceEntry = {
+  label: string;
+  paths: string[];
+};
+
+type ExpectedCameraDevice = {
+  role: "cam1" | "cam2";
+  path: string;
+  present: boolean;
+};
+
+type CameraDeviceStatusPayload = {
+  schema_version: "tennisbot.camera_devices_status.v1";
+  result: "passed" | "failed";
+  command: string[];
+  exit_code: number;
+  expected: ExpectedCameraDevice[];
+  devices: CameraDeviceEntry[];
+  stdout: string;
+  stderr: string;
+};
+
 export function contentType(pathname: string): string {
   if (pathname.endsWith(".html")) return "text/html; charset=utf-8";
   if (pathname.endsWith(".js")) return "text/javascript; charset=utf-8";
@@ -65,6 +87,9 @@ export function startServer() {
       }
       if (url.pathname === "/api/calibration/current-artifacts") {
         return handleCurrentArtifactsRequest(request);
+      }
+      if (url.pathname === "/api/camera-devices/status") {
+        return handleCameraDevicesStatusRequest(request);
       }
       const resolvedPath = resolveStaticRequestPath(url.pathname);
       if (resolvedPath === null) return new Response("Not found", { status: 404 });
@@ -164,6 +189,84 @@ export function collectCurrentCalibrationArtifacts(root = repoRoot): CurrentCali
     });
   }
   return artifacts;
+}
+
+export async function handleCameraDevicesStatusRequest(request: Request): Promise<Response> {
+  if (request.method !== "GET") {
+    return jsonResponse({ error: "Use GET." }, 405);
+  }
+  return jsonResponse(await cameraDevicesStatus());
+}
+
+async function cameraDevicesStatus(): Promise<CameraDeviceStatusPayload> {
+  const command = ["v4l2-ctl", "--list-devices"];
+  let childProcess: ReturnType<typeof Bun.spawn>;
+  try {
+    childProcess = Bun.spawn(command, {
+      cwd: repoRoot,
+      env: processEnv(),
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+  } catch (error) {
+    return {
+      schema_version: "tennisbot.camera_devices_status.v1",
+      result: "failed",
+      command,
+      exit_code: -1,
+      expected: expectedCameraDevices([]),
+      devices: [],
+      stdout: "",
+      stderr: error instanceof Error ? error.message : String(error),
+    };
+  }
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(childProcess.stdout).text(),
+    new Response(childProcess.stderr).text(),
+    childProcess.exited,
+  ]);
+  const devices = parseV4l2DeviceList(stdout);
+  const expected = expectedCameraDevices(devices);
+  return {
+    schema_version: "tennisbot.camera_devices_status.v1",
+    result: exitCode === 0 && expected.every((device) => device.present) ? "passed" : "failed",
+    command,
+    exit_code: exitCode,
+    expected,
+    devices,
+    stdout,
+    stderr,
+  };
+}
+
+export function parseV4l2DeviceList(output: string): CameraDeviceEntry[] {
+  const devices: CameraDeviceEntry[] = [];
+  let current: CameraDeviceEntry | undefined;
+  for (const line of output.split("\n")) {
+    if (line.trim() === "") continue;
+    const videoPaths = [...line.matchAll(/\/dev\/video\d+/gu)].map((match) => match[0]);
+    if (line.startsWith("\t") || line.startsWith(" ")) {
+      if (videoPaths.length === 0) continue;
+      if (current === undefined) {
+        current = { label: "Unlabeled camera", paths: [] };
+        devices.push(current);
+      }
+      current.paths.push(...videoPaths);
+      continue;
+    }
+    current = { label: line.trim().replace(/:$/u, ""), paths: videoPaths };
+    devices.push(current);
+  }
+  return devices.filter((device) => device.paths.length > 0);
+}
+
+function expectedCameraDevices(devices: CameraDeviceEntry[]): ExpectedCameraDevice[] {
+  const paths = new Set(devices.flatMap((device) => device.paths));
+  return [
+    { role: "cam1", path: "/dev/video0", present: paths.has("/dev/video0") },
+    { role: "cam2", path: "/dev/video2", present: paths.has("/dev/video2") },
+  ];
 }
 
 function decodePathname(pathname: string): string | null {
