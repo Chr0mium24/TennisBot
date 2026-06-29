@@ -63,6 +63,8 @@ const valueFlags = new Set([
   "--min-views",
   "--min-pairs",
   "--max-rms-px",
+  "--dpi",
+  "--margin-mm",
   "--path",
 ]);
 const pathFlags = new Set([

@@ -123,6 +123,8 @@ describe("calibration command runner", () => {
           "uv run tennisbot-calibration target charuco",
           "--output ../../artifacts/calibration_targets/target.png",
           "--output-report ../../docs/calibration_target.md",
+          "--dpi 300",
+          "--margin-mm 10",
         ].join(" "),
         roots,
       );
