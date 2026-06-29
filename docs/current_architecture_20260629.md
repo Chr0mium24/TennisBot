@@ -310,6 +310,18 @@ Remaining gate: no visible tennis ball was detected, so runtime 3D stayed at
 left-detections-missing instead of prediction-ready.
 ```
 
+Latest hardware acceptance probe:
+
+```text
+Report: docs/live3d_hardware_acceptance_probe_20260629.md
+Checklist passed: app server, runtime snapshot, YOLO artifact, calibration
+artifact, stereo USB camera streams, and readable left/right camera frames.
+Checklist blocked: left/right YOLO detection because no visible tennis ball was
+present in the current scene.
+Remaining gate: stereo triangulation and prediction are waiting on live
+left/right ball detections.
+```
+
 ## Remaining Physical Validation
 
 The architecture is implemented in software. These items still require real

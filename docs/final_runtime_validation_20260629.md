@@ -280,6 +280,11 @@ Result: 13 tests passed. A real runtime YOLO package was written from the
   ONNX backend loop without session concurrency errors.
 - The recalibrated Live3D hardware report loaded baselineMeters
   `0.05248616443700974` and captured non-black frames after UVC preparation.
+- `docs/live3d_hardware_acceptance_probe_20260629.md` reran the current
+  hardware verifier after checklist reporting was added. It passed server,
+  snapshot, artifact, stereo camera, and frame-quality gates, then marked
+  left/right YOLO detection as blocked because no visible tennis ball was
+  present.
 - Live3D now has a repeatable headless hardware verifier that reads
   `window.__tennisbotLive3dSnapshot` and records camera, YOLO, calibration,
   detection, runtime 3D state, frame captures, and frame brightness statistics

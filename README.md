@@ -150,6 +150,7 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 - [Legacy board/runtime shell retirement](docs/legacy_board_retirement_20260629.md)
 - [Live3D hardware smoke](docs/live3d_hardware_smoke_20260629.md)
 - [Live3D hardware acceptance checklist](docs/live3d_hardware_acceptance_checklist_20260629.md)
+- [Live3D hardware acceptance probe](docs/live3d_hardware_acceptance_probe_20260629.md)
 - [YOLO static sample validation](docs/yolo_static_sample_validation_20260629.md)
 - [Architecture simplification plan](docs/architecture_simplification_plan_20260628.md)
 - [Multi-agent refactor task plan](docs/multi_agent_refactor_tasks_20260628.md)
