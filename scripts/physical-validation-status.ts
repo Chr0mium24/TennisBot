@@ -103,7 +103,7 @@ function targetPrintCheck(): GateResult {
       status: "blocked",
       detail: "no recorded 15.0 mm print measurement was found.",
       evidence: displayPath(path),
-      next: "Print the target SVG at 100%, measure one square, then record the measurement in this artifact.",
+      next: targetPrintNextAction(),
     };
   }
   const measured = numberField(payload, "measured_square_mm");
@@ -117,6 +117,16 @@ function targetPrintCheck(): GateResult {
     evidence: compactJson({ path: displayPath(path), measured_square_mm: measured, tolerance_mm: tolerance, accepted: payload.accepted }),
     next: passed ? undefined : "Fix printer scaling and reprint before camera capture.",
   };
+}
+
+function targetPrintNextAction(): string {
+  const targetMetadata = readJson(resolve(repoRoot, "artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.json"));
+  const files = objectField(targetMetadata, "files");
+  const svgPath = stringField(files, "svg") ?? "artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.svg";
+  return [
+    `Print ${displayReferencePath(svgPath)} at 100% scale, measure one square, then record it in Calibration GUI Target > Print Check.`,
+    "CLI fallback: cd tools/calibration && uv run tennisbot-calibration target record-print-check --measured-square-mm <measured-mm>",
+  ].join(" ");
 }
 
 function monoPackageCheck(cameraId: string, path: string): GateResult {
@@ -308,6 +318,11 @@ function numberField(payload: JsonObject | undefined, key: string): number | und
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
+function stringField(payload: JsonObject | undefined, key: string): string | undefined {
+  const value = payload?.[key];
+  return typeof value === "string" ? value : undefined;
+}
+
 function approximately(value: number | undefined, expected: number, tolerance: number): boolean {
   return value !== undefined && Math.abs(value - expected) <= tolerance;
 }
@@ -322,6 +337,21 @@ function displayPath(path: string): string {
   return resolvedPath === resolvedRoot || !resolvedPath.startsWith(`${resolvedRoot}/`)
     ? path
     : resolvedPath.slice(resolvedRoot.length + 1);
+}
+
+function displayReferencePath(path: string): string {
+  const bases = [repoRoot, resolve(repoRoot, "tools/calibration")];
+  for (const base of bases) {
+    const resolved = resolve(base, path);
+    if (isInsideRepo(resolved)) return displayPath(resolved);
+  }
+  return path;
+}
+
+function isInsideRepo(path: string): boolean {
+  const resolvedRoot = resolve(repoRoot);
+  const resolvedPath = resolve(path);
+  return resolvedPath === resolvedRoot || resolvedPath.startsWith(`${resolvedRoot}/`);
 }
 
 function buildStatusPayload(gates: GateResult[]): StatusPayload {
