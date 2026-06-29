@@ -1,5 +1,5 @@
-import { existsSync, realpathSync, statSync } from "node:fs";
-import { resolve, sep } from "node:path";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { basename, resolve, sep } from "node:path";
 
 import { runCalibrationCommand } from "./calibration-command-runner";
 
@@ -9,6 +9,22 @@ const distDir = resolve(appDir, "dist");
 const artifactsDir = resolve(repoRoot, "artifacts");
 const port = Number(process.env.PORT ?? 5188);
 const host = process.env.HOST ?? "127.0.0.1";
+const currentArtifactPaths = [
+  "artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.json",
+  "artifacts/calibration_targets/dfoptix_charuco_15mm_print_check.json",
+  "artifacts/calibration/cam1/package.json",
+  "artifacts/calibration/cam1/verification.json",
+  "artifacts/calibration/cam2/package.json",
+  "artifacts/calibration/cam2/verification.json",
+  "artifacts/calibration/stereo_cam1_cam2/package.json",
+  "artifacts/calibration/stereo_cam1_cam2/verification.json",
+] as const;
+
+type CurrentCalibrationArtifact = {
+  name: string;
+  path: string;
+  payload: Record<string, unknown>;
+};
 
 export function contentType(pathname: string): string {
   if (pathname.endsWith(".html")) return "text/html; charset=utf-8";
@@ -46,6 +62,9 @@ export function startServer() {
       }
       if (url.pathname === "/api/physical/status") {
         return handlePhysicalStatusRequest(request);
+      }
+      if (url.pathname === "/api/calibration/current-artifacts") {
+        return handleCurrentArtifactsRequest(request);
       }
       const resolvedPath = resolveStaticRequestPath(url.pathname);
       if (resolvedPath === null) return new Response("Not found", { status: 404 });
@@ -121,6 +140,32 @@ export async function handlePhysicalStatusRequest(request: Request): Promise<Res
   }
 }
 
+export async function handleCurrentArtifactsRequest(request: Request): Promise<Response> {
+  if (request.method !== "GET") {
+    return jsonResponse({ error: "Use GET." }, 405);
+  }
+  return jsonResponse({
+    schema_version: "tennisbot.calibration_current_artifacts.v1",
+    artifacts: collectCurrentCalibrationArtifacts(),
+  });
+}
+
+export function collectCurrentCalibrationArtifacts(root = repoRoot): CurrentCalibrationArtifact[] {
+  const artifacts: CurrentCalibrationArtifact[] = [];
+  for (const relativePath of currentArtifactPaths) {
+    const path = resolve(root, relativePath);
+    if (!isServableFileInRoot(path, resolve(root, "artifacts"))) continue;
+    const payload = parseJsonObject(readFileSync(path, "utf-8"));
+    if (payload === undefined) continue;
+    artifacts.push({
+      name: basename(path),
+      path: relativePath,
+      payload,
+    });
+  }
+  return artifacts;
+}
+
 function decodePathname(pathname: string): string | null {
   try {
     const decoded = decodeURIComponent(pathname);
@@ -151,6 +196,17 @@ function jsonResponse(payload: unknown, status = 200): Response {
 
 function processEnv(): Record<string, string> {
   return Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined));
+}
+
+function parseJsonObject(text: string): Record<string, unknown> | undefined {
+  try {
+    const value = JSON.parse(text) as unknown;
+    return value !== null && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 if (import.meta.main) {

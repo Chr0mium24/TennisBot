@@ -175,7 +175,10 @@ function render(): void {
             ${renderPresetButton("cam2Mono", "Cam2 Mono")}
             ${renderPresetButton("stereo", "Stereo")}
           </div>
-          <button class="secondary" id="load-sample">Load Sample</button>
+          <div class="toolbar-actions">
+            <button class="secondary" id="load-current">Load Current</button>
+            <button class="secondary" id="load-sample">Load Sample</button>
+          </div>
         </header>
         ${state.activeTab === "target" ? renderTargetPanel(targetSheet, targetPrintCheck) : ""}
         ${state.activeTab === "capture" ? renderCapturePanel() : ""}
@@ -627,6 +630,9 @@ function wireEvents(): void {
     state.artifacts = sampleArtifacts();
     render();
   });
+  document.querySelector("#load-current")?.addEventListener("click", () => {
+    void loadCurrentArtifacts();
+  });
   document.querySelector("#refresh-physical-status")?.addEventListener("click", () => {
     void refreshPhysicalStatus();
   });
@@ -846,15 +852,29 @@ function importGeneratedArtifacts(artifacts: unknown[] | undefined): number {
     const name = typeof artifact.name === "string" ? artifact.name : "generated.json";
     const path = typeof artifact.path === "string" ? artifact.path : name;
     const payload = artifact.payload;
-    state.artifacts.push({
-      id: `${path}:${Date.now()}:${importedCount}`,
-      name: path,
-      kind: classifyArtifact(payload),
-      payload,
-    });
+    addOrReplaceArtifact(path, payload);
     importedCount += 1;
   }
   return importedCount;
+}
+
+async function loadCurrentArtifacts(): Promise<void> {
+  try {
+    const response = await fetch("/api/calibration/current-artifacts");
+    const payload = (await response.json()) as { artifacts?: unknown[]; error?: unknown };
+    if (!response.ok) {
+      throw new Error(typeof payload.error === "string" ? payload.error : `Load current artifacts failed with ${response.status}.`);
+    }
+    importGeneratedArtifacts(payload.artifacts);
+  } catch (error) {
+    state.commandRuns.verify = {
+      status: "error",
+      detail: error instanceof Error ? error.message : String(error),
+      stdout: "",
+      stderr: "",
+    };
+  }
+  render();
 }
 
 async function importFiles(files: FileList | null): Promise<void> {
@@ -862,14 +882,24 @@ async function importFiles(files: FileList | null): Promise<void> {
   for (const file of Array.from(files)) {
     const text = await file.text();
     const payload = JSON.parse(text) as JsonObject;
-    state.artifacts.push({
-      id: `${file.name}:${Date.now()}`,
-      name: file.name,
-      kind: classifyArtifact(payload),
-      payload,
-    });
+    addOrReplaceArtifact(file.name, payload);
   }
   render();
+}
+
+function addOrReplaceArtifact(path: string, payload: JsonObject): void {
+  const artifact: ImportedArtifact = {
+    id: `${path}:${Date.now()}`,
+    name: path,
+    kind: classifyArtifact(payload),
+    payload,
+  };
+  const index = state.artifacts.findIndex((item) => item.name === path);
+  if (index >= 0) {
+    state.artifacts[index] = artifact;
+  } else {
+    state.artifacts.push(artifact);
+  }
 }
 
 function sampleArtifacts(): ImportedArtifact[] {

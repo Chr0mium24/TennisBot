@@ -1,9 +1,16 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
-import { contentType, handleCalibrationRunRequest, handlePhysicalStatusRequest, resolveStaticRequestPath } from "./serve";
+import {
+  collectCurrentCalibrationArtifacts,
+  contentType,
+  handleCalibrationRunRequest,
+  handleCurrentArtifactsRequest,
+  handlePhysicalStatusRequest,
+  resolveStaticRequestPath,
+} from "./serve";
 
 describe("calibration review server", () => {
   test("serves static dist files and artifact files inside allowed roots", () => {
@@ -66,6 +73,49 @@ describe("calibration review server", () => {
     expect(payload.schema_version).toBe("tennisbot.physical_validation_status.v1");
     expect(["passed", "incomplete"]).toContain(payload.result);
     expect(payload.gates.length).toBeGreaterThan(0);
+  });
+
+  test("current artifacts endpoint is read-only", async () => {
+    const response = await handleCurrentArtifactsRequest(
+      new Request("http://localhost/api/calibration/current-artifacts", {
+        method: "POST",
+      }),
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(405);
+    expect(payload.error).toBe("Use GET.");
+  });
+
+  test("collects canonical current calibration artifacts", () => {
+    const root = makeTempRoot();
+    try {
+      mkdirSync(join(root, "artifacts", "calibration_targets"), { recursive: true });
+      mkdirSync(join(root, "artifacts", "calibration", "cam1"), { recursive: true });
+      writeFileSync(
+        join(root, "artifacts", "calibration_targets", "dfoptix_charuco_15mm_300dpi.json"),
+        JSON.stringify({ schema_version: "calibration.target_sheet.v1", accepted: true }),
+      );
+      writeFileSync(
+        join(root, "artifacts", "calibration", "cam1", "package.json"),
+        JSON.stringify({ schema_version: "calibration.mono.v1", accepted: true }),
+      );
+
+      expect(collectCurrentCalibrationArtifacts(root)).toEqual([
+        {
+          name: "dfoptix_charuco_15mm_300dpi.json",
+          path: "artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.json",
+          payload: { schema_version: "calibration.target_sheet.v1", accepted: true },
+        },
+        {
+          name: "package.json",
+          path: "artifacts/calibration/cam1/package.json",
+          payload: { schema_version: "calibration.mono.v1", accepted: true },
+        },
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 
