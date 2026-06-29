@@ -63,11 +63,16 @@ bun run build
 bun run verify:hardware -- --prepare-uvc-controls --timeout-ms 20000 --output ../../docs/live3d_hardware_loop_recalibrated_20260629.md
 ```
 
-Result: 42 tests passed, typecheck passed, browser bundle built. The hardware
+Result: 44 tests passed, typecheck passed, browser bundle built. The hardware
 verification command wrote
 `docs/live3d_hardware_loop_recalibrated_20260629.md`; it loaded the refreshed
 calibration baseline `0.05248616443700974`, captured non-black left/right
 frames, and failed only because the live scene had no detectable tennis ball.
+The verifier report renderer now also includes a fixed acceptance checklist for
+server, snapshot, artifacts, stereo cameras, frame quality, left/right
+detections, triangulation, and prediction. Unit tests cover the no-ball
+classification as blocked detection gates and the `prediction-ready` success
+case.
 
 Dev server smoke:
 

@@ -133,6 +133,13 @@ bun run build
 bun run verify:hardware -- --prepare-uvc-controls --timeout-ms 30000 --output ../../docs/live3d_hardware_loop_YYYYMMDD.md
 ```
 
+The hardware verifier writes a Markdown acceptance checklist for app server,
+runtime snapshot, YOLO artifact, calibration artifact, stereo camera streams,
+frame quality, left/right detections, stereo triangulation, and trajectory
+prediction. The overall run only passes when Live3D reaches `prediction-ready`.
+Readable scenes with no visible tennis ball are classified as blocked detection
+gates in the report, not as completed validation.
+
 Create dry-run calibration artifacts:
 
 ```bash
@@ -242,7 +249,7 @@ cd tools/calibration/frontend/review && bun test && bun run build
 Result: 6 passing tests, build passed.
 
 cd apps/live3d && bun test
-Result: 42 passing tests, 0 failures.
+Result: 44 passing tests, 0 failures.
 
 cd apps/live3d && bun run typecheck
 Result: passed.

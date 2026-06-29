@@ -78,6 +78,12 @@ YOLO, polls the runtime snapshot, captures left/right video PNG frames with
 brightness statistics, and writes a Markdown report. A passing run requires the
 runtime status to reach `prediction-ready`; no-ball or near-black scenes are
 reported as failed hardware validation, not as software success.
+The report includes a fixed acceptance checklist covering app server, snapshot,
+YOLO artifact, calibration artifact, stereo cameras, frame quality, left/right
+detections, stereo triangulation, and trajectory prediction. When the runtime is
+ready but the scene has no visible tennis ball, the detection gates are marked
+`blocked` with the next physical action instead of being conflated with a
+software failure.
 `--prepare-uvc-controls` applies the local USU Camera 4K controls that recovered
 non-black frames during validation: brightness `64`, gain `255`, manual
 exposure `2047` on `/dev/video0` and `/dev/video2`.

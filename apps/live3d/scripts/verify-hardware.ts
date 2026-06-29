@@ -19,6 +19,7 @@ type Options = {
 };
 
 type StepStatus = "passed" | "failed" | "skipped";
+export type VerificationGateStatus = "passed" | "failed" | "blocked" | "unknown";
 
 type VerificationStep = {
   name: string;
@@ -46,7 +47,7 @@ type CaptureArtifact = {
   nonBlackPixelPercent?: number;
 };
 
-type VerificationResult = {
+export type VerificationResult = {
   status: "passed" | "failed" | "error";
   startedAt: Date;
   finishedAt: Date;
@@ -55,6 +56,15 @@ type VerificationResult = {
   observation: Observation;
   captures: CaptureArtifact[];
   error?: string;
+};
+
+export type VerificationGate = {
+  id: string;
+  label: string;
+  status: VerificationGateStatus;
+  detail: string;
+  evidence: string;
+  nextAction?: string;
 };
 
 type SpawnedProcess = ReturnType<typeof Bun.spawn>;
@@ -82,29 +92,35 @@ const defaultTimeoutMs = 30_000;
 const defaultPollMs = 500;
 const defaultChromeDebugPort = 9233;
 
-const options = parseArgs(Bun.argv.slice(2));
-const startedAt = new Date();
+if (import.meta.main) {
+  await main(Bun.argv.slice(2));
+}
 
-try {
-  const result = await runVerification(startedAt, options);
-  writeReport(result, options.outputPath);
-  console.log(`Live3D hardware verification report: ${options.outputPath}`);
-  process.exitCode = result.status === "passed" ? 0 : 1;
-} catch (error) {
-  const result: VerificationResult = {
-    status: "error",
-    startedAt,
-    finishedAt: new Date(),
-    appUrl: options.appUrl,
-    steps: [],
-    observation: createEmptyObservation(),
-    captures: [],
-    error: formatUnknownError(error),
-  };
-  writeReport(result, options.outputPath);
-  console.error(result.error);
-  console.error(`Live3D hardware verification report: ${options.outputPath}`);
-  process.exitCode = 1;
+export async function main(args: string[]): Promise<void> {
+  const options = parseArgs(args);
+  const startedAt = new Date();
+
+  try {
+    const result = await runVerification(startedAt, options);
+    writeReport(result, options.outputPath);
+    console.log(`Live3D hardware verification report: ${options.outputPath}`);
+    process.exitCode = result.status === "passed" ? 0 : 1;
+  } catch (error) {
+    const result: VerificationResult = {
+      status: "error",
+      startedAt,
+      finishedAt: new Date(),
+      appUrl: options.appUrl,
+      steps: [],
+      observation: createEmptyObservation(),
+      captures: [],
+      error: formatUnknownError(error),
+    };
+    writeReport(result, options.outputPath);
+    console.error(result.error);
+    console.error(`Live3D hardware verification report: ${options.outputPath}`);
+    process.exitCode = 1;
+  }
 }
 
 async function runVerification(startedAt: Date, opts: Options): Promise<VerificationResult> {
@@ -758,8 +774,45 @@ function writeReport(result: VerificationResult, outputPath: string): void {
   writeFileSync(outputPath, renderReport(result), "utf-8");
 }
 
-function renderReport(result: VerificationResult): string {
+export function createAcceptanceChecklist(result: VerificationResult): VerificationGate[] {
+  const yoloGate = yoloArtifactGate(result);
+  const calibrationGate = calibrationArtifactGate(result);
+  const cameraGate = cameraGateFromSnapshot(result);
+  const frameGate = frameQualityGate(result);
+  const leftDetectionGate = detectionGate(
+    "left-yolo-detection",
+    "Left YOLO detection",
+    result.observation.maxLeftDetections,
+    yoloGate,
+    cameraGate,
+    frameGate,
+  );
+  const rightDetectionGate = detectionGate(
+    "right-yolo-detection",
+    "Right YOLO detection",
+    result.observation.maxRightDetections,
+    yoloGate,
+    cameraGate,
+    frameGate,
+  );
+
+  return [
+    stepGate("app-server", "Live3D app server", result, "app server"),
+    stepGate("page-snapshot", "Runtime snapshot export", result, "page snapshot"),
+    yoloGate,
+    calibrationGate,
+    cameraGate,
+    frameGate,
+    leftDetectionGate,
+    rightDetectionGate,
+    triangulationGate(result, calibrationGate, leftDetectionGate, rightDetectionGate),
+    predictionGate(result),
+  ];
+}
+
+export function renderReport(result: VerificationResult): string {
   const last = result.observation.lastSnapshot;
+  const checklist = renderAcceptanceChecklist(createAcceptanceChecklist(result));
   const steps =
     result.steps.length === 0
       ? "- No steps completed.\n"
@@ -785,6 +838,9 @@ function renderReport(result: VerificationResult): string {
 - Result: ${result.status}
 - Error: ${result.error ?? "none"}
 
+## Acceptance Checklist
+
+${checklist}
 ## Steps
 
 ${steps}
@@ -807,6 +863,297 @@ ${captures}
 ${JSON.stringify(last, null, 2)}
 \`\`\`
 `;
+}
+
+function renderAcceptanceChecklist(gates: VerificationGate[]): string {
+  return (
+    gates
+      .map((gate) => {
+        const next = gate.nextAction === undefined ? "" : ` Next: ${gate.nextAction}`;
+        return `- ${gate.status}: ${gate.label} - ${gate.detail} Evidence: ${gate.evidence}.${next}`;
+      })
+      .join("\n") + "\n"
+  );
+}
+
+function stepGate(
+  id: string,
+  label: string,
+  result: VerificationResult,
+  stepName: string,
+): VerificationGate {
+  const step = result.steps.find((candidate) => candidate.name === stepName);
+  if (step === undefined) {
+    return {
+      id,
+      label,
+      status: "unknown",
+      detail: `${stepName} did not run.`,
+      evidence: "No matching verifier step was recorded",
+    };
+  }
+
+  return {
+    id,
+    label,
+    status: step.status === "passed" ? "passed" : step.status === "failed" ? "failed" : "unknown",
+    detail: step.detail,
+    evidence: `step "${step.name}" recorded ${step.status}`,
+  };
+}
+
+function yoloArtifactGate(result: VerificationResult): VerificationGate {
+  const snapshot = result.observation.lastSnapshot;
+  if (snapshot === null) {
+    return {
+      id: "yolo-artifact",
+      label: "YOLO artifact package",
+      status: "unknown",
+      detail: "No runtime snapshot was available.",
+      evidence: "lastSnapshot is null",
+    };
+  }
+  if (snapshot.yoloArtifact.status === "loaded") {
+    return {
+      id: "yolo-artifact",
+      label: "YOLO artifact package",
+      status: "passed",
+      detail: `${snapshot.yoloArtifact.selectedModel ?? "unknown"} model loaded from ${snapshot.yoloArtifact.packagePath}.`,
+      evidence: "lastSnapshot.yoloArtifact.status is loaded",
+    };
+  }
+  return {
+    id: "yolo-artifact",
+    label: "YOLO artifact package",
+    status: "failed",
+    detail: snapshot.yoloArtifact.message ?? "YOLO artifact is not loaded.",
+    evidence: `lastSnapshot.yoloArtifact.status is ${snapshot.yoloArtifact.status}`,
+    nextAction: "Rebuild or verify artifacts/models/tennis_ball_yolo before testing cameras.",
+  };
+}
+
+function calibrationArtifactGate(result: VerificationResult): VerificationGate {
+  const snapshot = result.observation.lastSnapshot;
+  if (snapshot === null) {
+    return {
+      id: "calibration-artifact",
+      label: "Stereo calibration package",
+      status: "unknown",
+      detail: "No runtime snapshot was available.",
+      evidence: "lastSnapshot is null",
+    };
+  }
+  if (snapshot.calibrationArtifact.status === "loaded") {
+    return {
+      id: "calibration-artifact",
+      label: "Stereo calibration package",
+      status: "passed",
+      detail: `baseline=${snapshot.calibrationArtifact.baselineMeters ?? "unknown"} m from ${snapshot.calibrationArtifact.packagePath}.`,
+      evidence: "lastSnapshot.calibrationArtifact.status is loaded",
+    };
+  }
+  return {
+    id: "calibration-artifact",
+    label: "Stereo calibration package",
+    status: "failed",
+    detail: snapshot.calibrationArtifact.message ?? "Stereo calibration artifact is not loaded.",
+    evidence: `lastSnapshot.calibrationArtifact.status is ${snapshot.calibrationArtifact.status}`,
+    nextAction: "Run the mono/stereo calibration flow and verify artifacts/calibration/stereo_cam1_cam2.",
+  };
+}
+
+function cameraGateFromSnapshot(result: VerificationResult): VerificationGate {
+  const snapshot = result.observation.lastSnapshot;
+  if (snapshot === null) {
+    return {
+      id: "stereo-camera-streams",
+      label: "Stereo USB camera streams",
+      status: "unknown",
+      detail: "No runtime snapshot was available.",
+      evidence: "lastSnapshot is null",
+    };
+  }
+  if (snapshot.camera.state === "ready" && snapshot.camera.deviceCount >= 2) {
+    return {
+      id: "stereo-camera-streams",
+      label: "Stereo USB camera streams",
+      status: "passed",
+      detail: `${snapshot.camera.deviceCount} browser video input(s), left=${snapshot.camera.left.deviceLabel ?? "unknown"}, right=${snapshot.camera.right.deviceLabel ?? "unknown"}.`,
+      evidence: "lastSnapshot.camera.state is ready",
+    };
+  }
+  return {
+    id: "stereo-camera-streams",
+    label: "Stereo USB camera streams",
+    status: "failed",
+    detail: `${snapshot.camera.left.detail} ${snapshot.camera.right.detail}`,
+    evidence: `lastSnapshot.camera.state is ${snapshot.camera.state}`,
+    nextAction: "Check browser camera permission and that /dev/video0 and /dev/video2 are available.",
+  };
+}
+
+function frameQualityGate(result: VerificationResult): VerificationGate {
+  const savedCaptures = result.captures.filter((capture) => capture.status === "saved");
+  const darkCaptures = savedCaptures.filter((capture) => (capture.maxLuma ?? 0) <= 8);
+  if (savedCaptures.length >= 2 && darkCaptures.length === 0) {
+    return {
+      id: "frame-quality",
+      label: "Readable camera frames",
+      status: "passed",
+      detail: `Saved ${savedCaptures.length} non-black browser frame capture(s).`,
+      evidence: savedCaptures
+        .map((capture) => `${capture.label} max_luma=${formatMetric(capture.maxLuma)}`)
+        .join(", "),
+    };
+  }
+  if (savedCaptures.length > 0 && darkCaptures.length > 0) {
+    return {
+      id: "frame-quality",
+      label: "Readable camera frames",
+      status: "failed",
+      detail: `${darkCaptures.map((capture) => capture.label).join(", ")} capture(s) are near-black.`,
+      evidence: savedCaptures
+        .map((capture) => `${capture.label} max_luma=${formatMetric(capture.maxLuma)}`)
+        .join(", "),
+      nextAction: "Apply UVC controls, remove lens covers, and confirm lighting before judging YOLO.",
+    };
+  }
+  return {
+    id: "frame-quality",
+    label: "Readable camera frames",
+    status: "unknown",
+    detail: "No complete left/right browser frame capture is available.",
+    evidence:
+      result.captures.length === 0
+        ? "captures array is empty"
+        : result.captures.map((capture) => `${capture.label}:${capture.status}`).join(", "),
+  };
+}
+
+function detectionGate(
+  id: string,
+  label: string,
+  maxDetections: number,
+  yoloGate: VerificationGate,
+  cameraGate: VerificationGate,
+  frameGate: VerificationGate,
+): VerificationGate {
+  if (maxDetections > 0) {
+    return {
+      id,
+      label,
+      status: "passed",
+      detail: `Observed ${maxDetections} tennis-ball detection(s) in at least one polled frame.`,
+      evidence: `maxDetections=${maxDetections}`,
+    };
+  }
+
+  const runtimeReadyForDetection =
+    yoloGate.status === "passed" &&
+    cameraGate.status === "passed" &&
+    frameGate.status === "passed";
+  if (runtimeReadyForDetection) {
+    return {
+      id,
+      label,
+      status: "blocked",
+      detail: "The runtime was ready, but no tennis ball was visible to the detector.",
+      evidence: "artifact, camera, and frame-quality gates passed with maxDetections=0",
+      nextAction: "Put a visible tennis ball in both camera views or validate the model against the current lighting.",
+    };
+  }
+
+  return {
+    id,
+    label,
+    status: "unknown",
+    detail: "Detection cannot be judged until the model, cameras, and readable frames are available.",
+    evidence: `yolo=${yoloGate.status}, camera=${cameraGate.status}, frame=${frameGate.status}`,
+  };
+}
+
+function triangulationGate(
+  result: VerificationResult,
+  calibrationGate: VerificationGate,
+  leftDetectionGate: VerificationGate,
+  rightDetectionGate: VerificationGate,
+): VerificationGate {
+  if (result.observation.maxTrailLength >= 1) {
+    return {
+      id: "stereo-triangulation",
+      label: "Stereo triangulated ball point",
+      status: "passed",
+      detail: `Runtime trail reached ${result.observation.maxTrailLength} point(s).`,
+      evidence: `maxTrailLength=${result.observation.maxTrailLength}`,
+    };
+  }
+  if (
+    calibrationGate.status === "passed" &&
+    leftDetectionGate.status === "passed" &&
+    rightDetectionGate.status === "passed"
+  ) {
+    return {
+      id: "stereo-triangulation",
+      label: "Stereo triangulated ball point",
+      status: "failed",
+      detail: "Both YOLO sides detected a ball, but no 3D point was triangulated.",
+      evidence: `maxTrailLength=${result.observation.maxTrailLength}`,
+      nextAction: "Check camera order, rectification quality, and stereo pairing thresholds.",
+    };
+  }
+  return {
+    id: "stereo-triangulation",
+    label: "Stereo triangulated ball point",
+    status: "unknown",
+    detail: "Triangulation is waiting on calibration plus left/right detections.",
+    evidence: `calibration=${calibrationGate.status}, left=${leftDetectionGate.status}, right=${rightDetectionGate.status}`,
+  };
+}
+
+function predictionGate(result: VerificationResult): VerificationGate {
+  if (
+    result.observation.runtimeCodes.includes("prediction-ready") &&
+    result.observation.maxPredictionSamples > 0
+  ) {
+    return {
+      id: "trajectory-prediction",
+      label: "Prediction curve and landing point",
+      status: "passed",
+      detail: `Prediction reached ${result.observation.maxPredictionSamples} sample(s).`,
+      evidence: "runtimeCodes includes prediction-ready",
+    };
+  }
+  if (result.observation.maxTrailLength === 1) {
+    return {
+      id: "trajectory-prediction",
+      label: "Prediction curve and landing point",
+      status: "blocked",
+      detail: "Only one 3D ball point was observed; prediction needs two time-separated points.",
+      evidence: "maxTrailLength=1",
+      nextAction: "Move or throw the ball through both camera views for at least two frames.",
+    };
+  }
+  if (result.observation.maxTrailLength >= 2) {
+    return {
+      id: "trajectory-prediction",
+      label: "Prediction curve and landing point",
+      status: "failed",
+      detail: "Two or more 3D points were observed, but prediction-ready was not reached.",
+      evidence: `maxTrailLength=${result.observation.maxTrailLength}, maxPredictionSamples=${result.observation.maxPredictionSamples}`,
+      nextAction: "Inspect prediction input timing and trajectory solver diagnostics.",
+    };
+  }
+  return {
+    id: "trajectory-prediction",
+    label: "Prediction curve and landing point",
+    status: "unknown",
+    detail: "Prediction is waiting on stereo triangulation.",
+    evidence: `runtimeCodes=${result.observation.runtimeCodes.join(", ") || "none"}`,
+  };
+}
+
+function formatMetric(value: number | undefined): string {
+  return value === undefined ? "unknown" : value.toFixed(2);
 }
 
 function parseArgs(args: string[]): Options {
