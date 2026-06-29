@@ -177,6 +177,38 @@ function verificationResult(options: {
           predictionSampleCount: options.maxPredictionSamples,
           landingPoint: null,
         },
+        readinessGates: [
+          { id: "yolo-artifact", label: "YOLO artifact", state: "ready", detail: "onnx model loaded." },
+          { id: "calibration-artifact", label: "Calibration artifact", state: "ready", detail: "baseline 0.052 m." },
+          { id: "stereo-cameras", label: "Stereo cameras", state: "ready", detail: "2 browser video input(s)." },
+          {
+            id: "left-detection",
+            label: "Left detection",
+            state: options.maxLeftDetections > 0 ? "ready" : "pending",
+            detail: options.maxLeftDetections > 0 ? "1 tennis-ball detection(s)." : "No left tennis ball.",
+          },
+          {
+            id: "right-detection",
+            label: "Right detection",
+            state: options.maxRightDetections > 0 ? "ready" : "pending",
+            detail: options.maxRightDetections > 0 ? "1 tennis-ball detection(s)." : "No right tennis ball.",
+          },
+          {
+            id: "triangulation",
+            label: "Stereo 3D point",
+            state: options.maxTrailLength > 0 ? "ready" : "pending",
+            detail: options.maxTrailLength > 0 ? "3D point available." : "Runtime 3D detail.",
+          },
+          {
+            id: "prediction",
+            label: "Prediction curve",
+            state: options.maxPredictionSamples > 0 ? "ready" : "pending",
+            detail:
+              options.maxPredictionSamples > 0
+                ? `${options.maxPredictionSamples} prediction sample(s).`
+                : "Runtime 3D detail.",
+          },
+        ],
       },
     },
     captures: [

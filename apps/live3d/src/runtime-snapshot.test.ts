@@ -17,7 +17,7 @@ describe("Live3D runtime snapshot", () => {
   test("summarizes loaded artifacts, detections, and runtime 3D state", () => {
     const snapshot = createLive3dRuntimeSnapshot({
       generatedAtUnixMs: 1_777_000_000_000,
-      cameraStatus: pendingCameraStatus(),
+      cameraStatus: readyCameraStatus(),
       detectionStatus: detectionStatus(),
       yoloStatus: loadedYoloStatus(),
       calibrationStatus: loadedCalibrationStatus(),
@@ -34,6 +34,16 @@ describe("Live3D runtime snapshot", () => {
     expect(snapshot.runtime3d.trailLength).toBe(2);
     expect(snapshot.runtime3d.predictionSampleCount).toBe(2);
     expect(snapshot.runtime3d.landingPoint?.surface).toBe("court");
+    expect(snapshot.readinessGates.map((gate) => gate.state)).toEqual([
+      "ready",
+      "ready",
+      "ready",
+      "ready",
+      "ready",
+      "ready",
+      "ready",
+    ]);
+    expect(snapshot.readinessGates.find((gate) => gate.id === "prediction")?.detail).toBe("2 prediction sample(s).");
   });
 
   test("preserves blocked artifact errors for headless diagnostics", () => {
@@ -63,6 +73,27 @@ describe("Live3D runtime snapshot", () => {
     expect(snapshot.calibrationArtifact.errors).toContain("rectification.json missing");
     expect(snapshot.calibrationArtifact.warnings).toContain("verification.json missing");
     expect(snapshot.runtime3d.code).toBe("idle");
+    expect(snapshot.readinessGates.find((gate) => gate.id === "yolo-artifact")?.state).toBe("blocked");
+    expect(snapshot.readinessGates.find((gate) => gate.id === "prediction")?.state).toBe("pending");
+  });
+
+  test("keeps detection and prediction gates pending before visible ball detections", () => {
+    const snapshot = createLive3dRuntimeSnapshot({
+      generatedAtUnixMs: 1_777_000_000_000,
+      cameraStatus: readyCameraStatus(),
+      detectionStatus: {
+        left: { ...detectionStatus().left, detections: [], detectionCount: 0, detail: "No left tennis ball." },
+        right: { ...detectionStatus().right, detections: [], detectionCount: 0, detail: "No right tennis ball." },
+      },
+      yoloStatus: loadedYoloStatus(),
+      calibrationStatus: loadedCalibrationStatus(),
+      runtime3dState: idleRuntime3dState(),
+      yoloLoopActive: true,
+    });
+
+    expect(snapshot.readinessGates.find((gate) => gate.id === "stereo-cameras")?.state).toBe("ready");
+    expect(snapshot.readinessGates.find((gate) => gate.id === "left-detection")?.detail).toBe("No left tennis ball.");
+    expect(snapshot.readinessGates.find((gate) => gate.id === "prediction")?.state).toBe("pending");
   });
 });
 
@@ -87,6 +118,32 @@ function pendingCameraStatus(): StereoCameraRuntimeStatus {
       { deviceId: "left-device", label: "Left USB", kind: "videoinput" },
       { deviceId: "right-device", label: "Right USB", kind: "videoinput" },
     ],
+  };
+}
+
+function readyCameraStatus(): StereoCameraRuntimeStatus {
+  const pending = pendingCameraStatus();
+  return {
+    ...pending,
+    state: "ready",
+    left: {
+      ...pending.left,
+      state: "ready",
+      code: "opened",
+      label: "Left USB camera opened",
+      detail: "Left camera opened.",
+    },
+    right: {
+      ...pending.right,
+      state: "ready",
+      code: "opened",
+      label: "Right USB camera opened",
+      detail: "Right camera opened.",
+    },
+    streams: {
+      left: {} as MediaStream,
+      right: {} as MediaStream,
+    },
   };
 }
 

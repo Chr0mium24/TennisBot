@@ -34,7 +34,11 @@ triangulates a runtime 3D ball point, maintains a runtime trail, and renders a
 runtime prediction/landing once at least two runtime points are available.
 The page also exposes `window.__tennisbotLive3dSnapshot` so automated hardware
 checks can read camera, artifact, detection, and runtime 3D state without
-scraping UI text.
+scraping UI text. The same runtime snapshot now carries readiness gates for
+YOLO artifact, calibration artifact, stereo cameras, left/right detections,
+stereo 3D point, and prediction. The status panel renders those gates directly
+so the operator can see whether the next missing input is software, cameras,
+the visible ball, triangulation, or prediction.
 
 This implements the browser software path. Hardware smoke has opened two real
 USB cameras in Chrome and run the exported ONNX model on browser frames. The

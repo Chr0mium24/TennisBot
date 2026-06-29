@@ -69,6 +69,20 @@ export type Runtime3dSnapshot = {
   landingPoint: LandingPoint | null;
 };
 
+export type RuntimeReadinessGate = {
+  id:
+    | "yolo-artifact"
+    | "calibration-artifact"
+    | "stereo-cameras"
+    | "left-detection"
+    | "right-detection"
+    | "triangulation"
+    | "prediction";
+  label: string;
+  state: "ready" | "pending" | "blocked";
+  detail: string;
+};
+
 export type Live3dRuntimeSnapshot = {
   generatedAtUnixMs: number;
   camera: Live3dCameraRuntimeSnapshot;
@@ -80,6 +94,7 @@ export type Live3dRuntimeSnapshot = {
     right: YoloInferenceSideSnapshot;
   };
   runtime3d: Runtime3dSnapshot;
+  readinessGates: RuntimeReadinessGate[];
 };
 
 export function createLive3dRuntimeSnapshot(options: {
@@ -102,6 +117,101 @@ export function createLive3dRuntimeSnapshot(options: {
       right: yoloInferenceSnapshot(options.detectionStatus.right),
     },
     runtime3d: runtime3dSnapshot(options.runtime3dState),
+    readinessGates: createRuntimeReadinessGates(options),
+  };
+}
+
+export function createRuntimeReadinessGates(options: {
+  cameraStatus: StereoCameraRuntimeStatus;
+  detectionStatus: StereoYoloInferenceRuntimeStatus;
+  yoloStatus: YoloArtifactLoadStatus;
+  calibrationStatus: StereoCalibrationArtifactLoadStatus;
+  runtime3dState: Runtime3dState;
+  yoloLoopActive: boolean;
+}): RuntimeReadinessGate[] {
+  return [
+    {
+      id: "yolo-artifact",
+      label: "YOLO artifact",
+      state: options.yoloStatus.status === "loaded" ? "ready" : "blocked",
+      detail:
+        options.yoloStatus.status === "loaded"
+          ? `${options.yoloStatus.value.selectedModel} model loaded.`
+          : options.yoloStatus.message,
+    },
+    {
+      id: "calibration-artifact",
+      label: "Calibration artifact",
+      state: options.calibrationStatus.status === "loaded" ? "ready" : "blocked",
+      detail:
+        options.calibrationStatus.status === "loaded"
+          ? `baseline ${options.calibrationStatus.value.extrinsics.baselineMeters?.toFixed(3) ?? "unknown"} m.`
+          : options.calibrationStatus.message,
+    },
+    {
+      id: "stereo-cameras",
+      label: "Stereo cameras",
+      state: cameraGateState(options.cameraStatus),
+      detail:
+        options.cameraStatus.state === "ready"
+          ? `${options.cameraStatus.devices.length} browser video input(s).`
+          : `${options.cameraStatus.left.detail} ${options.cameraStatus.right.detail}`,
+    },
+    detectionGate("left-detection", "Left detection", options.detectionStatus.left, options.yoloLoopActive),
+    detectionGate("right-detection", "Right detection", options.detectionStatus.right, options.yoloLoopActive),
+    {
+      id: "triangulation",
+      label: "Stereo 3D point",
+      state:
+        options.runtime3dState.latestPoint !== null
+          ? "ready"
+          : options.runtime3dState.status.code === "triangulation-blocked"
+            ? "blocked"
+            : "pending",
+      detail: options.runtime3dState.latestPoint !== null ? "3D point available." : options.runtime3dState.status.detail,
+    },
+    {
+      id: "prediction",
+      label: "Prediction curve",
+      state:
+        options.runtime3dState.status.code === "prediction-ready"
+          ? "ready"
+          : options.runtime3dState.status.code === "prediction-blocked"
+            ? "blocked"
+            : "pending",
+      detail:
+        options.runtime3dState.status.code === "prediction-ready"
+          ? `${options.runtime3dState.prediction?.samples.length ?? 0} prediction sample(s).`
+          : options.runtime3dState.status.detail,
+    },
+  ];
+}
+
+function cameraGateState(status: StereoCameraRuntimeStatus): RuntimeReadinessGate["state"] {
+  if (status.state === "ready" && status.devices.length >= 2) return "ready";
+  if (status.state === "blocked") return "blocked";
+  return "pending";
+}
+
+function detectionGate(
+  id: "left-detection" | "right-detection",
+  label: string,
+  status: YoloInferenceRuntimeStatus,
+  yoloLoopActive: boolean,
+): RuntimeReadinessGate {
+  if (status.detectionCount > 0) {
+    return {
+      id,
+      label,
+      state: "ready",
+      detail: `${status.detectionCount} tennis-ball detection(s).`,
+    };
+  }
+  return {
+    id,
+    label,
+    state: status.state === "blocked" ? "blocked" : "pending",
+    detail: yoloLoopActive ? status.detail : "YOLO loop is not running.",
   };
 }
 

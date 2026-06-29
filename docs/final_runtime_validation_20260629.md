@@ -63,7 +63,7 @@ bun run build
 bun run verify:hardware -- --prepare-uvc-controls --timeout-ms 20000 --output ../../docs/live3d_hardware_loop_recalibrated_20260629.md
 ```
 
-Result: 44 tests passed, typecheck passed, browser bundle built. The hardware
+Result: 45 tests passed, typecheck passed, browser bundle built. The hardware
 verification command wrote
 `docs/live3d_hardware_loop_recalibrated_20260629.md`; it loaded the refreshed
 calibration baseline `0.05248616443700974`, captured non-black left/right
@@ -72,7 +72,7 @@ The verifier report renderer now also includes a fixed acceptance checklist for
 server, snapshot, artifacts, stereo cameras, frame quality, left/right
 detections, triangulation, and prediction. Unit tests cover the no-ball
 classification as blocked detection gates and the `prediction-ready` success
-case.
+case. Shared runtime readiness gates now cover the browser UI and snapshot.
 
 Dev server smoke:
 
@@ -300,6 +300,10 @@ Result: 13 tests passed. A real runtime YOLO package was written from the
   `window.__tennisbotLive3dSnapshot` and records camera, YOLO, calibration,
   detection, runtime 3D state, frame captures, and frame brightness statistics
   to Markdown.
+- Live3D now publishes and renders runtime readiness gates for YOLO artifact,
+  calibration artifact, stereo cameras, left/right detections, stereo 3D point,
+  and prediction so the browser UI shows the same blocked/pending/ready sequence
+  as the hardware verifier.
 - Live3D now decodes the current ONNX package's `xyxy_pixels` output correctly.
 - The current YOLO model package passed the static detection-quality smoke at
   `confidence_threshold: 0.05` on 109 matched labeled images.

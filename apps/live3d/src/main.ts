@@ -28,6 +28,8 @@ import {
 import {
   createLive3dRuntimeSnapshot,
   type Live3dRuntimeSnapshot,
+  createRuntimeReadinessGates,
+  type RuntimeReadinessGate,
 } from "./runtime-snapshot";
 import {
   createBlockedYoloInferenceBackend,
@@ -254,6 +256,16 @@ function renderStatusPanel(
           <strong>${defaultLive3dConfig.artifacts.stereoCalibrationPackagePath}</strong>
         </div>
       </div>
+      ${renderReadinessGates(
+        createRuntimeReadinessGates({
+          cameraStatus,
+          detectionStatus,
+          yoloStatus,
+          calibrationStatus,
+          runtime3dState,
+          yoloLoopActive,
+        }),
+      )}
       ${renderCameraControls(cameraStatus)}
       <section class="camera-status" aria-label="Camera runtime status">
         ${renderCameraRuntimeStatus(cameraStatus.left)}
@@ -285,6 +297,26 @@ function renderStatusPanel(
           .join("")}
       </ol>
     </aside>
+  `;
+}
+
+function renderReadinessGates(gates: RuntimeReadinessGate[]): string {
+  return `
+    <section class="readiness-gates" aria-label="Runtime readiness gates">
+      ${gates
+        .map(
+          (gate) => `
+            <article class="readiness-gate gate-${gate.state}">
+              <span></span>
+              <div>
+                <strong>${escapeHtml(gate.label)}</strong>
+                <p>${escapeHtml(gate.detail)}</p>
+              </div>
+            </article>
+          `,
+        )
+        .join("")}
+    </section>
   `;
 }
 
