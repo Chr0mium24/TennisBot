@@ -1,0 +1,10 @@
+{
+  "task": "single-class tennis ball detection",
+  "box_format": "xyxy_pixels",
+  "source_box_format": "YOLO normalized xywh",
+  "class_id": 0,
+  "confidence_threshold": 0.05,
+  "nms_iou_threshold": 0.5,
+  "max_detections": 10,
+  "runtime_output": "detections"
+}

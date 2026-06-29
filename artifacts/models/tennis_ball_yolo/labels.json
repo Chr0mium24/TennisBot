@@ -1,0 +1,9 @@
+{
+  "classes": [
+    {
+      "id": 0,
+      "name": "tennis_ball"
+    }
+  ],
+  "format": "YOLO detect normalized xywh"
+}

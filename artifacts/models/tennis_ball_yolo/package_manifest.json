@@ -1,0 +1,50 @@
+{
+  "created_at": "2026-06-28T20:57:00Z",
+  "files": [
+    {
+      "path": "eval_metrics.json",
+      "bytes": 678,
+      "sha256": "4632025ab49db4e9b463e46ed8395c201fa8bb6d2fbbbeca905840f38b2a0cee"
+    },
+    {
+      "path": "eval_report.md",
+      "bytes": 325,
+      "sha256": "3e13534db7869694cafff226c50680e3b2151dfe1be4a119a299ef3877f100d0"
+    },
+    {
+      "path": "labels.json",
+      "bytes": 121,
+      "sha256": "fe350052e51638424e7da60bbe36ab34f4b256543d491ba08b93905315c56885"
+    },
+    {
+      "path": "metadata.json",
+      "bytes": 926,
+      "sha256": "151566073ecd3a4033e306a6675e1bc6f5e4f3974064e9f4de25dff85c4cc521"
+    },
+    {
+      "path": "model.onnx",
+      "bytes": 10261007,
+      "sha256": "09457637e8a646804309a2d0a2f624c92c67e887ca0821757779e0eb29e50d55"
+    },
+    {
+      "path": "model.pt",
+      "bytes": 5450181,
+      "sha256": "8ab607acfc77e6a868a50f26221e621988c3c0597c6667719f708dd0e6f6bbd1"
+    },
+    {
+      "path": "package.json",
+      "bytes": 926,
+      "sha256": "151566073ecd3a4033e306a6675e1bc6f5e4f3974064e9f4de25dff85c4cc521"
+    },
+    {
+      "path": "postprocessing.json",
+      "bytes": 264,
+      "sha256": "1a462acf7cf53c092ffb62439d5edfbef1ceb343697f14bb7bb612379c7fb18f"
+    },
+    {
+      "path": "preprocessing.json",
+      "bytes": 348,
+      "sha256": "e0121b8c82c916aeddea07d9bc50a5d821aa72c79e2939aa3808703d8afb2c2e"
+    }
+  ]
+}

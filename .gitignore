@@ -9,5 +9,9 @@ dist/
 build/
 install/
 log/
-artifacts/
+artifacts/*
+!artifacts/models/
+artifacts/models/*
+!artifacts/models/tennis_ball_yolo/
+!artifacts/models/tennis_ball_yolo/**
 desperate/

@@ -1,0 +1,29 @@
+{
+  "dataset": {
+    "cameras": {
+      "cam1": 109,
+      "cam2": 0
+    },
+    "labels": 109,
+    "negatives": 0,
+    "positives": 109
+  },
+  "dry_run": false,
+  "inference_ready": true,
+  "model": {
+    "map50": null,
+    "map50_95": null,
+    "precision": null,
+    "recall": null
+  },
+  "static_smoke": {
+    "confidence_threshold": 0.05,
+    "detected_at_threshold": 109,
+    "detection_rate_at_threshold": 1.0,
+    "image_count": 109,
+    "max_confidence": 0.9584278464317322,
+    "min_confidence": 0.06655905395746231,
+    "model": "artifacts/model_candidates/finetune_indoor_cam1/best.pt",
+    "source": "TennisBallDetectorLab/yolo/dataset matched labeled images"
+  }
+}

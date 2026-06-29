@@ -124,6 +124,8 @@ uv run tennisbot-yolo package verify
 
 - 模型包：`artifacts/models/tennis_ball_yolo`
 
+这个默认模型包已纳入 Git 跟踪，拉取仓库后应直接存在。
+
 创建 dry-run 模型包：
 
 ```bash
