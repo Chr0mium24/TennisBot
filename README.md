@@ -136,6 +136,7 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 - [Calibration stereo solve](docs/calibration_stereo_solve_20260629.md)
 - [Calibration stereo solve capture quality](docs/calibration_stereo_solve_capture_quality_20260629.md)
 - [Calibration stereo solve ChArUco detection](docs/calibration_charuco_detection_stereo_solve_20260629.md)
+- [Tool boundary audit](docs/tool_boundary_audit_20260629.md)
 - [Legacy board/runtime shell retirement](docs/legacy_board_retirement_20260629.md)
 - [Live3D hardware smoke](docs/live3d_hardware_smoke_20260629.md)
 - [YOLO static sample validation](docs/yolo_static_sample_validation_20260629.md)
