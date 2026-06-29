@@ -92,6 +92,7 @@ const state: AppState = {
   targetPrintCheckOptions: {
     measuredSquareMm: 15,
     toleranceMm: 0.2,
+    targetMetadata: "../../artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.json",
     output: "../../artifacts/calibration_targets/dfoptix_charuco_15mm_print_check.json",
     outputReport: "../../docs/calibration_target_print_check_YYYYMMDD.md",
   },
@@ -272,6 +273,7 @@ function renderTargetPanel(targetSheet: JsonObject | undefined, targetPrintCheck
         <div class="form-grid">
           ${targetPrintCheckNumberField("measuredSquareMm", "Measured square mm", state.targetPrintCheckOptions.measuredSquareMm)}
           ${targetPrintCheckNumberField("toleranceMm", "Tolerance mm", state.targetPrintCheckOptions.toleranceMm)}
+          ${targetPrintCheckField("targetMetadata", "Target metadata", state.targetPrintCheckOptions.targetMetadata)}
           ${targetPrintCheckField("output", "Output", state.targetPrintCheckOptions.output)}
           ${targetPrintCheckField("outputReport", "Report", state.targetPrintCheckOptions.outputReport)}
         </div>
@@ -638,6 +640,7 @@ function wireEvents(): void {
     input.addEventListener("input", () => {
       const key = input.dataset.targetField as keyof TargetCommandOptions;
       (state.targetOptions[key] as string | number) = input.type === "number" ? Number(input.value) : input.value;
+      if (key === "output") state.targetPrintCheckOptions.targetMetadata = metadataPathForTargetOutput(input.value);
       render();
     });
   });
@@ -778,6 +781,13 @@ function updateSessionPaths(session: string): void {
   state.sessionPath = session;
   state.observationsPath = `${session}/observations.json`;
   state.solveOptions.observations = state.observationsPath;
+}
+
+function metadataPathForTargetOutput(output: string): string {
+  const slashIndex = Math.max(output.lastIndexOf("/"), output.lastIndexOf("\\"));
+  const dotIndex = output.lastIndexOf(".");
+  if (dotIndex <= slashIndex) return `${output}.json`;
+  return `${output.slice(0, dotIndex)}.json`;
 }
 
 async function runCalibrationCommand(id: CommandId): Promise<void> {

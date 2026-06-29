@@ -74,6 +74,7 @@ export type TargetCommandOptions = {
 export type TargetPrintCheckCommandOptions = {
   measuredSquareMm: number;
   toleranceMm: number;
+  targetMetadata: string;
   output: string;
   outputReport: string;
 };
@@ -185,6 +186,7 @@ export function buildTargetPrintCheckCommand(options: TargetPrintCheckCommandOpt
     "uv run tennisbot-calibration target record-print-check",
     `--measured-square-mm ${options.measuredSquareMm}`,
     `--tolerance-mm ${options.toleranceMm}`,
+    `--target-metadata ${quote(options.targetMetadata)}`,
     `--output ${quote(options.output)}`,
     `--output-report ${quote(options.outputReport)}`,
   ]);

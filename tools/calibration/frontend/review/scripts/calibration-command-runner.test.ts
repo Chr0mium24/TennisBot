@@ -146,6 +146,7 @@ describe("calibration command runner", () => {
           "uv run tennisbot-calibration target record-print-check",
           "--measured-square-mm 15.0",
           "--tolerance-mm 0.2",
+          "--target-metadata ../../artifacts/calibration_targets/target.json",
           "--output ../../artifacts/calibration_targets/print_check.json",
           "--output-report ../../docs/calibration_target_print_check.md",
         ].join(" "),

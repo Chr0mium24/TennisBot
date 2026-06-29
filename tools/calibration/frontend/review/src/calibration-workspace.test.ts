@@ -79,10 +79,11 @@ describe("calibration review workspace", () => {
       buildTargetPrintCheckCommand({
         measuredSquareMm: 15.05,
         toleranceMm: 0.2,
+        targetMetadata: "../../artifacts/calibration_targets/target.json",
         output: "../../artifacts/calibration_targets/print_check.json",
         outputReport: "../../docs/calibration_target_print_check.md",
       }),
-    ).toContain("target record-print-check");
+    ).toContain("--target-metadata ../../artifacts/calibration_targets/target.json");
     expect(
       buildCaptureCommand({
         topology: "stereo",
