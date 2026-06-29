@@ -5,6 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from .detect_gui import add_detect_gui_parser
 from .package import PackageVerificationError, create_model_package, verify_model_package
 
 
@@ -77,6 +78,8 @@ def build_parser() -> argparse.ArgumentParser:
     annotate.add_argument("--host", default="127.0.0.1")
     annotate.add_argument("--port", type=int, default=8765)
     annotate.set_defaults(func=cmd_annotate)
+
+    add_detect_gui_parser(subparsers)
 
     package = subparsers.add_parser("package", help="Create and verify runtime model packages.")
     package_subparsers = package.add_subparsers(dest="package_command", required=True)

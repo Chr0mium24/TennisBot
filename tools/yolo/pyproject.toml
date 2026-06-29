@@ -10,6 +10,13 @@ dependencies = [
     "uvicorn>=0.34.0",
 ]
 
+[project.optional-dependencies]
+detect = [
+    "numpy>=2.0.0",
+    "opencv-python>=4.13.0.92",
+    "ultralytics>=8.4.46",
+]
+
 [project.scripts]
 tennisbot-yolo = "tennisbot_yolo.cli:main"
 pytest = "tennisbot_yolo.pytest_main:main"

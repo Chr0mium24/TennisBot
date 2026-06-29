@@ -57,6 +57,27 @@ uv run tennisbot-yolo package verify \
   --path ../../artifacts/models/tennis_ball_yolo
 ```
 
+## Pure YOLO Detection GUI
+
+Run a local OpenCV preview that opens USB cameras, runs YOLO, and draws
+detection boxes only. It does not load calibration, triangulate, or predict.
+
+```bash
+cd tools/yolo
+uv run --extra detect tennisbot-yolo detect-gui \
+  --devices /dev/video0,/dev/video2 \
+  --width 3840 \
+  --height 2160 \
+  --fourcc MJPG \
+  --model ../../artifacts/models/tennis_ball_yolo/model.pt \
+  --tile \
+  --imgsz 1280 \
+  --display-width 720
+```
+
+Use `q` or `Esc` to exit. `--tile` keeps the detector useful for small balls in
+4K frames while the GUI still shows a downscaled preview.
+
 ## Current To Target Command Map
 
 Run current legacy commands from `desperate/TennisBallDetectorLab/` when that

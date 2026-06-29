@@ -32,12 +32,32 @@ def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
 def test_cli_help_exposes_package_create_and_verify() -> None:
     help_result = run_cli("--help")
     package_help = run_cli("package", "--help")
+    detect_help = run_cli("detect-gui", "--help")
 
     assert help_result.returncode == 0
     assert "package" in help_result.stdout
+    assert "detect-gui" in help_result.stdout
     assert package_help.returncode == 0
     assert "create" in package_help.stdout
     assert "verify" in package_help.stdout
+    assert detect_help.returncode == 0
+    assert "--devices" in detect_help.stdout
+
+
+def test_detect_gui_dry_run_does_not_require_camera_or_detector_dependencies(tmp_path: Path) -> None:
+    model = tmp_path / "model.pt"
+    result = run_cli(
+        "detect-gui",
+        "--dry-run",
+        "--devices",
+        "/dev/video0,/dev/video2",
+        "--model",
+        str(model),
+    )
+
+    assert result.returncode == 0
+    assert "detect_gui=dry-run" in result.stdout
+    assert "devices=/dev/video0,/dev/video2" in result.stdout
 
 
 def test_dry_run_package_writes_required_files_and_marks_non_inference(tmp_path: Path) -> None:
