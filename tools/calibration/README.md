@@ -3,9 +3,9 @@
 Date: 2026-06-28
 
 `tools/calibration` is the future home for TennisBot camera calibration tooling.
-Wave 1 is documentation and artifact contracts only. The existing
-`CameraCalibLab` project remains the working implementation and must not be
-moved or edited in this branch.
+Wave 1 is documentation and artifact contracts only. The legacy
+`CameraCalibLab` code remains local-only reference material under
+`desperate/CameraCalibLab` when present.
 
 ## Boundary
 
@@ -41,13 +41,13 @@ tools/calibration/
 
 `configs/`, `src/`, and `tests/` are planned migration targets. Frontend review
 UI work has been reverted; local calibration capture should use the original
-OpenCV GUI in `CameraCalibLab`.
+OpenCV GUI in `desperate/CameraCalibLab`.
 
 ## Current Command Mapping
 
-Current commands are run from `CameraCalibLab` with `uv`. Target commands should
-keep equivalent behavior after the later migration, but the exact package entry
-point may change.
+Legacy commands, when needed on this machine, are run from
+`desperate/CameraCalibLab` with `uv`. Target commands should keep equivalent
+behavior after migration, but the exact package entry point may change.
 
 | Current `CameraCalibLab` command | Target `tools/calibration` responsibility |
 | --- | --- |
@@ -179,7 +179,7 @@ CameraCalibLab internals:
 ```bash
 cd tools/calibration
 uv run tennisbot-calibration package import-scanned-camera-calib-lab \
-  --root ../../CameraCalibLab/runs/calibrations \
+  --root ../../desperate/CameraCalibLab/runs/calibrations \
   --cam1-pattern dfoptix_charuco_auto_combined_rational_20260620_top_right_eps1e7 \
   --cam2-pattern dfoptix_charuco_auto_cam2 \
   --output ../../artifacts/calibration/stereo_cam1_cam2 \
@@ -206,7 +206,7 @@ Use the original `CameraCalibLab` OpenCV GUI for local mono/stereo calibration
 capture:
 
 ```bash
-cd ../../CameraCalibLab
+cd ../../desperate/CameraCalibLab
 uv run camera-calib-lab capture stereo-charuco-auto-gui \
   --config configs/dfoptix_charuco_15mm_capture.yaml \
   --output captures/local/dfoptix_stereo_charuco_auto_session \

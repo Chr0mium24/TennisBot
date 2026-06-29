@@ -78,7 +78,7 @@ if (physicalStatus === undefined) {
   console.log(`Physical validation next action: ${physicalStatus.next_action}`);
 }
 console.log("");
-console.log("Use CameraCalibLab OpenCV GUI for local stereo calibration capture.");
+console.log("Use desperate/CameraCalibLab OpenCV GUI for local stereo calibration capture when the local archive is present.");
 console.log("Use Live3D after calibration and put a visible tennis ball in both camera views.");
 
 const childProcesses = started.flatMap((item) => (item.process === undefined ? [] : [item.process]));
@@ -224,7 +224,7 @@ Options:
   --no-build  Start missing services without running frontend builds first.
 
 Normal startup also prints the current physical validation next action. Run the
-original calibration GUI from CameraCalibLab with:
+original calibration GUI from desperate/CameraCalibLab with:
   uv run camera-calib-lab capture stereo-charuco-auto-gui
 `);
 }

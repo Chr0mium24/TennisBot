@@ -138,7 +138,7 @@ function monoPackageCheck(cameraId: string, path: string): GateResult {
       status: "blocked",
       detail: `${cameraId} mono package is missing.`,
       evidence: displayPath(path),
-      next: `Use CameraCalibLab OpenCV capture for ${cameraId}, then solve and verify the mono package.`,
+      next: `Use desperate/CameraCalibLab OpenCV capture for ${cameraId} when the local archive is present, then solve and verify the mono package.`,
     };
   }
   const quality = objectField(payload, "quality");
@@ -185,7 +185,7 @@ function stereoPackageCheck(path: string, monoPrerequisites: GateResult[]): Gate
       status: "blocked",
       detail: "stereo package is missing.",
       evidence: displayPath(path),
-      next: "Use CameraCalibLab OpenCV stereo capture after cam1 and cam2 mono packages are accepted.",
+      next: "Use desperate/CameraCalibLab OpenCV stereo capture after cam1 and cam2 mono packages are accepted when the local archive is present.",
     };
   }
   const quality = objectField(payload, "quality");

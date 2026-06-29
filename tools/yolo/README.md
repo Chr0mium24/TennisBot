@@ -6,8 +6,8 @@ Date: 2026-06-28
 annotation, dataset validation, training, evaluation, model export, and model
 package publication. In Wave 6 this directory owns the standalone runtime
 model package creation and verification surface. The remaining training,
-annotation, and dataset workflows still live in `TennisBallDetectorLab` until a
-later migration wave.
+annotation, and dataset workflows still live in the local-only
+`desperate/TennisBallDetectorLab` archive until a later migration wave.
 
 The live runtime must consume exported model packages from `artifacts/models/`.
 It must not import training, annotation, dataset, or export internals from this
@@ -59,8 +59,9 @@ uv run tennisbot-yolo package verify \
 
 ## Current To Target Command Map
 
-Run current commands from `TennisBallDetectorLab/`. Target commands are the
-intended post-migration shape from the TennisBot repository root.
+Run current legacy commands from `desperate/TennisBallDetectorLab/` when that
+local archive is present. Target commands are the intended post-migration shape
+from the TennisBot repository root.
 
 | Workflow | Current command | Target command |
 | --- | --- | --- |
@@ -141,6 +142,6 @@ artifacts/models/tennis_ball_yolo/
 ## Migration Checklist
 
 Use [`MIGRATION_CHECKLIST.md`](MIGRATION_CHECKLIST.md) for the later
-`TennisBallDetectorLab` move. The checklist is intentionally separate from this
-Wave 1 boundary branch because the current lab has user-owned dirty dataset
-changes.
+`TennisBallDetectorLab` migration. The checklist is intentionally separate
+because the legacy lab archive is local-only and ignored by the parent
+repository.

@@ -3,9 +3,9 @@
 Local-machine-first workspace for the TennisBot stereo vision runtime.
 
 The active architecture now lives in top-level `apps/`, `packages/`, and
-`tools/`. Legacy lab directories are reference submodules only where they still
-feed migration work; the live runtime consumes only exported artifacts from
-`artifacts/`.
+`tools/`. Legacy lab code is local-only reference material under ignored
+`desperate/` when present; the live runtime consumes only exported artifacts
+from `artifacts/`.
 
 ## Projects
 
@@ -17,7 +17,7 @@ feed migration work; the live runtime consumes only exported artifacts from
 | `tools/calibration` | Standalone mono/stereo calibration package tooling |
 | `tools/yolo` | Standalone YOLO runtime model package tooling |
 | `artifacts/` | Ignored local runtime outputs for calibration and model packages |
-| Legacy submodules | `CameraCalibLab`, `TennisBallDetectorLab`, `BallTrajectoryLab`, and `TennisWebSim` are reference/history only for migration work |
+| `desperate/` | Ignored local-only archive for legacy lab code, not part of the parent Git repository |
 
 ## Common Commands
 
@@ -72,7 +72,7 @@ bun run build
 Run the original OpenCV stereo calibration GUI:
 
 ```bash
-cd CameraCalibLab
+cd desperate/CameraCalibLab
 uv run camera-calib-lab capture stereo-charuco-auto-gui \
   --config configs/dfoptix_charuco_15mm_capture.yaml \
   --output captures/local/dfoptix_stereo_charuco_auto_session \
@@ -130,7 +130,7 @@ Import existing CameraCalibLab calibration into runtime artifacts:
 ```bash
 cd tools/calibration
 uv run tennisbot-calibration package import-scanned-camera-calib-lab \
-  --root ../../CameraCalibLab/runs/calibrations \
+  --root ../../desperate/CameraCalibLab/runs/calibrations \
   --cam1-pattern dfoptix_charuco_auto_combined_rational_20260620_top_right_eps1e7 \
   --cam2-pattern dfoptix_charuco_auto_cam2 \
   --output ../../artifacts/calibration/stereo_cam1_cam2 \
@@ -167,6 +167,7 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 
 - [Current architecture](docs/current_architecture_20260629.md)
 - [Current status](docs/current_status_20260629.md)
+- [Desperate legacy code retirement](docs/desperate_legacy_code_retirement_20260629.md)
 - [Local physical validation checklist](docs/local_physical_validation_checklist_20260629.md)
 - [Local physical validation status script](docs/local_physical_validation_status_script_20260629.md)
 - [Target print check recorder](docs/target_print_check_recorder_20260629.md)
@@ -235,19 +236,12 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 For active code in `apps/`, `packages/`, `tools/`, and `docs/`, commit directly
 in this repository.
 
-Legacy submodule edits are out of scope for the current runtime path. If a
-legacy submodule must be changed, commit inside that submodule first, then
-commit the updated gitlink from the top-level repository.
-
-```bash
-git -C <legacy-submodule> status
-git -C <legacy-submodule> commit -am "..."
-git add <legacy-submodule>
-git commit -m "Update legacy submodule pointer"
-```
+Legacy lab code under `desperate/` is ignored local reference material. Do not
+commit it from the parent repository; migrate needed behavior into `apps/`,
+`packages/`, or `tools/` with focused tests and documentation.
 
 ## Remote Status
 
-The remaining historical submodules use GitHub remotes under `Chr0mium24`.
-`TennisBotCV` was removed from the main repo because the current runtime path
-does not depend on board-side deployment code.
+The parent repository no longer tracks submodules. Local legacy code under
+`desperate/` may still have historical upstream origins, but that code is
+ignored and outside the active runtime path.

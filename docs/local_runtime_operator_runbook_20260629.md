@@ -69,9 +69,9 @@ Use the CLI and the original OpenCV GUI in order:
 1. `cd tools/calibration && uv run tennisbot-calibration target charuco ...`
    to generate the target, then print the SVG at 100% scale and confirm one
    printed square measures 15 mm.
-2. `cd CameraCalibLab && uv run camera-calib-lab capture charuco-auto-gui ...`
+2. `cd desperate/CameraCalibLab && uv run camera-calib-lab capture charuco-auto-gui ...`
    for each mono camera capture.
-3. `cd CameraCalibLab && uv run camera-calib-lab capture stereo-charuco-auto-gui ...`
+3. `cd desperate/CameraCalibLab && uv run camera-calib-lab capture stereo-charuco-auto-gui ...`
    for stereo capture.
 4. Use `tools/calibration` CLI commands to inspect, detect, solve, and verify
    the resulting runtime packages.

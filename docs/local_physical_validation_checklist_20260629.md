@@ -64,7 +64,7 @@ Use the original OpenCV GUI to capture Cam1 mono frames, then run the CLI
 inspection, detection, solve, and package verification steps:
 
 ```bash
-cd CameraCalibLab
+cd desperate/CameraCalibLab
 uv run camera-calib-lab capture charuco-auto-gui \
   --config configs/dfoptix_charuco_15mm_capture.yaml \
   --output captures/local/dfoptix_charuco_cam1_session \
@@ -114,7 +114,7 @@ If this fails, recapture Cam2 before attempting stereo solve.
 Use the original OpenCV stereo capture GUI:
 
 ```bash
-cd CameraCalibLab
+cd desperate/CameraCalibLab
 uv run camera-calib-lab capture stereo-charuco-auto-gui \
   --config configs/dfoptix_charuco_15mm_capture.yaml \
   --output captures/local/dfoptix_stereo_charuco_auto_session \

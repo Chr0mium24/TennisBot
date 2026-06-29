@@ -5,8 +5,9 @@ Date: 2026-06-29
 ## Current Shape
 
 TennisBot is now a local-machine-first workspace. The active runtime code lives
-in top-level `apps/`, `packages/`, and `tools/`; older lab directories remain
-as legacy/reference submodules and are not the runtime boundary.
+in top-level `apps/`, `packages/`, and `tools/`; older lab code is local-only
+reference material under ignored `desperate/` when present and is not the
+runtime boundary.
 
 ```text
 TennisBot/
@@ -28,19 +29,19 @@ TennisBot/
   docs/              plans, results, reviews, runbooks
 ```
 
-Legacy/reference submodules still present:
+Ignored local legacy archive when present:
 
 ```text
-CameraCalibLab/
-TennisBallDetectorLab/
-BallTrajectoryLab/
-TennisWebSim/
+desperate/CameraCalibLab/
+desperate/TennisBallDetectorLab/
+desperate/BallTrajectoryLab/
+desperate/TennisWebSim/
 ```
 
-They are not used as the main runtime architecture. `TennisBallDetectorLab`
-currently has user-owned dirty state and remains untouched. The old
-`TennisBotCV` integration/board-runtime shell was retired from the main
-repository on 2026-06-29; see `docs/legacy_board_retirement_20260629.md`.
+They are not tracked by the parent repository and are not used as the main
+runtime architecture. The old `TennisBotCV` integration/board-runtime shell was
+retired from the main repository on 2026-06-29; see
+`docs/legacy_board_retirement_20260629.md`.
 
 ## Boundaries
 
@@ -187,7 +188,7 @@ Import existing CameraCalibLab calibration:
 ```bash
 cd tools/calibration
 uv run tennisbot-calibration package import-scanned-camera-calib-lab \
-  --root ../../CameraCalibLab/runs/calibrations \
+  --root ../../desperate/CameraCalibLab/runs/calibrations \
   --cam1-pattern dfoptix_charuco_auto_combined_rational_20260620_top_right_eps1e7 \
   --cam2-pattern dfoptix_charuco_auto_cam2 \
   --output ../../artifacts/calibration/stereo_cam1_cam2 \
@@ -230,7 +231,7 @@ cd packages/core && bun test && bun run typecheck
 Run the original OpenCV stereo calibration GUI:
 
 ```bash
-cd CameraCalibLab
+cd desperate/CameraCalibLab
 uv run camera-calib-lab capture stereo-charuco-auto-gui \
   --config configs/dfoptix_charuco_15mm_capture.yaml \
   --output captures/local/dfoptix_stereo_charuco_auto_session \
