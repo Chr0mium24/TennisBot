@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 type CheckStatus = "passed" | "failed";
@@ -132,24 +132,44 @@ function displayPath(path: string): string {
 }
 
 async function cameraDeviceCheck(): Promise<CheckResult> {
-  const detected = await runCommand(["bun", "scripts/detect-camera-devices.ts", "--json"], { cwd: repoRoot });
-  let captureCount = 0;
-  try {
-    const payload = JSON.parse(detected.stdout) as { devices?: unknown };
-    captureCount = Array.isArray(payload.devices) ? payload.devices.length : 0;
-  } catch {
-    captureCount = 0;
+  const devices = listVideoDevicePaths();
+  const captureDevices: string[] = [];
+  const evidence: string[] = [];
+  for (const device of devices) {
+    const result = await runCommand(["v4l2-ctl", "-D", "-d", device], { cwd: repoRoot });
+    const isCapture = result.exitCode === 0 && result.stdout.includes("Video Capture");
+    const bus = valueAfterColon(result.stdout, "Bus info") ?? "unknown";
+    const isUsb = bus.toLowerCase().includes("usb");
+    if (isCapture && isUsb) captureDevices.push(device);
+    evidence.push(`${device}: ${isCapture ? "capture" : "not-capture"}, bus=${bus}`);
   }
-  const passed = detected.exitCode === 0 && captureCount >= 2;
+  const passed = captureDevices.length >= 2;
   return {
     id: "usb-cameras",
     label: "USB camera devices",
     status: passed ? "passed" : "failed",
     detail: passed
-      ? `${captureCount} V4L2 capture devices detected.`
-      : "Fewer than two V4L2 capture devices were detected.",
-    evidence: compactCommandEvidence(detected),
+      ? `${captureDevices.length} USB V4L2 capture devices detected.`
+      : "Fewer than two USB V4L2 capture devices were detected.",
+    evidence: evidence.length === 0 ? "No /dev/video* devices found." : evidence.join("\n"),
   };
+}
+
+function listVideoDevicePaths(): string[] {
+  if (!existsSync("/dev")) return [];
+  return readdirSync("/dev")
+    .filter((name) => /^video\d+$/u.test(name))
+    .map((name) => `/dev/${name}`)
+    .sort((left, right) => Number(left.replace("/dev/video", "")) - Number(right.replace("/dev/video", "")));
+}
+
+function valueAfterColon(text: string, label: string): string | undefined {
+  const line = text.split("\n").find((item) => item.includes(label));
+  if (line === undefined) return undefined;
+  const index = line.indexOf(":");
+  if (index < 0) return undefined;
+  const value = line.slice(index + 1).trim();
+  return value === "" ? undefined : value;
 }
 
 async function runCommand(command: string[], options: { cwd: string }): Promise<CommandResult> {
@@ -238,6 +258,6 @@ Checks local TennisBot operator readiness:
 - Live3D URL at http://127.0.0.1:5178/
 - YOLO runtime package verification
 - Stereo calibration package verification
-- At least two V4L2 capture devices
+- At least two USB V4L2 capture devices
 `);
 }
