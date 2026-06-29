@@ -4,7 +4,11 @@ version = "0.1.0"
 description = "Standalone TennisBot YOLO runtime package tooling."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "fastapi>=0.115.0",
+    "pydantic>=2.0.0",
+    "uvicorn>=0.34.0",
+]
 
 [project.scripts]
 tennisbot-yolo = "tennisbot_yolo.cli:main"
