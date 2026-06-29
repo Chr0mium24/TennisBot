@@ -1,6 +1,6 @@
 # Local Physical Validation Status
 
-- created_at: 2026-06-29T04:09:34.613Z
+- created_at: 2026-06-29T04:11:20.996Z
 - result: incomplete
 
 ## Gates
@@ -9,7 +9,7 @@
 - blocked: Printed target measurement - no recorded 15.0 mm print measurement was found.
 - blocked: cam1 mono calibration - cam1 mono package is accepted but not hardware validated.
 - blocked: cam2 mono calibration - cam2 mono package is accepted but not hardware validated.
-- passed: Stereo calibration - stereo package is hardware validated.
+- blocked: Stereo calibration - stereo package is hardware validated, but mono prerequisites are incomplete.
 - blocked: Live3D prediction-ready hardware run - no Live3D hardware report has reached prediction-ready.
 
 ## Details
@@ -79,12 +79,25 @@ artifacts/calibration_targets/dfoptix_charuco_15mm_print_check.json
 
 ### Stereo calibration
 
-- status: passed
-- detail: stereo package is hardware validated.
+- status: blocked
+- detail: stereo package is hardware validated, but mono prerequisites are incomplete.
+- next: Complete real cam1 and cam2 mono calibration before accepting the stereo gate.
 
 ```text
 {
   "path": "artifacts/calibration/stereo_cam1_cam2/package.json",
+  "mono_prerequisites": [
+    {
+      "id": "cam1-mono",
+      "status": "blocked",
+      "detail": "cam1 mono package is accepted but not hardware validated."
+    },
+    {
+      "id": "cam2-mono",
+      "status": "blocked",
+      "detail": "cam2 mono package is accepted but not hardware validated."
+    }
+  ],
   "accepted": true,
   "dry_run": false,
   "hardware_validated": true,

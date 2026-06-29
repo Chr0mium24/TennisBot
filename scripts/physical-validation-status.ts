@@ -38,7 +38,7 @@ function runValidationStatus(): GateResult[] {
   const targetPrint = targetPrintCheck();
   const cam1 = monoPackageCheck("cam1", resolve(repoRoot, "artifacts/calibration/cam1/package.json"));
   const cam2 = monoPackageCheck("cam2", resolve(repoRoot, "artifacts/calibration/cam2/package.json"));
-  const stereo = stereoPackageCheck(resolve(repoRoot, "artifacts/calibration/stereo_cam1_cam2/package.json"));
+  const stereo = stereoPackageCheck(resolve(repoRoot, "artifacts/calibration/stereo_cam1_cam2/package.json"), [cam1, cam2]);
   const live3d = live3dPredictionCheck();
   return [targetMetadata, targetPrint, cam1, cam2, stereo, live3d];
 }
@@ -147,7 +147,8 @@ function monoPackageCheck(cameraId: string, path: string): GateResult {
   };
 }
 
-function stereoPackageCheck(path: string): GateResult {
+function stereoPackageCheck(path: string, monoPrerequisites: GateResult[]): GateResult {
+  const monoPrerequisitesPassed = monoPrerequisites.every((gate) => gate.status === "passed");
   const payload = readJson(path);
   if (payload === undefined) {
     return {
@@ -163,7 +164,7 @@ function stereoPackageCheck(path: string): GateResult {
   const rms = numberField(quality, "stereo_rms_reprojection_px");
   const pairCount = numberField(quality, "accepted_pair_count");
   const baseline = numberField(quality, "baseline_m") ?? stereoBaselineFromFile();
-  const passed =
+  const packagePassed =
     payload.schema_version === "calibration.stereo.v1" &&
     payload.accepted === true &&
     payload.dry_run === false &&
@@ -174,18 +175,26 @@ function stereoPackageCheck(path: string): GateResult {
     pairCount >= 12 &&
     baseline !== undefined &&
     baseline > 0;
+  const passed = packagePassed && monoPrerequisitesPassed;
   const blocked = payload.accepted === true && (payload.dry_run === true || payload.hardware_validated !== true);
   return {
     id: "stereo",
     label: "Stereo calibration",
-    status: passed ? "passed" : blocked ? "blocked" : "failed",
+    status: passed ? "passed" : !monoPrerequisitesPassed || blocked ? "blocked" : "failed",
     detail: passed
       ? "stereo package is hardware validated."
-      : blocked
+      : packagePassed && !monoPrerequisitesPassed
+        ? "stereo package is hardware validated, but mono prerequisites are incomplete."
+        : blocked
         ? "stereo package is accepted but not hardware validated."
         : "stereo package does not satisfy the physical validation gate.",
     evidence: compactJson({
       path: displayPath(path),
+      mono_prerequisites: monoPrerequisites.map((gate) => ({
+        id: gate.id,
+        status: gate.status,
+        detail: gate.detail,
+      })),
       accepted: payload.accepted,
       dry_run: payload.dry_run,
       hardware_validated: payload.hardware_validated,
@@ -193,7 +202,11 @@ function stereoPackageCheck(path: string): GateResult {
       stereo_rms_reprojection_px: rms,
       baseline_m: baseline,
     }),
-    next: passed ? undefined : "Capture real stereo ChArUco pairs, solve stereo, and verify the package.",
+    next: passed
+      ? undefined
+      : !monoPrerequisitesPassed
+        ? "Complete real cam1 and cam2 mono calibration before accepting the stereo gate."
+        : "Capture real stereo ChArUco pairs, solve stereo, and verify the package.",
   };
 }
 

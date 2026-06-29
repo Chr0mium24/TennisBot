@@ -13,7 +13,8 @@ The script checks:
 - recorded printed target square measurement;
 - real `cam1` mono calibration package;
 - real `cam2` mono calibration package;
-- real stereo calibration package;
+- real stereo calibration package, gated by the real `cam1` and `cam2` mono
+  prerequisites;
 - Live3D hardware report reaching `prediction-ready`.
 
 ## Result Semantics
@@ -37,5 +38,6 @@ Observed on 2026-06-29:
 
 ```text
 physical-validation-status: wrote docs/local_physical_validation_status_20260629.md and exited non-zero because physical gates remain incomplete.
+stereo gate: blocked while cam1/cam2 mono packages are still dry-run, even though the current stereo package is hardware validated.
 operator-preflight: passed.
 ```
