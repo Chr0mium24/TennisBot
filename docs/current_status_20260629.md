@@ -40,6 +40,8 @@ The latest committed runtime work added:
 - local operator launcher;
 - local runtime preflight;
 - local physical validation checklist;
+- local physical validation status script;
+- target print measurement recorder;
 - calibration target generation;
 - calibration GUI target, mono, stereo, and package verification presets;
 - Live3D readiness gates and hardware reports.

@@ -1,0 +1,112 @@
+# Local Physical Validation Status
+
+- created_at: 2026-06-29T04:09:34.613Z
+- result: incomplete
+
+## Gates
+
+- passed: ChArUco target metadata - dfoptix ChArUco target metadata is accepted at 15.0 mm square size.
+- blocked: Printed target measurement - no recorded 15.0 mm print measurement was found.
+- blocked: cam1 mono calibration - cam1 mono package is accepted but not hardware validated.
+- blocked: cam2 mono calibration - cam2 mono package is accepted but not hardware validated.
+- passed: Stereo calibration - stereo package is hardware validated.
+- blocked: Live3D prediction-ready hardware run - no Live3D hardware report has reached prediction-ready.
+
+## Details
+
+### ChArUco target metadata
+
+- status: passed
+- detail: dfoptix ChArUco target metadata is accepted at 15.0 mm square size.
+
+```text
+{
+  "path": "artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.json",
+  "accepted": true,
+  "profile": "dfoptix_charuco_15mm",
+  "square_size_mm": 15,
+  "files": {
+    "metadata": "../../artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.json",
+    "png": "../../artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.png",
+    "svg": "../../artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.svg"
+  }
+}
+```
+
+### Printed target measurement
+
+- status: blocked
+- detail: no recorded 15.0 mm print measurement was found.
+- next: Print the target SVG at 100%, measure one square, then record the measurement in this artifact.
+
+```text
+artifacts/calibration_targets/dfoptix_charuco_15mm_print_check.json
+```
+
+### cam1 mono calibration
+
+- status: blocked
+- detail: cam1 mono package is accepted but not hardware validated.
+- next: Capture real cam1 ChArUco frames, solve mono, and verify the package.
+
+```text
+{
+  "path": "artifacts/calibration/cam1/package.json",
+  "accepted": true,
+  "dry_run": true,
+  "hardware_validated": false,
+  "accepted_view_count": 25,
+  "rms_reprojection_px": 0.35
+}
+```
+
+### cam2 mono calibration
+
+- status: blocked
+- detail: cam2 mono package is accepted but not hardware validated.
+- next: Capture real cam2 ChArUco frames, solve mono, and verify the package.
+
+```text
+{
+  "path": "artifacts/calibration/cam2/package.json",
+  "accepted": true,
+  "dry_run": true,
+  "hardware_validated": false,
+  "accepted_view_count": 25,
+  "rms_reprojection_px": 0.35
+}
+```
+
+### Stereo calibration
+
+- status: passed
+- detail: stereo package is hardware validated.
+
+```text
+{
+  "path": "artifacts/calibration/stereo_cam1_cam2/package.json",
+  "accepted": true,
+  "dry_run": false,
+  "hardware_validated": true,
+  "accepted_pair_count": 33,
+  "stereo_rms_reprojection_px": 0.42365210023675176,
+  "baseline_m": 0.05248616443700974
+}
+```
+
+### Live3D prediction-ready hardware run
+
+- status: blocked
+- detail: no Live3D hardware report has reached prediction-ready.
+- next: Put a visible tennis ball in both camera views and run apps/live3d verify:hardware until it passes.
+
+```text
+report: docs/live3d_hardware_readiness_gates_20260629.md
+- Result: failed
+- Error: Runtime 3D prediction did not reach ready.
+- Max left detections: 0
+- Max right detections: 0
+- Max prediction samples: 0
+- Runtime 3D codes: idle, left-detections-missing
+```
+

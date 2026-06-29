@@ -39,6 +39,18 @@ Run the local preflight:
 bun scripts/operator-preflight.ts --output docs/local_runtime_preflight_YYYYMMDD.md
 ```
 
+Check physical acceptance status:
+
+```bash
+bun scripts/physical-validation-status.ts --output docs/local_physical_validation_status_YYYYMMDD.md
+```
+
+Record the printed target measurement:
+
+```bash
+bun scripts/record-target-print-check.ts --measured-square-mm 15.0
+```
+
 Run Live3D:
 
 ```bash
@@ -151,9 +163,12 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 - [Current architecture](docs/current_architecture_20260629.md)
 - [Current status](docs/current_status_20260629.md)
 - [Local physical validation checklist](docs/local_physical_validation_checklist_20260629.md)
+- [Local physical validation status script](docs/local_physical_validation_status_script_20260629.md)
+- [Target print check recorder](docs/target_print_check_recorder_20260629.md)
 - [Final runtime validation](docs/final_runtime_validation_20260629.md)
 - [Local runtime operator runbook](docs/local_runtime_operator_runbook_20260629.md)
 - [Local runtime preflight](docs/local_runtime_preflight_20260629.md)
+- [Local physical validation status](docs/local_physical_validation_status_20260629.md)
 - [Physical artifact import](docs/physical_artifact_import_20260629.md)
 - [Calibration candidate scan](docs/calibration_candidate_scan_20260629.md)
 - [Calibration capture session flow](docs/calibration_capture_session_flow_20260629.md)
