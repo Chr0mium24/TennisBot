@@ -27,15 +27,18 @@ Allowed command families:
 
 ## GUI Behavior
 
-The Capture and Solve panels now show a `Run` button beside each generated
-command. Results are rendered inline with status, exit code/duration detail,
-stdout, and stderr. Rejected commands return a structured `rejected` result
-instead of being executed.
+The Target, Capture, and Solve panels now show a `Run` button beside each
+generated command. Results are rendered inline with status, exit code/duration
+detail, stdout, and stderr. Rejected commands return a structured `rejected`
+result instead of being executed.
 
 When a command writes a JSON artifact, the server returns it with the command
 result. The browser automatically imports returned JSON artifacts into the
 review workspace, so a capture/inspect/detect/solve sequence can update the gate
-state without manual file picker steps.
+state without manual file picker steps. The workspace now treats
+`calibration.target_sheet.v1` as a first-class Target gate, so the visible GUI
+flow starts with target-sheet generation before capture, inspect, detect, and
+solve.
 
 The review server now binds to `127.0.0.1` by default because it can execute
 local commands. Set `HOST=0.0.0.0` only for deliberate LAN exposure.
@@ -48,6 +51,7 @@ Commands:
 cd tools/calibration/frontend/review
 bun test
 bun run build
+curl -sS http://127.0.0.1:5188/assets/main.js | rg 'renderTab\("target"|target charuco|calibration.target_sheet.v1'
 cd ../..
 uv run pytest -q
 ```
@@ -57,14 +61,16 @@ Results:
 ```text
 bun test: 12 passed, 0 failed.
 bun run build: passed.
+bundle smoke: Target tab, target charuco command, and target-sheet schema present.
 uv run pytest -q: 20 passed.
 ```
 
 The added tests cover command planning without shell execution, rejection of
 non-whitelisted commands, rejection of unsafe paths/devices, and API rejection
 responses, plus generated JSON artifact collection from command output paths and
-`package verify` stdout, including target-sheet metadata returned by
-`target charuco`.
+`package verify` stdout. Frontend workspace tests cover Target artifact
+classification, the Target workflow gate, target command generation, and
+target-sheet metadata returned by `target charuco`.
 
 Local API smoke:
 

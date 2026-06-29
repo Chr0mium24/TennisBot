@@ -3,6 +3,7 @@ import {
   buildDetectCommand,
   buildInspectCommand,
   buildSolveCommand,
+  buildTargetCommand,
   captureFramePreviews,
   classifyArtifact,
   frameRows,
@@ -13,10 +14,11 @@ import {
   type ImportedArtifact,
   type JsonObject,
   type SolveCommandOptions,
+  type TargetCommandOptions,
 } from "./calibration-workspace";
 
-type Tab = "capture" | "review" | "solve" | "packages";
-type CommandId = "capture" | "inspect" | "detect" | "solve";
+type Tab = "target" | "capture" | "review" | "solve" | "packages";
+type CommandId = "target" | "capture" | "inspect" | "detect" | "solve";
 
 type CommandRunView = {
   status: "running" | "passed" | "failed" | "rejected" | "error";
@@ -28,6 +30,7 @@ type CommandRunView = {
 type AppState = {
   artifacts: ImportedArtifact[];
   activeTab: Tab;
+  targetOptions: TargetCommandOptions;
   captureOptions: CaptureCommandOptions;
   solveOptions: SolveCommandOptions;
   sessionPath: string;
@@ -39,12 +42,18 @@ type AppState = {
 
 const state: AppState = {
   artifacts: [],
-  activeTab: "review",
+  activeTab: "target",
   sessionPath: "../../artifacts/calibration_sessions/stereo_session",
   observationsPath: "../../artifacts/calibration_sessions/stereo_session/observations.json",
   inspectionReportPath: "../../docs/calibration_capture_quality_YYYYMMDD.md",
   detectionReportPath: "../../docs/calibration_charuco_detection_YYYYMMDD.md",
   commandRuns: {},
+  targetOptions: {
+    output: "../../artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.png",
+    outputReport: "../../docs/calibration_charuco_target_sheet_YYYYMMDD.md",
+    dpi: 300,
+    marginMm: 10,
+  },
   captureOptions: {
     topology: "stereo",
     cameraId: "cam1",
@@ -82,6 +91,7 @@ if (app === null) {
 render();
 
 function render(): void {
+  const targetSheet = latest(state.artifacts, "targetSheet")?.payload;
   const manifest = latest(state.artifacts, "captureManifest")?.payload;
   const inspection = latest(state.artifacts, "captureInspection")?.payload;
   const observations = latest(state.artifacts, "charucoObservations")?.payload;
@@ -108,6 +118,7 @@ function render(): void {
       <section class="workspace">
         <header class="toolbar">
           <div class="tabs">
+            ${renderTab("target", "Target")}
             ${renderTab("review", "Review")}
             ${renderTab("capture", "Capture")}
             ${renderTab("solve", "Solve")}
@@ -115,6 +126,7 @@ function render(): void {
           </div>
           <button class="secondary" id="load-sample">Load Sample</button>
         </header>
+        ${state.activeTab === "target" ? renderTargetPanel(targetSheet) : ""}
         ${state.activeTab === "capture" ? renderCapturePanel() : ""}
         ${state.activeTab === "review" ? renderReviewPanel(manifest, inspection, observations) : ""}
         ${state.activeTab === "solve" ? renderSolvePanel() : ""}
@@ -139,6 +151,30 @@ function renderStage(stage: ReturnType<typeof summarizeWorkflow>[number]): strin
 
 function renderTab(tab: Tab, label: string): string {
   return `<button class="tab ${state.activeTab === tab ? "active" : ""}" data-tab="${tab}">${label}</button>`;
+}
+
+function renderTargetPanel(targetSheet: JsonObject | undefined): string {
+  return `
+    <section class="panel-grid">
+      <article class="panel">
+        <h2>Target</h2>
+        <div class="form-grid">
+          ${targetField("output", "Output", state.targetOptions.output)}
+          ${targetField("outputReport", "Report", state.targetOptions.outputReport)}
+          ${targetNumberField("dpi", "DPI", state.targetOptions.dpi)}
+          ${targetNumberField("marginMm", "Margin mm", state.targetOptions.marginMm)}
+        </div>
+      </article>
+      <article class="panel command-panel">
+        <h2>Command</h2>
+        ${commandBlock("target", "Generate target", buildCommand("target"))}
+      </article>
+      <article class="panel">
+        <h2>Target Sheet</h2>
+        ${targetSheetMetrics(targetSheet)}
+      </article>
+    </section>
+  `;
 }
 
 function renderCapturePanel(): string {
@@ -286,6 +322,25 @@ function packageMetrics(payload: JsonObject | undefined, keys: string[]): string
   return `<dl class="metrics">${rows.map(([key, value]) => `<dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd>`).join("")}</dl>`;
 }
 
+function targetSheetMetrics(payload: JsonObject | undefined): string {
+  if (payload === undefined) return `<p class="empty">No target sheet loaded.</p>`;
+  const target = payload.target && typeof payload.target === "object" && !Array.isArray(payload.target) ? (payload.target as JsonObject) : {};
+  const board =
+    payload.board_size_mm && typeof payload.board_size_mm === "object" && !Array.isArray(payload.board_size_mm)
+      ? (payload.board_size_mm as JsonObject)
+      : {};
+  const rows = [
+    ["accepted", display(payload.accepted)],
+    ["profile", display(target.profile)],
+    ["dictionary", display(target.dictionary)],
+    ["squares", `${display(target.squares_x)} x ${display(target.squares_y)}`],
+    ["square_mm", display(typeof target.square_size_m === "number" ? target.square_size_m * 1000 : undefined)],
+    ["board_mm", `${display(board.width)} x ${display(board.height)}`],
+    ["dpi", display(payload.dpi)],
+  ];
+  return `<dl class="metrics">${rows.map(([key, value]) => `<dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd>`).join("")}</dl>`;
+}
+
 function renderTable(columns: string[], rows: Array<Record<string, string>>): string {
   if (rows.length === 0) return `<p class="empty">No rows loaded.</p>`;
   return `
@@ -331,10 +386,19 @@ function renderCommandRun(run: CommandRunView): string {
 }
 
 function buildCommand(id: CommandId): string {
+  if (id === "target") return buildTargetCommand(state.targetOptions);
   if (id === "capture") return buildCaptureCommand(state.captureOptions);
   if (id === "inspect") return buildInspectCommand(state.sessionPath, state.inspectionReportPath);
   if (id === "detect") return buildDetectCommand(state.sessionPath, state.observationsPath, state.detectionReportPath);
   return buildSolveCommand(state.solveOptions);
+}
+
+function targetField(key: keyof TargetCommandOptions, label: string, value: string | number): string {
+  return `<label>${label}<input data-target-field="${key}" value="${escapeHtml(String(value))}"></label>`;
+}
+
+function targetNumberField(key: keyof TargetCommandOptions, label: string, value: number): string {
+  return `<label>${label}<input data-target-field="${key}" type="number" step="0.1" value="${value}"></label>`;
 }
 
 function field(key: keyof CaptureCommandOptions, label: string, value: string, visible: boolean): string {
@@ -372,6 +436,13 @@ function wireEvents(): void {
   document.querySelector("#load-sample")?.addEventListener("click", () => {
     state.artifacts = sampleArtifacts();
     render();
+  });
+  document.querySelectorAll<HTMLInputElement>("[data-target-field]").forEach((input) => {
+    input.addEventListener("input", () => {
+      const key = input.dataset.targetField as keyof TargetCommandOptions;
+      (state.targetOptions[key] as string | number) = input.type === "number" ? Number(input.value) : input.value;
+      render();
+    });
   });
   document.querySelectorAll<HTMLButtonElement>("[data-capture-topology]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -495,6 +566,25 @@ async function importFiles(files: FileList | null): Promise<void> {
 
 function sampleArtifacts(): ImportedArtifact[] {
   return [
+    {
+      id: "sample-target",
+      name: "target.json",
+      kind: "targetSheet",
+      payload: {
+        schema_version: "calibration.target_sheet.v1",
+        accepted: true,
+        dpi: 300,
+        target: {
+          type: "charuco",
+          profile: "dfoptix_charuco_15mm",
+          dictionary: "DICT_5X5_100",
+          squares_x: 14,
+          squares_y: 9,
+          square_size_m: 0.015,
+        },
+        board_size_mm: { width: 210, height: 135 },
+      },
+    },
     {
       id: "sample-manifest",
       name: "manifest.json",

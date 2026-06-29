@@ -223,12 +223,14 @@ bun run build
 ```
 
 Result: 12 tests passed and the browser bundle built. The review GUI imports
-artifact-shaped JSON, summarizes capture/inspect/detect/mono/stereo gates,
-renders local capture PNG frame previews, inspection and ChArUco tables,
+artifact-shaped JSON, summarizes target/capture/inspect/detect/mono/stereo
+gates, renders local capture PNG frame previews, inspection and ChArUco tables,
 displays package metrics, generates the next CLI commands, and can execute
-whitelisted calibration CLI commands through its local Bun server. Command
-results now return generated JSON artifacts for automatic workspace import. It
-does not import Python calibration internals or legacy lab source modules.
+whitelisted calibration CLI commands through its local Bun server. The GUI
+starts the visible workflow with `target charuco`, then capture, inspect,
+detect, and solve. Command results return generated JSON artifacts for automatic
+workspace import. It does not import Python calibration internals or legacy lab
+source modules.
 
 Imported calibration quality warning:
 

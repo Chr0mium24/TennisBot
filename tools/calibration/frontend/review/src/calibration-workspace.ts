@@ -1,6 +1,7 @@
 export type JsonObject = Record<string, unknown>;
 
 export type ArtifactKind =
+  | "targetSheet"
   | "captureManifest"
   | "captureInspection"
   | "charucoObservations"
@@ -56,6 +57,13 @@ export type CaptureCommandOptions = {
   prepareUvcControls: boolean;
 };
 
+export type TargetCommandOptions = {
+  output: string;
+  outputReport: string;
+  dpi: number;
+  marginMm: number;
+};
+
 export type SolveCommandOptions = {
   topology: "mono" | "stereo";
   observations: string;
@@ -71,6 +79,7 @@ export type SolveCommandOptions = {
 export function classifyArtifact(payload: JsonObject): ArtifactKind {
   const schema = stringField(payload, "schema_version");
   const packageType = stringField(payload, "package_type");
+  if (schema === "calibration.target_sheet.v1") return "targetSheet";
   if (schema === "calibration.capture_session.v1") return "captureManifest";
   if (schema === "calibration.capture_inspection.v1") return "captureInspection";
   if (schema === "calibration.charuco_observations.v1") return "charucoObservations";
@@ -82,6 +91,7 @@ export function classifyArtifact(payload: JsonObject): ArtifactKind {
 }
 
 export function summarizeWorkflow(artifacts: ImportedArtifact[]): WorkflowStage[] {
+  const targetSheet = latest(artifacts, "targetSheet");
   const manifest = latest(artifacts, "captureManifest");
   const inspection = latest(artifacts, "captureInspection");
   const observations = latest(artifacts, "charucoObservations");
@@ -89,6 +99,13 @@ export function summarizeWorkflow(artifacts: ImportedArtifact[]): WorkflowStage[
   const stereoPackage = latest(artifacts, "stereoPackage");
 
   return [
+    {
+      id: "target",
+      label: "Target",
+      state: booleanField(targetSheet?.payload, "accepted") ? "ready" : targetSheet ? "blocked" : "missing",
+      detail: targetSheet ? targetSheetDetail(targetSheet.payload) : "No target sheet loaded.",
+      metric: targetSheet ? targetSheetMetric(targetSheet.payload) : undefined,
+    },
     {
       id: "capture",
       label: "Capture",
@@ -124,6 +141,16 @@ export function summarizeWorkflow(artifacts: ImportedArtifact[]): WorkflowStage[
       metric: qualityMetric(stereoPackage?.payload, "stereo_rms_reprojection_px"),
     },
   ];
+}
+
+export function buildTargetCommand(options: TargetCommandOptions): string {
+  return joinCommand([
+    "uv run tennisbot-calibration target charuco",
+    `--output ${quote(options.output)}`,
+    `--output-report ${quote(options.outputReport)}`,
+    `--dpi ${options.dpi}`,
+    `--margin-mm ${options.marginMm}`,
+  ]);
 }
 
 export function buildCaptureCommand(options: CaptureCommandOptions): string {
@@ -358,6 +385,17 @@ function captureDetail(payload: JsonObject): string {
     return `${sessionId}: stereo ${numberDisplay(payload["pair_count"])} pair(s).`;
   }
   return `${sessionId}: mono ${numberDisplay(payload["frame_count"])} frame(s).`;
+}
+
+function targetSheetDetail(payload: JsonObject): string {
+  const target = objectField(payload, "target");
+  return `${stringField(target, "profile") ?? "unknown"}: ${numberDisplay(target?.["squares_x"])} x ${numberDisplay(target?.["squares_y"])}.`;
+}
+
+function targetSheetMetric(payload: JsonObject): string {
+  const target = objectField(payload, "target");
+  const squareSizeM = target?.["square_size_m"];
+  return typeof squareSizeM === "number" ? `${Number((squareSizeM * 1000).toFixed(3))} mm` : "ready";
 }
 
 function inspectionDetail(payload: JsonObject): string {

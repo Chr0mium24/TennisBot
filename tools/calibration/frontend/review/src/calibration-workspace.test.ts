@@ -5,6 +5,7 @@ import {
   buildDetectCommand,
   buildInspectCommand,
   buildSolveCommand,
+  buildTargetCommand,
   captureFramePreviews,
   classifyArtifact,
   frameRows,
@@ -15,6 +16,7 @@ import {
 
 describe("calibration review workspace", () => {
   test("classifies calibration JSON artifacts", () => {
+    expect(classifyArtifact({ schema_version: "calibration.target_sheet.v1" })).toBe("targetSheet");
     expect(classifyArtifact({ schema_version: "calibration.capture_session.v1" })).toBe("captureManifest");
     expect(classifyArtifact({ schema_version: "calibration.capture_inspection.v1" })).toBe("captureInspection");
     expect(classifyArtifact({ schema_version: "calibration.charuco_observations.v1" })).toBe("charucoObservations");
@@ -25,6 +27,11 @@ describe("calibration review workspace", () => {
 
   test("summarizes workflow gates from imported artifacts", () => {
     const artifacts: ImportedArtifact[] = [
+      artifact("target", "targetSheet", {
+        schema_version: "calibration.target_sheet.v1",
+        accepted: true,
+        target: { profile: "dfoptix_charuco_15mm", squares_x: 14, squares_y: 9, square_size_m: 0.015 },
+      }),
       artifact("manifest", "captureManifest", {
         schema_version: "calibration.capture_session.v1",
         topology: "stereo",
@@ -48,12 +55,21 @@ describe("calibration review workspace", () => {
 
     const stages = summarizeWorkflow(artifacts);
 
-    expect(stages.map((stage) => stage.state)).toEqual(["ready", "ready", "blocked", "missing", "missing"]);
-    expect(stages[0].detail).toContain("stereo_session");
-    expect(stages[2].metric).toBe("0 / 5");
+    expect(stages.map((stage) => stage.state)).toEqual(["ready", "ready", "ready", "blocked", "missing", "missing"]);
+    expect(stages[0].detail).toContain("dfoptix_charuco_15mm");
+    expect(stages[1].detail).toContain("stereo_session");
+    expect(stages[3].metric).toBe("0 / 5");
   });
 
   test("builds capture, review, detection, and solve commands", () => {
+    expect(
+      buildTargetCommand({
+        output: "../../artifacts/calibration_targets/target.png",
+        outputReport: "../../docs/calibration_target.md",
+        dpi: 300,
+        marginMm: 10,
+      }),
+    ).toContain("target charuco");
     expect(
       buildCaptureCommand({
         topology: "stereo",
