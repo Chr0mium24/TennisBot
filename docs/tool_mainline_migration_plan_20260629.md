@@ -9,8 +9,8 @@ calibration are handled consistently, using the smallest runnable slice first:
 
 - `tools/yolo`: tennis-ball annotation frontend/backend plus existing runtime
   model package creation.
-- `tools/calibration`: DFOptix ChArUco/OpenCV mono and stereo capture GUI plus
-  the backend needed by those two GUI commands.
+- `tools/calibration`: fixed DFOptix ChArUco/OpenCV mono and stereo capture GUI
+  plus the backend needed by those two GUI commands.
 
 The runtime boundary remains unchanged: apps and packages consume only
 `artifacts/models/...` and `artifacts/calibration/...`.
@@ -107,8 +107,8 @@ Move first:
 - `src/camera_calib_lab/commands/capture.py`
 - `src/camera_calib_lab/pipelines/capture_pipeline.py`
 - `src/camera_calib_lab/pipelines/calibration_pipeline.py`
-- `src/camera_calib_lab/targets/base.py`
-- `src/camera_calib_lab/targets/charuco.py`
+- a small fixed target module for the project board:
+  DFOptix ChArUco 14x9, `DICT_5X5_100`, 15 mm squares, 11.25 mm markers.
 - `src/camera_calib_lab/detection/charuco.py`
 - `src/camera_calib_lab/detection/base.py`
 - `src/camera_calib_lab/detection/quality.py`
@@ -116,6 +116,8 @@ Move first:
 - `src/camera_calib_lab/solvers/`
 - Required `contracts/`, `io/`, `reports/`, `registries/`, `utils/`, and
   `methods/` modules only as import errors require them for these two commands.
+  Prefer deleting registry/plugin lookups over migrating them when the only
+  needed target is the fixed project board.
 - `configs/dfoptix_charuco_15mm_capture.yaml`
 
 Do not move in the first pass:
@@ -123,6 +125,8 @@ Do not move in the first pass:
 - tests and historical docs
 - passive GUI and phase GUI
 - standalone target CLI
+- target registry, checkerboard, circle-grid, phase-screen, and other board
+  plugins
 - inspect/detect/package command groups
 - simulation experiments
 - method comparison matrix
