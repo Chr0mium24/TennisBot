@@ -8,6 +8,7 @@ import {
   buildTargetCommand,
   buildTargetPrintCheckCommand,
   buildVerifyCommand,
+  captureCommandReadiness,
   captureFramePreviews,
   classifyArtifact,
   frameRows,
@@ -169,6 +170,26 @@ describe("calibration review workspace", () => {
     expect(targetPrintCheckReadiness({ ...base, measuredSquareMm: 0 })).toMatchObject({ ready: false });
     expect(targetPrintCheckReadiness({ ...base, measuredSquareMm: Number.NaN })).toMatchObject({ ready: false });
     expect(targetPrintCheckReadiness({ ...base, measuredSquareMm: 15.02 })).toMatchObject({ ready: true });
+  });
+
+  test("requires an accepted print check before camera capture", () => {
+    expect(captureCommandReadiness([])).toMatchObject({ ready: false });
+    expect(
+      captureCommandReadiness([
+        artifact("print-check", "targetPrintCheck", {
+          schema_version: "calibration.target_print_check.v1",
+          accepted: false,
+        }),
+      ]),
+    ).toMatchObject({ ready: false });
+    expect(
+      captureCommandReadiness([
+        artifact("print-check", "targetPrintCheck", {
+          schema_version: "calibration.target_print_check.v1",
+          accepted: true,
+        }),
+      ]),
+    ).toMatchObject({ ready: true });
   });
 
   test("extracts inspection and observation table rows", () => {

@@ -6,6 +6,7 @@ import {
   buildTargetCommand,
   buildTargetPrintCheckCommand,
   buildVerifyCommand,
+  captureCommandReadiness,
   captureFramePreviews,
   classifyArtifact,
   frameRows,
@@ -632,8 +633,12 @@ function commandBlock(id: CommandId, label: string, command: string): string {
 }
 
 function commandBlockedReason(id: CommandId): string | null {
-  if (id !== "targetPrintCheck") return null;
-  const readiness = targetPrintCheckReadiness(state.targetPrintCheckOptions);
+  const readiness =
+    id === "targetPrintCheck"
+      ? targetPrintCheckReadiness(state.targetPrintCheckOptions)
+      : id === "capture"
+        ? captureCommandReadiness(state.artifacts)
+        : { ready: true, detail: "" };
   return readiness.ready ? null : readiness.detail;
 }
 

@@ -211,6 +211,19 @@ export function targetPrintCheckReadiness(options: TargetPrintCheckCommandOption
     : { ready: false, detail: "Enter the measured printed square size before recording the print check." };
 }
 
+export function captureCommandReadiness(artifacts: ImportedArtifact[]): CommandReadiness {
+  const targetPrintCheck = latest(artifacts, "targetPrintCheck");
+  if (booleanField(targetPrintCheck?.payload, "accepted")) {
+    return { ready: true, detail: "Printed target measurement is accepted." };
+  }
+  return {
+    ready: false,
+    detail: targetPrintCheck
+      ? "Fix or re-record the printed target measurement before camera capture."
+      : "Record an accepted printed target measurement before camera capture.",
+  };
+}
+
 export function buildCaptureCommand(options: CaptureCommandOptions): string {
   if (options.topology === "mono") {
     return joinCommand([
