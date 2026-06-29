@@ -1,10 +1,36 @@
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 from pathlib import Path
 
 from .package import PackageVerificationError, create_model_package, verify_model_package
+
+
+TOOL_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_IMAGES_ROOT = TOOL_ROOT / "yolo" / "dataset" / "images"
+DEFAULT_LABELS_ROOT = TOOL_ROOT / "yolo" / "dataset" / "labels"
+DEFAULT_EXCLUDED_FILE = TOOL_ROOT / "yolo" / "dataset" / "excluded_images.txt"
+ANNOTATOR_SCRIPT = TOOL_ROOT / "yolo" / "scripts" / "serve_annotator.py"
+
+
+def cmd_annotate(args: argparse.Namespace) -> int:
+    command = [
+        sys.executable,
+        str(ANNOTATOR_SCRIPT),
+        "--images",
+        str(args.images_root),
+        "--labels",
+        str(args.labels_root),
+        "--excluded",
+        str(args.excluded_file),
+        "--host",
+        args.host,
+        "--port",
+        str(args.port),
+    ]
+    return subprocess.call(command, cwd=TOOL_ROOT)
 
 
 def cmd_package_create(args: argparse.Namespace) -> int:
@@ -43,6 +69,14 @@ def build_parser() -> argparse.ArgumentParser:
         description="TennisBot YOLO runtime package tools.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    annotate = subparsers.add_parser("annotate", help="Serve the local YOLO annotation frontend/backend.")
+    annotate.add_argument("--images-root", type=Path, default=DEFAULT_IMAGES_ROOT)
+    annotate.add_argument("--labels-root", type=Path, default=DEFAULT_LABELS_ROOT)
+    annotate.add_argument("--excluded-file", type=Path, default=DEFAULT_EXCLUDED_FILE)
+    annotate.add_argument("--host", default="127.0.0.1")
+    annotate.add_argument("--port", type=int, default=8765)
+    annotate.set_defaults(func=cmd_annotate)
 
     package = subparsers.add_parser("package", help="Create and verify runtime model packages.")
     package_subparsers = package.add_subparsers(dest="package_command", required=True)

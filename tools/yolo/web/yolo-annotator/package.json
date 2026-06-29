@@ -1,0 +1,12 @@
+{
+  "name": "@tennisbot/yolo-annotator",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "bunx tsc --noEmit",
+    "dev": "cd ../.. && uv run tennisbot-yolo annotate"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0"
+  }
+}

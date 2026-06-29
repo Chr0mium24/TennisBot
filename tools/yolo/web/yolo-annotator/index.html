@@ -1,0 +1,2512 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tennis Ball YOLO Annotator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          boxShadow: {
+            soft: "0 10px 30px rgba(15, 23, 42, 0.08)",
+          },
+        },
+      },
+    };
+  </script>
+  <style type="text/tailwindcss">
+    @layer base {
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        @apply h-full;
+      }
+
+      body {
+        @apply m-0 flex flex-col overflow-hidden bg-[#f4f7f2] text-stone-950 antialiased;
+        font: 14px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      input::-webkit-outer-spin-button,
+      input::-webkit-inner-spin-button {
+        appearance: none;
+        margin: 0;
+      }
+    }
+
+    @layer components {
+      .toolbar {
+        @apply sticky top-0 z-30 flex flex-none flex-wrap items-center gap-2 overflow-visible border-b border-stone-200 bg-[#fbfcf8] px-3 py-2 shadow-sm;
+        min-height: 64px;
+      }
+
+      .tool-button {
+        @apply inline-flex h-9 min-w-9 shrink-0 items-center justify-center rounded-md border border-stone-300 bg-white px-3 text-sm font-semibold text-stone-800 shadow-sm transition hover:border-stone-400 hover:bg-stone-100 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-40;
+      }
+
+      .tool-button-primary {
+        @apply border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100;
+      }
+
+      .tool-button-danger {
+        @apply border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100;
+      }
+
+      .tool-button-muted {
+        @apply border-stone-800 bg-[#132018] text-white hover:bg-[#233327];
+      }
+
+      .tool-button-active {
+        @apply border-emerald-300 bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200 hover:bg-emerald-100;
+      }
+
+      .annotator-input {
+        @apply h-9 w-20 shrink-0 rounded-md border border-stone-300 bg-white px-2.5 text-sm text-stone-900 shadow-sm outline-none transition placeholder:text-stone-400 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:opacity-40;
+        appearance: textfield;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .zoom-button {
+        @apply min-w-14 tabular-nums;
+      }
+
+      .spacer {
+        @apply min-w-3 flex-1;
+      }
+
+      .meta {
+        @apply flex min-w-0 shrink items-center gap-3 whitespace-nowrap text-stone-500;
+      }
+
+      .count {
+        @apply min-w-20 text-right font-medium text-stone-900 tabular-nums;
+      }
+
+      .filename {
+        @apply overflow-hidden text-ellipsis text-stone-900;
+        max-width: min(48vw, 720px);
+      }
+
+      .status {
+        @apply overflow-hidden text-ellipsis;
+        max-width: min(34vw, 520px);
+      }
+
+      .workspace {
+        @apply relative flex min-h-0 flex-1 bg-[#f4f7f2];
+      }
+
+      .video-panel {
+        @apply hidden min-h-0 flex-none border-r border-stone-200 bg-[#fbfcf8];
+        width: 380px;
+        max-width: min(86vw, 380px);
+      }
+
+      .video-panel.visible {
+        @apply flex flex-col;
+      }
+
+      .panel-title {
+        @apply flex min-h-12 items-center justify-between border-b border-stone-200 px-4 py-3 text-xs font-bold uppercase tracking-normal text-stone-500;
+      }
+
+      .video-list {
+        @apply min-h-0 flex-1 space-y-2 overflow-auto p-2;
+      }
+
+      .video-row {
+        @apply rounded-md border border-transparent bg-transparent p-2.5 transition;
+      }
+
+      .video-row.active {
+        @apply border-emerald-200 bg-white shadow-soft;
+      }
+
+      .video-title {
+        @apply truncate text-sm font-bold text-stone-900;
+      }
+
+      .video-total {
+        @apply mt-1 text-xs text-stone-500 tabular-nums;
+      }
+
+      .camera-buttons {
+        @apply mt-2 grid grid-cols-2 gap-2;
+      }
+
+      .camera-choice {
+        @apply flex min-h-10 min-w-0 flex-col items-stretch rounded-md border border-stone-200 bg-white px-2.5 py-2 text-left text-stone-700 shadow-sm transition hover:border-stone-300 hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50;
+      }
+
+      .camera-choice.active {
+        @apply border-emerald-300 bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200;
+      }
+
+      .camera-choice-header {
+        @apply flex min-w-0 items-center justify-between gap-2;
+      }
+
+      .camera-name,
+      .camera-count {
+        @apply truncate;
+      }
+
+      .camera-name {
+        @apply text-sm font-semibold;
+      }
+
+      .camera-count {
+        @apply shrink-0 text-xs text-stone-500 tabular-nums;
+      }
+
+      .camera-choice.active .camera-count {
+        @apply text-emerald-700;
+      }
+
+      .progress-track {
+        @apply relative mt-2 h-3 w-full cursor-ew-resize overflow-hidden rounded-full bg-stone-200 ring-1 ring-stone-200;
+      }
+
+      .progress-labels {
+        @apply mt-1.5 grid grid-cols-4 gap-1 text-[11px] font-medium text-stone-600 tabular-nums;
+      }
+
+      .progress-label-item {
+        @apply inline-flex min-w-0 items-center gap-1 truncate;
+      }
+
+      .progress-dot {
+        @apply inline-block h-2 w-2 shrink-0 rounded-full;
+      }
+
+      .progress-cursor {
+        @apply absolute top-1/2 h-5 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-stone-950 shadow;
+      }
+
+      .progress-unlabeled {
+        @apply bg-stone-300;
+      }
+
+      .progress-empty {
+        @apply bg-amber-400;
+      }
+
+      .progress-ball {
+        @apply bg-emerald-500;
+      }
+
+      .progress-excluded {
+        @apply bg-stone-950;
+      }
+
+      .empty-list {
+        @apply rounded-md border border-dashed border-stone-300 bg-white p-4 text-sm text-stone-500;
+      }
+
+      .stage {
+        @apply relative min-h-0 flex-1 bg-[#dbe7d1];
+      }
+
+      canvas {
+        @apply block h-full w-full;
+        touch-action: none;
+        cursor: crosshair;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .toolbar {
+        @apply px-2 py-2;
+        min-height: 56px;
+      }
+
+      .workspace {
+        @apply flex-row;
+      }
+
+      .video-panel.visible {
+        @apply absolute inset-y-0 left-0 z-20 flex-none border-b-0 border-r border-stone-200 shadow-2xl;
+        width: min(86vw, 360px);
+        max-height: none;
+      }
+
+      .meta {
+        @apply gap-2;
+      }
+
+      .filename,
+      .status {
+        max-width: 36vw;
+      }
+
+      .tool-button,
+      .annotator-input {
+        @apply h-10 min-w-10;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <button id="toggleSidebar" class="tool-button" type="button" title="Show or hide video list">Videos</button>
+    <button id="pickImages" class="tool-button tool-button-primary" type="button" title="Open image directory">Images</button>
+    <button id="pickLabels" class="tool-button tool-button-primary" type="button" title="Open label directory">Labels</button>
+    <button id="prev" class="tool-button" type="button" title="Previous image (A)">A</button>
+    <button id="next" class="tool-button" type="button" title="Save current label and go next (D)">D</button>
+    <input id="jumpIndex" class="annotator-input" type="number" min="1" step="1" inputmode="numeric" placeholder="#" title="Image number">
+    <button id="jump" class="tool-button" type="button" title="Jump to image number">Go</button>
+    <button id="save" class="tool-button" type="button" title="Save current label">Save</button>
+    <button id="clear" class="tool-button tool-button-danger" type="button" title="Clear current label">Clear</button>
+    <button id="exclude" class="tool-button" type="button" title="Toggle unusable sample (X)">X</button>
+    <button id="autoDetect" class="tool-button" type="button" title="Auto annotate new images from motion difference and HSV (T); center current box or candidate (C)">Auto</button>
+    <button id="panMode" class="tool-button" type="button" title="Toggle one-finger pan mode">Pan</button>
+    <button id="zoomOut" class="tool-button" type="button" title="Zoom out (-)">-</button>
+    <button id="zoomReset" class="tool-button zoom-button" type="button" title="Fit view (0)">100%</button>
+    <button id="zoomIn" class="tool-button" type="button" title="Zoom in (+)">+</button>
+    <div class="spacer"></div>
+    <div class="meta">
+      <span id="count" class="count">0 / 0</span>
+      <span id="filename" class="filename"></span>
+      <span id="status" class="status"></span>
+    </div>
+  </div>
+  <div class="workspace">
+    <aside id="videoPanel" class="video-panel" aria-label="Video list">
+      <div class="panel-title">Videos</div>
+      <div id="videoList" class="video-list"></div>
+    </aside>
+    <main class="stage">
+      <canvas id="canvas" aria-label="Image annotation canvas"></canvas>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const imageExts = new Set(["jpg", "jpeg", "png", "webp", "bmp"]);
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+      const MIN_ZOOM = 1;
+      const MAX_ZOOM = 24;
+      const ZOOM_STEP = 1.25;
+      const RECT_STRETCH_RATIO = 2.25;
+      const RECT_STRETCH_MIN_SCREEN = 18;
+      const SELECTION_STORAGE_KEY = "tennis-yolo-selection";
+      const AUTO_STORAGE_KEY = "tennis-yolo-auto-annotate";
+      const SIDEBAR_STORAGE_KEY = "tennis-yolo-sidebar-open";
+      const AUTO_MAX_DIM = 1280;
+      const AUTO_MOTION_RADIUS = 2;
+      const AUTO_BOX_PADDING = 0.08;
+      const AUTO_BOX_MIN_PAD = 2;
+      const AUTO_BOX_MAX_IMAGE_RATIO = 0.025;
+      const AUTO_EQUIVALENT_DIAMETER_SCALE = 1.18;
+      const buttons = {
+        toggleSidebar: document.getElementById("toggleSidebar"),
+        pickImages: document.getElementById("pickImages"),
+        pickLabels: document.getElementById("pickLabels"),
+        prev: document.getElementById("prev"),
+        next: document.getElementById("next"),
+        jump: document.getElementById("jump"),
+        save: document.getElementById("save"),
+        clear: document.getElementById("clear"),
+        exclude: document.getElementById("exclude"),
+        autoDetect: document.getElementById("autoDetect"),
+        panMode: document.getElementById("panMode"),
+        zoomOut: document.getElementById("zoomOut"),
+        zoomReset: document.getElementById("zoomReset"),
+        zoomIn: document.getElementById("zoomIn"),
+      };
+      const jumpIndexInput = document.getElementById("jumpIndex");
+      const countEl = document.getElementById("count");
+      const filenameEl = document.getElementById("filename");
+      const statusEl = document.getElementById("status");
+      const videoPanel = document.getElementById("videoPanel");
+      const videoListEl = document.getElementById("videoList");
+
+      let imageRoot = null;
+      let labelRoot = null;
+      let backendMode = false;
+      let videos = [];
+      let selectedVideoId = "";
+      let selectedCamera = "";
+      let images = [];
+      let currentIndex = -1;
+      let currentImage = null;
+      let currentUrl = "";
+      let autoReferenceImage = null;
+      let box = null;
+      let drag = null;
+      let isSpaceDown = false;
+      let autoAnnotateEnabled = readAutoAnnotateEnabled();
+      let sidebarOpen = readSidebarOpen();
+      let panModeEnabled = false;
+      const activePointers = new Map();
+      let pinch = null;
+      let viewport = { zoom: 1, panX: 0, panY: 0 };
+      let baseView = { x: 0, y: 0, w: 0, h: 0, scale: 1 };
+      let view = { x: 0, y: 0, w: 0, h: 0, scale: 1 };
+      let loadToken = 0;
+
+      function setStatus(message) {
+        statusEl.textContent = message || "";
+      }
+
+      function readStoredSelection() {
+        try {
+          const raw = window.localStorage.getItem(SELECTION_STORAGE_KEY);
+          if (!raw) {
+            return null;
+          }
+          const parsed = JSON.parse(raw);
+          return parsed && typeof parsed === "object" ? parsed : null;
+        } catch (error) {
+          return null;
+        }
+      }
+
+      function writeStoredSelection() {
+        if (currentIndex < 0 || !images[currentIndex]) {
+          return;
+        }
+        const entry = images[currentIndex];
+        const payload = {
+          videoId: entry.video || selectedVideoId || "",
+          camera: entry.camera || selectedCamera || "",
+          path: entry.path || "",
+          index: currentIndex,
+          updatedAt: Date.now(),
+        };
+        try {
+          window.localStorage.setItem(SELECTION_STORAGE_KEY, JSON.stringify(payload));
+        } catch (error) {
+          // Selection persistence is a convenience; annotation still works without it.
+        }
+      }
+
+      function restoredImageIndex(selection) {
+        if (!images.length) {
+          return -1;
+        }
+        if (selection && typeof selection.path === "string" && selection.path) {
+          const pathIndex = images.findIndex((entry) => entry.path === selection.path);
+          if (pathIndex >= 0) {
+            return pathIndex;
+          }
+        }
+        const rawIndex = selection ? Number(selection.index) : NaN;
+        if (Number.isInteger(rawIndex) && rawIndex >= 0 && rawIndex < images.length) {
+          return rawIndex;
+        }
+        return 0;
+      }
+
+      function restoredVideoCamera(selection) {
+        if (!selection) {
+          return null;
+        }
+        const video = findVideo(String(selection.videoId || ""));
+        if (!video) {
+          return null;
+        }
+        const camera = String(selection.camera || "");
+        if (!cameraNames(video).includes(camera)) {
+          return null;
+        }
+        return { video, camera };
+      }
+
+      function readAutoAnnotateEnabled() {
+        try {
+          return window.localStorage.getItem(AUTO_STORAGE_KEY) === "1";
+        } catch (error) {
+          return false;
+        }
+      }
+
+      function writeAutoAnnotateEnabled(enabled) {
+        try {
+          window.localStorage.setItem(AUTO_STORAGE_KEY, enabled ? "1" : "0");
+        } catch (error) {
+          // Local storage can be unavailable in restrictive browser modes.
+        }
+      }
+
+      function defaultSidebarOpen() {
+        return !window.matchMedia("(max-width: 760px)").matches;
+      }
+
+      function readSidebarOpen() {
+        try {
+          const value = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
+          if (value === "1") {
+            return true;
+          }
+          if (value === "0") {
+            return false;
+          }
+        } catch (error) {
+          // Fall back to the viewport default if local storage is unavailable.
+        }
+        return defaultSidebarOpen();
+      }
+
+      function writeSidebarOpen(open) {
+        try {
+          window.localStorage.setItem(SIDEBAR_STORAGE_KEY, open ? "1" : "0");
+        } catch (error) {
+          // Sidebar persistence is only a convenience.
+        }
+      }
+
+      function updateAutoAnnotateButton() {
+        buttons.autoDetect.classList.toggle("tool-button-active", autoAnnotateEnabled);
+        buttons.autoDetect.textContent = autoAnnotateEnabled ? "Auto On" : "Auto";
+        buttons.autoDetect.title = autoAnnotateEnabled
+          ? "Auto annotation is on: motion difference + HSV on new images (T); center current box or candidate (C)"
+          : "Auto annotate new images from motion difference and HSV (T); center current box or candidate (C)";
+      }
+
+      function updateSidebarButton() {
+        buttons.toggleSidebar.disabled = !backendMode;
+        buttons.toggleSidebar.classList.toggle("tool-button-active", backendMode && sidebarOpen);
+        buttons.toggleSidebar.textContent = backendMode && sidebarOpen ? "Hide" : "Videos";
+        buttons.toggleSidebar.title = backendMode
+          ? (sidebarOpen ? "Hide video list" : "Show video list")
+          : "Video list is available in backend mode";
+      }
+
+      function updatePanModeButton() {
+        buttons.panMode.disabled = !currentImage;
+        buttons.panMode.classList.toggle("tool-button-active", panModeEnabled);
+        buttons.panMode.textContent = panModeEnabled ? "Pan On" : "Pan";
+        buttons.panMode.title = panModeEnabled
+          ? "One-finger pan mode is on"
+          : "Toggle one-finger pan mode";
+      }
+
+      function togglePanMode() {
+        if (!currentImage) {
+          setStatus("Load an image first");
+          return;
+        }
+        panModeEnabled = !panModeEnabled;
+        drag = null;
+        activePointers.clear();
+        pinch = null;
+        updateUi();
+        updateCanvasCursor();
+        setStatus(panModeEnabled ? "Pan mode on" : "Pan mode off");
+      }
+
+      async function toggleAutoAnnotate() {
+        autoAnnotateEnabled = !autoAnnotateEnabled;
+        writeAutoAnnotateEnabled(autoAnnotateEnabled);
+        updateUi();
+        if (!autoAnnotateEnabled) {
+          setStatus("Auto annotation off");
+          return;
+        }
+        setStatus("Auto annotation on");
+        await autoAnnotateCurrent("toggle");
+      }
+
+      function isFileSystemAccessReady() {
+        if ("showDirectoryPicker" in window) {
+          return true;
+        }
+        setStatus("Chrome or Edge is required");
+        return false;
+      }
+
+      function apiPath(path) {
+        return path.split("/").map(encodeURIComponent).join("/");
+      }
+
+      function apiUrl(prefix, path = "") {
+        return path ? `${prefix}/${apiPath(path)}` : prefix;
+      }
+
+      function apiQuery(prefix, params) {
+        const search = new URLSearchParams();
+        for (const [key, value] of Object.entries(params)) {
+          if (value !== undefined && value !== null && value !== "") {
+            search.set(key, value);
+          }
+        }
+        const query = search.toString();
+        return query ? `${prefix}?${query}` : prefix;
+      }
+
+      async function apiJson(url, options = {}) {
+        const response = await fetch(url, options);
+        if (response.ok) {
+          return response.json();
+        }
+        let message = response.statusText || `HTTP ${response.status}`;
+        try {
+          const body = await response.json();
+          message = body.detail || message;
+        } catch (error) {
+          // Keep the HTTP status message if the backend did not return JSON.
+        }
+        throw new Error(message);
+      }
+
+      function labelsAreWritable() {
+        return backendMode || Boolean(labelRoot);
+      }
+
+      function releaseUrl(url) {
+        if (url && url.startsWith("blob:")) {
+          URL.revokeObjectURL(url);
+        }
+      }
+
+      function normalizeBackendImages(rawImages) {
+        return rawImages
+          .map((entry) => {
+            const frame = entry.frame === null || entry.frame === undefined ? null : Number(entry.frame);
+            return {
+              path: String(entry.path || ""),
+              video: String(entry.video || ""),
+              camera: String(entry.camera || ""),
+              frame: Number.isFinite(frame) ? frame : null,
+              labelExists: Boolean(entry.label_exists),
+              labelStatus: normalizeLabelStatus(entry.label_status),
+              excluded: Boolean(entry.excluded),
+            };
+          })
+          .filter((entry) => entry.path && isImageName(entry.path));
+      }
+
+      function cameraNames(video) {
+        const cameras = video && video.cameras ? Object.keys(video.cameras) : [];
+        const preferred = ["cam1", "cam2"].filter((camera) => cameras.includes(camera));
+        const remaining = cameras
+          .filter((camera) => !preferred.includes(camera))
+          .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+        return [...preferred, ...remaining];
+      }
+
+      function findVideo(videoId) {
+        return videos.find((video) => video.id === videoId) || null;
+      }
+
+      function normalizeLabelStatus(status) {
+        if (status === "empty" || status === "ball") {
+          return status;
+        }
+        return "unlabeled";
+      }
+
+      function countValue(value) {
+        const number = Number(value);
+        return Number.isFinite(number) ? Math.max(0, number) : 0;
+      }
+
+      function progressCounts(stats) {
+        const total = countValue(stats && stats.total);
+        const empty = countValue(stats && stats.empty);
+        const ball = countValue(stats && stats.ball);
+        const excluded = countValue(stats && stats.excluded);
+        const rawUnlabeled = countValue(stats && stats.unlabeled);
+        const unlabeled = stats && stats.unlabeled !== undefined
+          ? rawUnlabeled
+          : Math.max(0, total - empty - ball);
+        const labeled = stats && stats.labeled !== undefined ? countValue(stats.labeled) : empty + ball;
+        return { total, labeled, unlabeled, empty, ball, excluded };
+      }
+
+      function activeTimelineEntries(video, camera) {
+        if (video.id !== selectedVideoId || camera !== selectedCamera) {
+          return [];
+        }
+        return images.filter((entry) => entry.video === video.id && entry.camera === camera);
+      }
+
+      function statusColor(status, excluded = false) {
+        if (excluded) {
+          return "#132018";
+        }
+        if (status === "empty") {
+          return "#f59e0b";
+        }
+        if (status === "ball") {
+          return "#10b981";
+        }
+        return "#c5cfbd";
+      }
+
+      function timelineGradient(entries) {
+        if (!entries.length) {
+          return "";
+        }
+        const runs = [];
+        let runStart = 0;
+        let runStatus = normalizeLabelStatus(entries[0].labelStatus);
+        let runExcluded = Boolean(entries[0].excluded);
+        for (let i = 1; i <= entries.length; i += 1) {
+          const status = i < entries.length ? normalizeLabelStatus(entries[i].labelStatus) : null;
+          const excluded = i < entries.length ? Boolean(entries[i].excluded) : null;
+          if (status === runStatus && excluded === runExcluded) {
+            continue;
+          }
+          runs.push({
+            status: runStatus,
+            excluded: runExcluded,
+            start: (runStart / entries.length) * 100,
+            end: (i / entries.length) * 100,
+          });
+          runStart = i;
+          runStatus = status;
+          runExcluded = excluded;
+        }
+        const stops = runs.map((run) => {
+          const color = statusColor(run.status, run.excluded);
+          return `${color} ${run.start.toFixed(3)}% ${run.end.toFixed(3)}%`;
+        });
+        return `linear-gradient(to right, ${stops.join(", ")})`;
+      }
+
+      function timelineCursorLeft(index, total) {
+        if (!total) {
+          return "0%";
+        }
+        return `${((Math.min(Math.max(index, 0), total - 1) + 0.5) / total) * 100}%`;
+      }
+
+      function timelineIndexFromEvent(track, entries, event) {
+        const rect = track.getBoundingClientRect();
+        const ratio = rect.width ? clamp((event.clientX - rect.left) / rect.width, 0, 0.999999) : 0;
+        return Math.min(entries.length - 1, Math.floor(ratio * entries.length));
+      }
+
+      function bindTimelineSeek(track, marker, entries) {
+        if (!entries.length) {
+          return;
+        }
+        let pointerId = null;
+        let lastIndex = -1;
+        const seek = (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const index = timelineIndexFromEvent(track, entries, event);
+          marker.style.left = timelineCursorLeft(index, entries.length);
+          if (index === lastIndex || index === currentIndex) {
+            lastIndex = index;
+            return;
+          }
+          lastIndex = index;
+          loadIndex(index, { updateTimeline: false }).catch((error) => {
+            console.error(error);
+            setStatus(error.message || "Could not load image");
+          });
+        };
+
+        track.addEventListener("pointerdown", (event) => {
+          if (event.button !== 0) {
+            return;
+          }
+          pointerId = event.pointerId;
+          track.setPointerCapture(pointerId);
+          seek(event);
+        });
+        track.addEventListener("pointermove", (event) => {
+          if (event.pointerId === pointerId) {
+            seek(event);
+          }
+        });
+        const finish = (event) => {
+          if (event.pointerId !== pointerId) {
+            return;
+          }
+          pointerId = null;
+          event.preventDefault();
+          event.stopPropagation();
+          renderVideoList();
+        };
+        track.addEventListener("pointerup", finish);
+        track.addEventListener("pointercancel", finish);
+        track.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        });
+      }
+
+      function appendProgressBar(parent, stats, entries) {
+        const counts = progressCounts(stats);
+        const track = document.createElement("div");
+        track.className = "progress-track";
+        track.title = `未标注 ${counts.unlabeled} / 没有球 ${counts.empty} / 标注了球 ${counts.ball} / 禁用 ${counts.excluded}`;
+        track.setAttribute("role", "slider");
+        track.setAttribute("aria-label", "Frame timeline");
+        track.setAttribute("aria-valuemin", entries.length ? "1" : "0");
+        track.setAttribute("aria-valuemax", String(entries.length || 0));
+        track.setAttribute("aria-valuenow", String(entries.length ? currentIndex + 1 : 0));
+        if (entries.length) {
+          track.style.background = timelineGradient(entries);
+          const marker = document.createElement("span");
+          marker.className = "progress-cursor";
+          marker.style.left = timelineCursorLeft(currentIndex, entries.length);
+          track.append(marker);
+          bindTimelineSeek(track, marker, entries);
+        }
+
+        const labels = document.createElement("div");
+        labels.className = "progress-labels";
+        for (const [key, label, count] of [
+          ["unlabeled", "未", counts.unlabeled],
+          ["empty", "无球", counts.empty],
+          ["ball", "有球", counts.ball],
+          ["excluded", "禁用", counts.excluded],
+        ]) {
+          const item = document.createElement("span");
+          item.className = "progress-label-item";
+          const dot = document.createElement("span");
+          dot.className = `progress-dot progress-${key}`;
+          const text = document.createElement("span");
+          text.className = "truncate";
+          text.textContent = `${label} ${count}`;
+          item.append(dot, text);
+          labels.append(item);
+        }
+
+        parent.append(track, labels);
+      }
+
+      function createCameraButton(video, camera, stats) {
+        const active = video.id === selectedVideoId && camera === selectedCamera;
+        const counts = progressCounts(stats);
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `camera-choice${active ? " active" : ""}`;
+        button.disabled = !stats || !counts.total;
+        button.title = stats
+          ? `${camera} ${counts.labeled}/${counts.total} | 未标注 ${counts.unlabeled} / 没有球 ${counts.empty} / 标注了球 ${counts.ball} / 禁用 ${counts.excluded}`
+          : camera;
+        button.addEventListener("click", () => {
+          selectVideoCamera(video.id, camera).catch((error) => {
+            console.error(error);
+            setStatus(error.message || "Could not load video");
+          });
+        });
+
+        const header = document.createElement("span");
+        header.className = "camera-choice-header";
+        const name = document.createElement("span");
+        name.className = "camera-name";
+        name.textContent = camera;
+        const count = document.createElement("span");
+        count.className = "camera-count";
+        count.textContent = stats ? `${counts.labeled}/${counts.total}` : "0/0";
+        header.append(name, count);
+        button.append(header);
+
+        if (active && stats) {
+          appendProgressBar(button, stats, activeTimelineEntries(video, camera));
+        }
+
+        return button;
+      }
+
+      function setVideoPanelVisible(visible) {
+        const nextVisible = Boolean(visible && backendMode);
+        updateSidebarButton();
+        if (videoPanel.classList.contains("visible") === nextVisible) {
+          return;
+        }
+        videoPanel.classList.toggle("visible", nextVisible);
+        resizeCanvas();
+      }
+
+      function toggleSidebar() {
+        if (!backendMode) {
+          setStatus("Video list is available in backend mode");
+          return;
+        }
+        sidebarOpen = !sidebarOpen;
+        writeSidebarOpen(sidebarOpen);
+        renderVideoList();
+        updateUi();
+      }
+
+      function renderVideoList() {
+        setVideoPanelVisible(backendMode && sidebarOpen);
+        videoListEl.replaceChildren();
+        if (!backendMode) {
+          return;
+        }
+        if (!videos.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty-list";
+          empty.textContent = "No videos";
+          videoListEl.append(empty);
+          return;
+        }
+
+        for (const video of videos) {
+          const row = document.createElement("div");
+          row.className = `video-row${video.id === selectedVideoId ? " active" : ""}`;
+
+          const title = document.createElement("div");
+          title.className = "video-title";
+          title.title = video.id;
+          title.textContent = video.id;
+          row.append(title);
+
+          const total = document.createElement("div");
+          total.className = "video-total";
+          total.textContent = `${video.labeled || 0}/${video.total || 0}`;
+          row.append(total);
+
+          const buttonsWrap = document.createElement("div");
+          buttonsWrap.className = "camera-buttons";
+          const orderedCameras = [...new Set(["cam1", "cam2", ...cameraNames(video)])];
+          for (const camera of orderedCameras) {
+            const stats = video.cameras ? video.cameras[camera] : null;
+            buttonsWrap.append(createCameraButton(video, camera, stats));
+          }
+          row.append(buttonsWrap);
+          videoListEl.append(row);
+        }
+      }
+
+      function isImageName(name) {
+        const ext = name.split(".").pop().toLowerCase();
+        return imageExts.has(ext);
+      }
+
+      async function walkDirectory(handle, prefix = "") {
+        const found = [];
+        for await (const [name, child] of handle.entries()) {
+          const rel = prefix ? `${prefix}/${name}` : name;
+          if (child.kind === "directory") {
+            found.push(...await walkDirectory(child, rel));
+          } else if (child.kind === "file" && isImageName(name)) {
+            found.push({ path: rel, handle: child });
+          }
+        }
+        return found;
+      }
+
+      function currentEntry() {
+        return currentIndex >= 0 ? images[currentIndex] || null : null;
+      }
+
+      function updateExcludeButton() {
+        const entry = currentEntry();
+        const excluded = Boolean(entry && entry.excluded);
+        buttons.exclude.classList.toggle("tool-button-muted", excluded);
+        buttons.exclude.textContent = excluded ? "Use" : "X";
+        buttons.exclude.title = excluded
+          ? "Restore this sample for training (X)"
+          : "Mark this sample unusable for training (X)";
+      }
+
+      function updateUi() {
+        setVideoPanelVisible(backendMode && sidebarOpen);
+        countEl.textContent = images.length ? `${currentIndex + 1} / ${images.length}` : "0 / 0";
+        const entry = currentEntry();
+        filenameEl.textContent = entry ? `${entry.excluded ? "[excluded] " : ""}${entry.path}` : "";
+        buttons.pickImages.disabled = backendMode;
+        buttons.pickLabels.disabled = backendMode;
+        buttons.pickImages.textContent = backendMode ? "Backend" : "Images";
+        buttons.pickImages.title = backendMode ? "Images loaded from backend" : "Open image directory";
+        buttons.pickLabels.title = backendMode ? "Labels saved by backend" : "Open label directory";
+        buttons.prev.disabled = currentIndex <= 0;
+        buttons.next.disabled = currentIndex < 0 || currentIndex >= images.length - 1;
+        buttons.jump.disabled = !images.length;
+        jumpIndexInput.disabled = !images.length;
+        jumpIndexInput.max = images.length || "";
+        jumpIndexInput.placeholder = images.length && currentIndex >= 0 ? String(currentIndex + 1) : "#";
+        buttons.save.disabled = currentIndex < 0 || !labelsAreWritable();
+        buttons.clear.disabled = currentIndex < 0 || !labelsAreWritable();
+        buttons.exclude.disabled = currentIndex < 0 || !backendMode;
+        buttons.autoDetect.disabled = !currentImage;
+        updateSidebarButton();
+        updateExcludeButton();
+        updateAutoAnnotateButton();
+        updatePanModeButton();
+        buttons.zoomOut.disabled = !currentImage || viewport.zoom <= MIN_ZOOM;
+        buttons.zoomIn.disabled = !currentImage || viewport.zoom >= MAX_ZOOM;
+        buttons.zoomReset.disabled = !currentImage || (
+          viewport.zoom === 1 &&
+          Math.abs(viewport.panX) < 0.5 &&
+          Math.abs(viewport.panY) < 0.5
+        );
+        buttons.zoomReset.textContent = currentImage ? `${Math.round(viewport.zoom * 100)}%` : "100%";
+      }
+
+      function imageSize() {
+        return {
+          w: currentImage ? currentImage.naturalWidth : 0,
+          h: currentImage ? currentImage.naturalHeight : 0,
+        };
+      }
+
+      function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function isEditableTarget(target) {
+        return Boolean(target && (
+          target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable
+        ));
+      }
+
+      function centerPoint() {
+        return {
+          x: canvas.clientWidth / 2,
+          y: canvas.clientHeight / 2,
+        };
+      }
+
+      function cloneBox(raw) {
+        return raw ? { x1: raw.x1, y1: raw.y1, x2: raw.x2, y2: raw.y2, mode: raw.mode } : null;
+      }
+
+      function normalizeBox(raw) {
+        if (!raw || !currentImage) {
+          return null;
+        }
+        const { w, h } = imageSize();
+        const x1 = clamp(Math.min(raw.x1, raw.x2), 0, w);
+        const x2 = clamp(Math.max(raw.x1, raw.x2), 0, w);
+        const y1 = clamp(Math.min(raw.y1, raw.y2), 0, h);
+        const y2 = clamp(Math.max(raw.y1, raw.y2), 0, h);
+        if (raw.mode === "rect") {
+          return { x1, y1, x2, y2, mode: "rect" };
+        }
+        return squareBoxAroundCenter({ x1, y1, x2, y2 });
+      }
+
+      function squareBoxAroundCenter(rect) {
+        const { w, h } = imageSize();
+        const side = Math.min(Math.max(rect.x2 - rect.x1, rect.y2 - rect.y1), w, h);
+        if (side <= 0) {
+          return { x1: rect.x1, y1: rect.y1, x2: rect.x1, y2: rect.y1, mode: "square" };
+        }
+        const cx = (rect.x1 + rect.x2) / 2;
+        const cy = (rect.y1 + rect.y2) / 2;
+        const x1 = clamp(cx - side / 2, 0, w - side);
+        const y1 = clamp(cy - side / 2, 0, h - side);
+        return { x1, y1, x2: x1 + side, y2: y1 + side, mode: "square" };
+      }
+
+      function squareBoxFromAnchor(anchorX, anchorY, targetX, targetY) {
+        const { w, h } = imageSize();
+        const signX = targetX < anchorX ? -1 : 1;
+        const signY = targetY < anchorY ? -1 : 1;
+        const maxX = signX > 0 ? w - anchorX : anchorX;
+        const maxY = signY > 0 ? h - anchorY : anchorY;
+        const side = Math.min(Math.max(Math.abs(targetX - anchorX), Math.abs(targetY - anchorY)), maxX, maxY);
+        return {
+          x1: anchorX,
+          y1: anchorY,
+          x2: anchorX + signX * side,
+          y2: anchorY + signY * side,
+          mode: "square",
+        };
+      }
+
+      function rectangleBoxFromAnchor(anchorX, anchorY, targetX, targetY) {
+        const { w, h } = imageSize();
+        return {
+          x1: anchorX,
+          y1: anchorY,
+          x2: clamp(targetX, 0, w),
+          y2: clamp(targetY, 0, h),
+          mode: "rect",
+        };
+      }
+
+      function shouldStretchToRect(anchorX, anchorY, targetX, targetY) {
+        const dx = Math.abs(targetX - anchorX);
+        const dy = Math.abs(targetY - anchorY);
+        const dominant = Math.max(dx, dy);
+        const minor = Math.min(dx, dy);
+        const minDelta = RECT_STRETCH_MIN_SCREEN / Math.max(view.scale || 1, 0.001);
+        return dominant >= minDelta && dominant / Math.max(minor, 0.001) >= RECT_STRETCH_RATIO;
+      }
+
+      function boxFromAnchor(anchorX, anchorY, targetX, targetY, rectMode) {
+        if (rectMode) {
+          return rectangleBoxFromAnchor(anchorX, anchorY, targetX, targetY);
+        }
+        return squareBoxFromAnchor(anchorX, anchorY, targetX, targetY);
+      }
+
+      function boxIsUsable(raw) {
+        const b = normalizeBox(raw);
+        return Boolean(b && b.x2 - b.x1 >= 3 && b.y2 - b.y1 >= 3);
+      }
+
+      function autoAnalysisSize(image) {
+        const maxSide = Math.max(image.naturalWidth, image.naturalHeight);
+        const scale = Math.min(1, AUTO_MAX_DIM / Math.max(maxSide, 1));
+        return {
+          w: Math.max(1, Math.round(image.naturalWidth * scale)),
+          h: Math.max(1, Math.round(image.naturalHeight * scale)),
+        };
+      }
+
+      function scaledImageData(image, width, height) {
+        const offscreen = document.createElement("canvas");
+        offscreen.width = width;
+        offscreen.height = height;
+        const offscreenCtx = offscreen.getContext("2d", { willReadFrequently: true });
+        offscreenCtx.drawImage(image, 0, 0, width, height);
+        return offscreenCtx.getImageData(0, 0, width, height).data;
+      }
+
+      function hueDegrees(r, g, b, max, delta) {
+        if (delta <= 0) {
+          return 0;
+        }
+        let hue = 0;
+        if (max === r) {
+          hue = ((g - b) / delta) % 6;
+        } else if (max === g) {
+          hue = (b - r) / delta + 2;
+        } else {
+          hue = (r - g) / delta + 4;
+        }
+        hue *= 60;
+        return hue < 0 ? hue + 360 : hue;
+      }
+
+      function isTennisBallColor(r, g, b) {
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        const delta = max - min;
+        const value = max / 255;
+        const saturation = max > 0 ? delta / max : 0;
+        const hue = hueDegrees(r, g, b, max, delta);
+        const hsvYellowGreen = hue >= 38 && hue <= 95 && saturation >= 0.22 && value >= 0.35;
+        const brightYellowish =
+          max >= 145 &&
+          r + g > b * 2.35 + 55 &&
+          g >= b * 1.05 &&
+          r >= b * 0.95 &&
+          Math.abs(r - g) <= 90;
+        return hsvYellowGreen || brightYellowish;
+      }
+
+      function buildMotionIntegral(motion, width, height) {
+        const stride = width + 1;
+        const integral = new Uint32Array(stride * (height + 1));
+        for (let y = 0; y < height; y += 1) {
+          let rowSum = 0;
+          for (let x = 0; x < width; x += 1) {
+            rowSum += motion[y * width + x];
+            integral[(y + 1) * stride + x + 1] = integral[y * stride + x + 1] + rowSum;
+          }
+        }
+        return integral;
+      }
+
+      function integralSum(integral, width, x1, y1, x2, y2) {
+        const stride = width + 1;
+        return (
+          integral[y2 * stride + x2] -
+          integral[y1 * stride + x2] -
+          integral[y2 * stride + x1] +
+          integral[y1 * stride + x1]
+        );
+      }
+
+      function hasNearbyMotion(integral, width, height, x, y) {
+        const x1 = Math.max(0, x - AUTO_MOTION_RADIUS);
+        const y1 = Math.max(0, y - AUTO_MOTION_RADIUS);
+        const x2 = Math.min(width, x + AUTO_MOTION_RADIUS + 1);
+        const y2 = Math.min(height, y + AUTO_MOTION_RADIUS + 1);
+        return integralSum(integral, width, x1, y1, x2, y2) > 0;
+      }
+
+      function componentCandidate(mask, motion, start, width, height, stack) {
+        let stackSize = 0;
+        stack[stackSize] = start;
+        stackSize += 1;
+        mask[start] = 0;
+
+        let area = 0;
+        let motionCount = 0;
+        let xSum = 0;
+        let ySum = 0;
+        let minX = width;
+        let minY = height;
+        let maxX = 0;
+        let maxY = 0;
+
+        while (stackSize > 0) {
+          stackSize -= 1;
+          const index = stack[stackSize];
+          const x = index % width;
+          const y = Math.floor(index / width);
+          area += 1;
+          motionCount += motion[index];
+          xSum += x;
+          ySum += y;
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+
+          for (let dy = -1; dy <= 1; dy += 1) {
+            const ny = y + dy;
+            if (ny < 0 || ny >= height) {
+              continue;
+            }
+            for (let dx = -1; dx <= 1; dx += 1) {
+              if (dx === 0 && dy === 0) {
+                continue;
+              }
+              const nx = x + dx;
+              if (nx < 0 || nx >= width) {
+                continue;
+              }
+              const next = ny * width + nx;
+              if (!mask[next]) {
+                continue;
+              }
+              mask[next] = 0;
+              stack[stackSize] = next;
+              stackSize += 1;
+            }
+          }
+        }
+
+        return { area, motionCount, xSum, ySum, minX, minY, maxX, maxY };
+      }
+
+      function candidateScore(candidate) {
+        const bw = candidate.maxX - candidate.minX + 1;
+        const bh = candidate.maxY - candidate.minY + 1;
+        const side = Math.max(bw, bh);
+        const minor = Math.max(1, Math.min(bw, bh));
+        const aspect = side / minor;
+        const fill = candidate.area / Math.max(1, bw * bh);
+        if (candidate.area < 2 || side < 2 || aspect > 5 || fill < 0.04) {
+          return -Infinity;
+        }
+        if (side > 220) {
+          return -Infinity;
+        }
+        const sizePenalty = side > 120 ? 0.15 : side > 80 ? 0.35 : side > 50 ? 0.7 : 1;
+        return (candidate.area + candidate.motionCount * 2) * (0.35 + fill) * sizePenalty;
+      }
+
+      function boxFromAutoCandidate(candidate, analysisWidth, analysisHeight) {
+        const scaleX = currentImage.naturalWidth / analysisWidth;
+        const scaleY = currentImage.naturalHeight / analysisHeight;
+        const bboxW = (candidate.maxX - candidate.minX + 1) * scaleX;
+        const bboxH = (candidate.maxY - candidate.minY + 1) * scaleY;
+        const bboxSide = Math.max(bboxW, bboxH);
+        const averageScale = (scaleX + scaleY) / 2;
+        const equivalentSide = Math.sqrt(candidate.area / Math.PI) * 2 * averageScale * AUTO_EQUIVALENT_DIAMETER_SCALE;
+        const side = clamp(equivalentSide, 6, Math.max(6, bboxSide * 1.04));
+        const cx = ((candidate.xSum / candidate.area) + 0.5) * scaleX;
+        const cy = ((candidate.ySum / candidate.area) + 0.5) * scaleY;
+        const maxAutoSide = Math.max(currentImage.naturalWidth, currentImage.naturalHeight) * AUTO_BOX_MAX_IMAGE_RATIO;
+        const paddedSide = Math.min(maxAutoSide, side + Math.max(AUTO_BOX_MIN_PAD * 2, side * AUTO_BOX_PADDING));
+        return normalizeBox({
+          x1: cx - paddedSide / 2,
+          y1: cy - paddedSide / 2,
+          x2: cx + paddedSide / 2,
+          y2: cy + paddedSide / 2,
+          mode: "square",
+        });
+      }
+
+      function focusBoxInView(raw, targetRatio = 0.4) {
+        const b = normalizeBox(raw);
+        if (!b || !currentImage) {
+          return false;
+        }
+        const cw = Math.max(1, canvas.clientWidth);
+        const ch = Math.max(1, canvas.clientHeight);
+        const boxSide = Math.max(b.x2 - b.x1, b.y2 - b.y1);
+        if (boxSide <= 0) {
+          return false;
+        }
+        baseView = computeBaseView();
+        const targetScreenSide = Math.min(cw, ch) * targetRatio;
+        const nextZoom = clamp(targetScreenSide / Math.max(boxSide * baseView.scale, 0.001), MIN_ZOOM, MAX_ZOOM);
+        const cx = (b.x1 + b.x2) / 2;
+        const cy = (b.y1 + b.y2) / 2;
+        viewport.zoom = nextZoom;
+        viewport.panX = cw / 2 - baseView.x - cx * baseView.scale * viewport.zoom;
+        viewport.panY = ch / 2 - baseView.y - cy * baseView.scale * viewport.zoom;
+        computeView();
+        return true;
+      }
+
+      function detectAutoBox(referenceImage, targetImage) {
+        if (!referenceImage || !targetImage) {
+          return null;
+        }
+        if (
+          referenceImage.naturalWidth !== targetImage.naturalWidth ||
+          referenceImage.naturalHeight !== targetImage.naturalHeight
+        ) {
+          return null;
+        }
+
+        const { w, h } = autoAnalysisSize(targetImage);
+        const total = w * h;
+        const previousData = scaledImageData(referenceImage, w, h);
+        const currentData = scaledImageData(targetImage, w, h);
+        const motion = new Uint8Array(total);
+        const color = new Uint8Array(total);
+
+        for (let i = 0; i < total; i += 1) {
+          const offset = i * 4;
+          const r = currentData[offset];
+          const g = currentData[offset + 1];
+          const b = currentData[offset + 2];
+          const pr = previousData[offset];
+          const pg = previousData[offset + 1];
+          const pb = previousData[offset + 2];
+          const diff = Math.abs(r - pr) + Math.abs(g - pg) + Math.abs(b - pb);
+          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+          const prevLum = 0.299 * pr + 0.587 * pg + 0.114 * pb;
+          motion[i] = diff >= 52 || Math.abs(lum - prevLum) >= 20 ? 1 : 0;
+          color[i] = isTennisBallColor(r, g, b) ? 1 : 0;
+        }
+
+        const motionIntegral = buildMotionIntegral(motion, w, h);
+        const mask = new Uint8Array(total);
+        for (let y = 0; y < h; y += 1) {
+          for (let x = 0; x < w; x += 1) {
+            const index = y * w + x;
+            if (color[index] && hasNearbyMotion(motionIntegral, w, h, x, y)) {
+              mask[index] = 1;
+            }
+          }
+        }
+
+        const stack = new Int32Array(total);
+        let best = null;
+        let bestScore = -Infinity;
+        for (let index = 0; index < total; index += 1) {
+          if (!mask[index]) {
+            continue;
+          }
+          const candidate = componentCandidate(mask, motion, index, w, h, stack);
+          const score = candidateScore(candidate);
+          if (score > bestScore) {
+            best = candidate;
+            bestScore = score;
+          }
+        }
+
+        return best && bestScore > 0 ? boxFromAutoCandidate(best, w, h) : null;
+      }
+
+      function canAutoAnnotate(entry) {
+        if (!currentImage || !autoReferenceImage || box) {
+          return false;
+        }
+        if (backendMode && normalizeLabelStatus(entry && entry.labelStatus) !== "unlabeled") {
+          return false;
+        }
+        return true;
+      }
+
+      function canDetectCurrentCandidate() {
+        return Boolean(currentImage && autoReferenceImage);
+      }
+
+      async function autoAnnotateCurrent(reason = "auto", expectedToken = loadToken) {
+        const entry = images[currentIndex];
+        if (!entry || !currentImage) {
+          return false;
+        }
+        if (!autoReferenceImage) {
+          if (reason === "toggle") {
+            setStatus("Auto on; go to next frame to detect");
+          }
+          return false;
+        }
+        if (!canAutoAnnotate(entry)) {
+          return false;
+        }
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        if (expectedToken !== loadToken || !canAutoAnnotate(entry)) {
+          return false;
+        }
+
+        let detected = null;
+        try {
+          detected = detectAutoBox(autoReferenceImage, currentImage);
+        } catch (error) {
+          console.warn("Auto annotation failed", error);
+          if (reason === "toggle") {
+            setStatus(error.message || "Auto annotation failed");
+          }
+          return false;
+        }
+        if (expectedToken !== loadToken || !canAutoAnnotate(entry)) {
+          return false;
+        }
+        if (!detected || !boxIsUsable(detected)) {
+          if (reason !== "load") {
+            setStatus("Auto: no motion/HSV candidate");
+          }
+          return false;
+        }
+        focusBoxInView(detected, 0.4);
+        render();
+        setStatus("Auto centered on candidate; draw the ball box");
+        return true;
+      }
+
+      async function centerCurrentBoxOrAuto() {
+        if (!currentImage) {
+          return false;
+        }
+        if (boxIsUsable(box)) {
+          focusBoxInView(box, 0.4);
+          updateUi();
+          render();
+          setStatus("Centered on current box");
+          return true;
+        }
+        if (!canDetectCurrentCandidate()) {
+          setStatus("No box; go to next frame before auto center");
+          return false;
+        }
+
+        const expectedToken = loadToken;
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        if (expectedToken !== loadToken || !canDetectCurrentCandidate() || boxIsUsable(box)) {
+          return false;
+        }
+
+        let detected = null;
+        try {
+          detected = detectAutoBox(autoReferenceImage, currentImage);
+        } catch (error) {
+          console.warn("Auto center failed", error);
+          setStatus(error.message || "Auto center failed");
+          return false;
+        }
+        if (expectedToken !== loadToken || boxIsUsable(box)) {
+          return false;
+        }
+        if (!detected || !boxIsUsable(detected)) {
+          setStatus("Auto center: no motion/HSV candidate");
+          return false;
+        }
+        focusBoxInView(detected, 0.4);
+        updateUi();
+        render();
+        setStatus("Auto centered on candidate; draw the ball box");
+        return true;
+      }
+
+      function computeBaseView() {
+        const cw = Math.max(1, canvas.clientWidth);
+        const ch = Math.max(1, canvas.clientHeight);
+        if (!currentImage) {
+          return { x: 0, y: 0, w: cw, h: ch, scale: 1 };
+        }
+        const iw = currentImage.naturalWidth;
+        const ih = currentImage.naturalHeight;
+        const scale = Math.min(cw / iw, ch / ih);
+        const w = iw * scale;
+        const h = ih * scale;
+        return {
+          x: (cw - w) / 2,
+          y: (ch - h) / 2,
+          w,
+          h,
+          scale,
+        };
+      }
+
+      function clampPan() {
+        if (!currentImage) {
+          return;
+        }
+
+        const cw = Math.max(1, canvas.clientWidth);
+        const ch = Math.max(1, canvas.clientHeight);
+        const scaledW = baseView.w * viewport.zoom;
+        const scaledH = baseView.h * viewport.zoom;
+
+        if (scaledW <= cw) {
+          viewport.panX = (cw - scaledW) / 2 - baseView.x;
+        } else {
+          viewport.panX = clamp(viewport.panX, cw - baseView.x - scaledW, -baseView.x);
+        }
+
+        if (scaledH <= ch) {
+          viewport.panY = (ch - scaledH) / 2 - baseView.y;
+        } else {
+          viewport.panY = clamp(viewport.panY, ch - baseView.y - scaledH, -baseView.y);
+        }
+      }
+
+      function computeView() {
+        baseView = computeBaseView();
+        if (!currentImage) {
+          view = baseView;
+          return;
+        }
+        viewport.zoom = clamp(viewport.zoom, MIN_ZOOM, MAX_ZOOM);
+        clampPan();
+        view = {
+          x: baseView.x + viewport.panX,
+          y: baseView.y + viewport.panY,
+          w: baseView.w * viewport.zoom,
+          h: baseView.h * viewport.zoom,
+          scale: baseView.scale * viewport.zoom,
+        };
+      }
+
+      function zoomAt(point, factor) {
+        if (!currentImage) {
+          return;
+        }
+        const before = {
+          x: clamp((point.x - view.x) / view.scale, 0, currentImage.naturalWidth),
+          y: clamp((point.y - view.y) / view.scale, 0, currentImage.naturalHeight),
+        };
+        const nextZoom = clamp(viewport.zoom * factor, MIN_ZOOM, MAX_ZOOM);
+        if (nextZoom === viewport.zoom) {
+          return;
+        }
+
+        viewport.zoom = nextZoom;
+        baseView = computeBaseView();
+        viewport.panX = point.x - baseView.x - before.x * baseView.scale * viewport.zoom;
+        viewport.panY = point.y - baseView.y - before.y * baseView.scale * viewport.zoom;
+        computeView();
+        updateUi();
+        render();
+      }
+
+      function resetZoom() {
+        viewport = { zoom: 1, panX: 0, panY: 0 };
+        computeView();
+        updateUi();
+        render();
+      }
+
+      function resizeCanvas() {
+        const dpr = window.devicePixelRatio || 1;
+        const width = Math.max(1, Math.round(canvas.clientWidth * dpr));
+        const height = Math.max(1, Math.round(canvas.clientHeight * dpr));
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+        }
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        computeView();
+        render();
+      }
+
+      function drawPlaceholder() {
+        const w = canvas.clientWidth;
+        const h = canvas.clientHeight;
+        ctx.fillStyle = "#f8fafc";
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = "#64748b";
+        ctx.font = "600 16px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("No image loaded", w / 2, h / 2);
+      }
+
+      function screenCorner(point) {
+        return {
+          x: view.x + point.x * view.scale,
+          y: view.y + point.y * view.scale,
+        };
+      }
+
+      function boxCorners(raw) {
+        const b = normalizeBox(raw);
+        if (!b) {
+          return [];
+        }
+        return [
+          { name: "nw", x: b.x1, y: b.y1 },
+          { name: "ne", x: b.x2, y: b.y1 },
+          { name: "sw", x: b.x1, y: b.y2 },
+          { name: "se", x: b.x2, y: b.y2 },
+        ];
+      }
+
+      function render() {
+        const w = canvas.clientWidth;
+        const h = canvas.clientHeight;
+        ctx.clearRect(0, 0, w, h);
+        if (!currentImage) {
+          drawPlaceholder();
+          return;
+        }
+
+        ctx.fillStyle = "#f8fafc";
+        ctx.fillRect(0, 0, w, h);
+        const excluded = Boolean(currentEntry()?.excluded);
+        if (excluded) {
+          ctx.save();
+          ctx.filter = "grayscale(1)";
+          ctx.drawImage(currentImage, view.x, view.y, view.w, view.h);
+          ctx.restore();
+          ctx.save();
+          ctx.fillStyle = "rgba(15, 23, 42, 0.18)";
+          ctx.fillRect(view.x, view.y, view.w, view.h);
+          ctx.fillStyle = "rgba(15, 23, 42, 0.86)";
+          ctx.font = "700 16px system-ui, sans-serif";
+          ctx.textAlign = "left";
+          ctx.textBaseline = "top";
+          ctx.fillText("EXCLUDED", Math.max(12, view.x + 16), Math.max(12, view.y + 16));
+          ctx.restore();
+        } else {
+          ctx.drawImage(currentImage, view.x, view.y, view.w, view.h);
+        }
+
+        const b = normalizeBox(box);
+        if (!b) {
+          return;
+        }
+
+        const x = view.x + b.x1 * view.scale;
+        const y = view.y + b.y1 * view.scale;
+        const bw = (b.x2 - b.x1) * view.scale;
+        const bh = (b.y2 - b.y1) * view.scale;
+
+        ctx.save();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "#f59e0b";
+        ctx.fillStyle = "rgba(245, 158, 11, 0.16)";
+        ctx.fillRect(x, y, bw, bh);
+        ctx.strokeRect(x, y, bw, bh);
+
+        for (const corner of boxCorners(b)) {
+          const p = screenCorner(corner);
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+          ctx.fillStyle = "#10b981";
+          ctx.fill();
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = "#f8fafc";
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function canvasPoint(event) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = rect.width ? canvas.clientWidth / rect.width : 1;
+        const scaleY = rect.height ? canvas.clientHeight / rect.height : 1;
+        return {
+          x: (event.clientX - rect.left) * scaleX,
+          y: (event.clientY - rect.top) * scaleY,
+        };
+      }
+
+      function imagePointFromCanvas(point) {
+        if (!currentImage) {
+          return { x: 0, y: 0, inside: false };
+        }
+        const inside =
+          point.x >= view.x &&
+          point.x <= view.x + view.w &&
+          point.y >= view.y &&
+          point.y <= view.y + view.h;
+        const { w, h } = imageSize();
+        return {
+          x: clamp((point.x - view.x) / view.scale, 0, w),
+          y: clamp((point.y - view.y) / view.scale, 0, h),
+          inside,
+        };
+      }
+
+      function imagePoint(event) {
+        return imagePointFromCanvas(canvasPoint(event));
+      }
+
+      function hitHandle(event) {
+        if (!box || !currentImage) {
+          return null;
+        }
+        const point = canvasPoint(event);
+        let hit = null;
+        let bestDistance = Infinity;
+        for (const corner of boxCorners(box)) {
+          const p = screenCorner(corner);
+          const distance = Math.hypot(point.x - p.x, point.y - p.y);
+          if (distance <= 12 && distance < bestDistance) {
+            hit = corner.name;
+            bestDistance = distance;
+          }
+        }
+        return hit;
+      }
+
+      function cursorForHandle(handle) {
+        if (isSpaceDown) {
+          return "grab";
+        }
+        if (handle === "nw" || handle === "se") {
+          return "nwse-resize";
+        }
+        if (handle === "ne" || handle === "sw") {
+          return "nesw-resize";
+        }
+        return "crosshair";
+      }
+
+      function updateCanvasCursor(event = null) {
+        if (!currentImage) {
+          canvas.style.cursor = "crosshair";
+          return;
+        }
+        if (pinch) {
+          canvas.style.cursor = "grabbing";
+          return;
+        }
+        if (drag && drag.type === "pan") {
+          canvas.style.cursor = "grabbing";
+          return;
+        }
+        if (panModeEnabled || isSpaceDown) {
+          canvas.style.cursor = "grab";
+          return;
+        }
+        canvas.style.cursor = cursorForHandle(event ? hitHandle(event) : null);
+      }
+
+      function isPanPointer(event) {
+        return ((isSpaceDown || panModeEnabled) && event.button === 0) || event.button === 1 || event.button === 2;
+      }
+
+      function activePointerPair() {
+        const points = Array.from(activePointers.values());
+        if (points.length < 2) {
+          return null;
+        }
+        return [points[0], points[1]];
+      }
+
+      function midpoint(a, b) {
+        return {
+          x: (a.x + b.x) / 2,
+          y: (a.y + b.y) / 2,
+        };
+      }
+
+      function pointerDistance(a, b) {
+        return Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+      }
+
+      function cancelDragForGesture() {
+        if (!drag) {
+          return;
+        }
+        if (drag.type !== "pan") {
+          box = cloneBox(drag.originalBox);
+        }
+        drag = null;
+      }
+
+      function startPinchGesture() {
+        const pair = activePointerPair();
+        if (!pair || !currentImage) {
+          pinch = null;
+          return false;
+        }
+        const [a, b] = pair;
+        const center = midpoint(a, b);
+        const anchor = imagePointFromCanvas(center);
+        pinch = {
+          startDistance: pointerDistance(a, b),
+          startZoom: viewport.zoom,
+          anchorX: anchor.x,
+          anchorY: anchor.y,
+        };
+        return true;
+      }
+
+      function updatePinchGesture() {
+        const pair = activePointerPair();
+        if (!pair || !pinch || !currentImage) {
+          return;
+        }
+        const [a, b] = pair;
+        const center = midpoint(a, b);
+        const distance = pointerDistance(a, b);
+        viewport.zoom = clamp(pinch.startZoom * (distance / pinch.startDistance), MIN_ZOOM, MAX_ZOOM);
+        baseView = computeBaseView();
+        viewport.panX = center.x - baseView.x - pinch.anchorX * baseView.scale * viewport.zoom;
+        viewport.panY = center.y - baseView.y - pinch.anchorY * baseView.scale * viewport.zoom;
+        computeView();
+        updateUi();
+        render();
+      }
+
+      function updateHandle(activeDrag, point) {
+        if (!box) {
+          return;
+        }
+        const b = normalizeBox(box);
+        if (!b) {
+          return;
+        }
+        const anchors = {
+          nw: { x: b.x2, y: b.y2 },
+          ne: { x: b.x1, y: b.y2 },
+          sw: { x: b.x2, y: b.y1 },
+          se: { x: b.x1, y: b.y1 },
+        };
+        const anchor = anchors[activeDrag.handle];
+        if (anchor) {
+          activeDrag.rectMode = activeDrag.rectMode || shouldStretchToRect(anchor.x, anchor.y, point.x, point.y);
+          box = boxFromAnchor(anchor.x, anchor.y, point.x, point.y, activeDrag.rectMode);
+        }
+      }
+
+      function labelPathFor(entry) {
+        return entry.path.replace(/\.[^.]+$/, ".txt");
+      }
+
+      async function getLabelFile(entry, create) {
+        if (!labelRoot) {
+          return null;
+        }
+        const parts = labelPathFor(entry).split("/");
+        let dir = labelRoot;
+        for (let i = 0; i < parts.length - 1; i += 1) {
+          dir = await dir.getDirectoryHandle(parts[i], { create });
+        }
+        return dir.getFileHandle(parts[parts.length - 1], { create });
+      }
+
+      function boxFromYoloText(text) {
+        const line = (text || "").trim().split(/\r?\n/)[0];
+        if (!line) {
+          return null;
+        }
+        const parts = line.trim().split(/\s+/).map(Number);
+        if (parts.length < 5 || parts.slice(1, 5).some((n) => !Number.isFinite(n))) {
+          return null;
+        }
+        const { w, h } = imageSize();
+        const cx = parts[1] * w;
+        const cy = parts[2] * h;
+        const bw = parts[3] * w;
+        const bh = parts[4] * h;
+        const mode = Math.abs(bw - bh) > Math.max(bw, bh) * 0.05 ? "rect" : "square";
+        return normalizeBox({
+          x1: cx - bw / 2,
+          y1: cy - bh / 2,
+          x2: cx + bw / 2,
+          y2: cy + bh / 2,
+          mode,
+        });
+      }
+
+      async function loadLabel(entry) {
+        if (backendMode) {
+          const data = await apiJson(apiUrl("/api/labels", labelPathFor(entry)));
+          if ((data.text || "").trim()) {
+            entry.labelStatus = "ball";
+            entry.labelExists = true;
+          }
+          return boxFromYoloText(data.text);
+        }
+        if (!labelRoot) {
+          return null;
+        }
+        try {
+          const handle = await getLabelFile(entry, false);
+          const file = await handle.getFile();
+          const text = await file.text();
+          entry.labelStatus = labelStatusFromYoloText(text);
+          entry.labelExists = true;
+          return boxFromYoloText(text);
+        } catch (error) {
+          if (error.name !== "NotFoundError") {
+            console.warn(error);
+          } else {
+            entry.labelStatus = "unlabeled";
+            entry.labelExists = false;
+          }
+          return null;
+        }
+      }
+
+      async function ensureWritable() {
+        if (!labelRoot) {
+          setStatus("Open labels first");
+          return false;
+        }
+        const options = { mode: "readwrite" };
+        if ((await labelRoot.queryPermission(options)) === "granted") {
+          return true;
+        }
+        return (await labelRoot.requestPermission(options)) === "granted";
+      }
+
+      function yoloText() {
+        const b = normalizeBox(box);
+        if (!b || !currentImage) {
+          return "";
+        }
+        const { w, h } = imageSize();
+        const cx = ((b.x1 + b.x2) / 2) / w;
+        const cy = ((b.y1 + b.y2) / 2) / h;
+        const bw = (b.x2 - b.x1) / w;
+        const bh = (b.y2 - b.y1) / h;
+        const format = (n) => clamp(n, 0, 1).toFixed(6);
+        return `0 ${format(cx)} ${format(cy)} ${format(bw)} ${format(bh)}\n`;
+      }
+
+      function labelStatusFromYoloText(text) {
+        return text.trim() ? "ball" : "empty";
+      }
+
+      function applyStatusDelta(target, status, delta) {
+        if (!target) {
+          return;
+        }
+        const normalized = normalizeLabelStatus(status);
+        target[normalized] = Math.max(0, countValue(target[normalized]) + delta);
+        if (normalized !== "unlabeled") {
+          target.labeled = Math.max(0, countValue(target.labeled) + delta);
+        }
+      }
+
+      function updateBackendLabelStatus(entry, previousStatus, nextStatus) {
+        if (!backendMode) {
+          return;
+        }
+        const previous = normalizeLabelStatus(
+          previousStatus || entry.labelStatus || (entry.labelExists ? "ball" : "unlabeled")
+        );
+        const next = normalizeLabelStatus(nextStatus);
+        entry.labelStatus = next;
+        entry.labelExists = next !== "unlabeled";
+        if (previous === next) {
+          return;
+        }
+        const video = findVideo(entry.video || selectedVideoId);
+        if (!video || !video.cameras) {
+          return;
+        }
+        const stats = video.cameras[entry.camera || selectedCamera];
+        if (!stats) {
+          return;
+        }
+        applyStatusDelta(stats, previous, -1);
+        applyStatusDelta(stats, next, 1);
+        applyStatusDelta(video, previous, -1);
+        applyStatusDelta(video, next, 1);
+        renderVideoList();
+      }
+
+      function applyExcludedDelta(target, delta) {
+        if (!target) {
+          return;
+        }
+        target.excluded = Math.max(0, countValue(target.excluded) + delta);
+      }
+
+      function updateBackendExcludedStatus(entry, previousExcluded, nextExcluded) {
+        entry.excluded = Boolean(nextExcluded);
+        if (!backendMode || Boolean(previousExcluded) === Boolean(nextExcluded)) {
+          return;
+        }
+        const delta = nextExcluded ? 1 : -1;
+        const video = findVideo(entry.video || selectedVideoId);
+        if (!video || !video.cameras) {
+          return;
+        }
+        const stats = video.cameras[entry.camera || selectedCamera];
+        applyExcludedDelta(stats, delta);
+        applyExcludedDelta(video, delta);
+        renderVideoList();
+      }
+
+      function entryLabelStatus(entry) {
+        return normalizeLabelStatus(entry?.labelStatus || (entry?.labelExists ? "ball" : "unlabeled"));
+      }
+
+      function wouldClearExistingBall(entry, text) {
+        return !text.trim() && entryLabelStatus(entry) === "ball";
+      }
+
+      async function saveCurrent(options = {}) {
+        if (currentIndex < 0 || !images[currentIndex]) {
+          return false;
+        }
+        const entry = images[currentIndex];
+        const text = yoloText();
+        if (!options.allowEmptyOverwrite && wouldClearExistingBall(entry, text)) {
+          setStatus("Skipped empty save; use Clear/Delete to remove existing label");
+          return true;
+        }
+        try {
+          if (backendMode) {
+            const result = await apiJson(apiUrl("/api/labels", labelPathFor(entry)), {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ text }),
+            });
+            updateBackendLabelStatus(
+              entry,
+              result.previous_status,
+              result.label_status || labelStatusFromYoloText(text)
+            );
+            setStatus(`Saved ${labelPathFor(entry)}`);
+            return true;
+          }
+          if (!await ensureWritable()) {
+            setStatus("Labels are read only");
+            return false;
+          }
+          const handle = await getLabelFile(entry, true);
+          const writable = await handle.createWritable();
+          await writable.write(text);
+          await writable.close();
+          setStatus(`Saved ${labelPathFor(entry)}`);
+          return true;
+        } catch (error) {
+          console.error(error);
+          setStatus(error.message || "Save failed");
+          return false;
+        }
+      }
+
+      async function toggleExcluded() {
+        const entry = currentEntry();
+        if (!entry) {
+          return;
+        }
+        if (!backendMode) {
+          setStatus("Sample exclusion needs backend mode");
+          return;
+        }
+        const nextExcluded = !entry.excluded;
+        try {
+          const result = await apiJson(apiUrl("/api/excluded", entry.path), {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ excluded: nextExcluded }),
+          });
+          updateBackendExcludedStatus(entry, result.previous_excluded, result.excluded);
+          updateUi();
+          render();
+          setStatus(result.excluded ? "Sample excluded from training" : "Sample restored for training");
+        } catch (error) {
+          console.error(error);
+          setStatus(error.message || "Could not toggle sample exclusion");
+        }
+      }
+
+      async function loadIndex(index, options = {}) {
+        if (index < 0 || index >= images.length) {
+          return;
+        }
+        const updateTimeline = options.updateTimeline !== false;
+        const previousIndex = currentIndex;
+        const previousImage = currentImage;
+        const previousBox = box;
+        const previousAutoReference = autoReferenceImage;
+        const token = ++loadToken;
+        currentIndex = index;
+        box = null;
+        if (updateTimeline) {
+          renderVideoList();
+        }
+        updateUi();
+        render();
+
+        const entry = images[index];
+        let url = apiUrl("/api/images", entry.path);
+        let img = null;
+        try {
+          if (!backendMode) {
+            const file = await entry.handle.getFile();
+            url = URL.createObjectURL(file);
+          }
+          img = new Image();
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = url;
+          });
+        } catch (error) {
+          console.error(error);
+          releaseUrl(url);
+          if (token === loadToken) {
+            currentIndex = previousIndex;
+            currentImage = previousImage;
+            box = previousBox;
+            autoReferenceImage = previousAutoReference;
+            computeView();
+            updateUi();
+            render();
+            setStatus(error.message || "Could not load image");
+          }
+          return;
+        }
+        if (token !== loadToken) {
+          releaseUrl(url);
+          return;
+        }
+        if (currentUrl) {
+          releaseUrl(currentUrl);
+        }
+        currentUrl = url;
+        currentImage = img;
+        autoReferenceImage =
+          previousIndex >= 0 &&
+          previousIndex !== index &&
+          previousImage &&
+          previousImage.naturalWidth === img.naturalWidth &&
+          previousImage.naturalHeight === img.naturalHeight
+            ? previousImage
+            : null;
+        computeView();
+        try {
+          box = await loadLabel(entry);
+          setStatus(box ? "Loaded label" : "");
+        } catch (error) {
+          console.error(error);
+          box = null;
+          setStatus(error.message || "Could not load label");
+        }
+        if (autoAnnotateEnabled) {
+          await autoAnnotateCurrent("load", token);
+        }
+        writeStoredSelection();
+        updateUi();
+        render();
+      }
+
+      async function go(offset) {
+        if (!images.length) {
+          return;
+        }
+        await loadIndex(clamp(currentIndex + offset, 0, images.length - 1));
+      }
+
+      async function jumpToInputIndex() {
+        if (!images.length) {
+          return;
+        }
+        const rawValue = jumpIndexInput.value.trim();
+        const rawIndex = Number(rawValue);
+        if (!rawValue) {
+          setStatus("Enter an image number");
+          jumpIndexInput.select();
+          return;
+        }
+        if (!Number.isInteger(rawIndex)) {
+          setStatus("Enter an image number");
+          jumpIndexInput.select();
+          return;
+        }
+        const index = rawIndex - 1;
+        if (index < 0 || index >= images.length) {
+          setStatus(`Enter 1-${images.length}`);
+          jumpIndexInput.select();
+          return;
+        }
+        await loadIndex(index);
+        jumpIndexInput.value = "";
+      }
+
+      async function saveAndGoNext() {
+        if (!images.length || currentIndex < 0) {
+          return;
+        }
+        if (labelsAreWritable()) {
+          const saved = await saveCurrent();
+          if (!saved) {
+            return;
+          }
+        }
+        await go(1);
+      }
+
+      async function selectVideoCamera(videoId, camera, options = {}) {
+        selectedVideoId = videoId;
+        selectedCamera = camera;
+        renderVideoList();
+        setStatus("Loading images");
+        const data = await apiJson(apiQuery("/api/images", { video: videoId, camera }));
+        images = normalizeBackendImages(data.images || []);
+        const targetIndex = restoredImageIndex(options.selection || null);
+        currentIndex = targetIndex;
+        renderVideoList();
+        updateUi();
+        if (images.length) {
+          await loadIndex(targetIndex);
+        } else {
+          currentImage = null;
+          autoReferenceImage = null;
+          box = null;
+          setStatus("No images found");
+          render();
+        }
+      }
+
+      async function pickImages() {
+        if (backendMode) {
+          return;
+        }
+        if (!isFileSystemAccessReady()) {
+          return;
+        }
+        imageRoot = await window.showDirectoryPicker({
+          id: "tennis-yolo-images",
+          mode: "read",
+        });
+        setStatus("Indexing images");
+        images = await walkDirectory(imageRoot);
+        images.sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true }));
+        currentIndex = images.length ? 0 : -1;
+        updateUi();
+        if (images.length) {
+          await loadIndex(0);
+        } else {
+          currentImage = null;
+          autoReferenceImage = null;
+          box = null;
+          setStatus("No images found");
+          render();
+        }
+      }
+
+      async function pickLabels() {
+        if (backendMode) {
+          return;
+        }
+        if (!isFileSystemAccessReady()) {
+          return;
+        }
+        labelRoot = await window.showDirectoryPicker({
+          id: "tennis-yolo-labels",
+          mode: "readwrite",
+        });
+        setStatus("Labels ready");
+        updateUi();
+        if (currentIndex >= 0) {
+          await loadIndex(currentIndex);
+        }
+      }
+
+      async function initBackend() {
+        if (window.location.protocol === "file:") {
+          return;
+        }
+        try {
+          const data = await apiJson("/api/videos");
+          if (!Array.isArray(data.videos)) {
+            return;
+          }
+          backendMode = true;
+          imageRoot = null;
+          labelRoot = null;
+          videos = data.videos;
+          const storedSelection = readStoredSelection();
+          const restored = restoredVideoCamera(storedSelection);
+          const firstVideo = restored ? restored.video : videos[0] || null;
+          const firstCamera = restored ? restored.camera : firstVideo ? cameraNames(firstVideo)[0] : "";
+          updateUi();
+          renderVideoList();
+          if (firstVideo && firstCamera) {
+            await selectVideoCamera(firstVideo.id, firstCamera, { selection: restored ? storedSelection : null });
+          } else {
+            images = [];
+            currentIndex = -1;
+            currentImage = null;
+            autoReferenceImage = null;
+            box = null;
+            setStatus("Backend ready, no images found");
+            render();
+          }
+        } catch (error) {
+          console.debug("Annotator backend unavailable", error);
+        }
+      }
+
+      canvas.addEventListener("pointerdown", (event) => {
+        if (!currentImage) {
+          return;
+        }
+        const canvasPosition = canvasPoint(event);
+        activePointers.set(event.pointerId, canvasPosition);
+        canvas.setPointerCapture(event.pointerId);
+        if (activePointers.size >= 2) {
+          event.preventDefault();
+          cancelDragForGesture();
+          if (startPinchGesture()) {
+            updateCanvasCursor(event);
+            render();
+          }
+          return;
+        }
+        if (isPanPointer(event)) {
+          event.preventDefault();
+          drag = {
+            type: "pan",
+            pointerId: event.pointerId,
+            startX: canvasPosition.x,
+            startY: canvasPosition.y,
+            panX: viewport.panX,
+            panY: viewport.panY,
+          };
+          updateCanvasCursor(event);
+          return;
+        }
+        if (event.button !== 0) {
+          return;
+        }
+        const point = imagePointFromCanvas(canvasPosition);
+        if (!point.inside) {
+          return;
+        }
+        event.preventDefault();
+        const handle = hitHandle(event);
+        if (handle) {
+          drag = {
+            type: "handle",
+            handle,
+            pointerId: event.pointerId,
+            rectMode: event.shiftKey || normalizeBox(box)?.mode === "rect",
+            originalBox: cloneBox(box),
+          };
+        } else {
+          const originalBox = cloneBox(box);
+          box = { x1: point.x, y1: point.y, x2: point.x, y2: point.y };
+          drag = {
+            type: "draw",
+            pointerId: event.pointerId,
+            anchorX: point.x,
+            anchorY: point.y,
+            rectMode: event.shiftKey,
+            originalBox,
+          };
+        }
+        render();
+      });
+
+      canvas.addEventListener("pointermove", (event) => {
+        if (!currentImage) {
+          return;
+        }
+        if (activePointers.has(event.pointerId)) {
+          activePointers.set(event.pointerId, canvasPoint(event));
+        }
+        if (pinch || activePointers.size >= 2) {
+          event.preventDefault();
+          cancelDragForGesture();
+          if (!pinch) {
+            startPinchGesture();
+          }
+          updatePinchGesture();
+          updateCanvasCursor(event);
+          return;
+        }
+        if (!drag) {
+          updateCanvasCursor(event);
+          return;
+        }
+        if (event.pointerId !== drag.pointerId) {
+          return;
+        }
+        if (drag.type === "pan") {
+          const point = canvasPoint(event);
+          viewport.panX = drag.panX + point.x - drag.startX;
+          viewport.panY = drag.panY + point.y - drag.startY;
+          computeView();
+          updateUi();
+          render();
+          return;
+        }
+        const point = imagePoint(event);
+        if (drag.type === "handle") {
+          drag.rectMode = drag.rectMode || event.shiftKey;
+          updateHandle(drag, point);
+        } else if (box) {
+          drag.rectMode = drag.rectMode || event.shiftKey || shouldStretchToRect(drag.anchorX, drag.anchorY, point.x, point.y);
+          box = boxFromAnchor(drag.anchorX, drag.anchorY, point.x, point.y, drag.rectMode);
+        }
+        render();
+      });
+
+      async function finishPointer(event) {
+        activePointers.delete(event.pointerId);
+        if (pinch) {
+          event.preventDefault();
+          if (activePointers.size >= 2) {
+            startPinchGesture();
+            updatePinchGesture();
+          } else {
+            pinch = null;
+          }
+          updateCanvasCursor(event);
+          return;
+        }
+        if (!drag || event.pointerId !== drag.pointerId) {
+          return;
+        }
+        const finishedType = drag.type;
+        drag = null;
+        updateCanvasCursor(event);
+        if (finishedType === "pan") {
+          return;
+        }
+        if (!boxIsUsable(box)) {
+          box = null;
+          render();
+          return;
+        }
+        box = normalizeBox(box);
+        render();
+        if (finishedType === "draw") {
+          const saved = await saveCurrent();
+          if (saved) {
+            await go(1);
+          }
+        } else {
+          await saveCurrent();
+        }
+      }
+
+      canvas.addEventListener("pointerup", finishPointer);
+      canvas.addEventListener("pointercancel", finishPointer);
+      canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+      canvas.addEventListener("wheel", (event) => {
+        if (!currentImage) {
+          return;
+        }
+        event.preventDefault();
+        zoomAt(canvasPoint(event), event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP);
+      }, { passive: false });
+
+      buttons.toggleSidebar.addEventListener("click", toggleSidebar);
+      buttons.pickImages.addEventListener("click", () => {
+        pickImages().catch((error) => {
+          console.error(error);
+          setStatus(error.message || "Could not open images");
+        });
+      });
+      buttons.pickLabels.addEventListener("click", () => {
+        pickLabels().catch((error) => {
+          console.error(error);
+          setStatus(error.message || "Could not open labels");
+        });
+      });
+      buttons.prev.addEventListener("click", () => go(-1));
+      buttons.next.addEventListener("click", () => saveAndGoNext());
+      buttons.jump.addEventListener("click", () => jumpToInputIndex());
+      jumpIndexInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          jumpToInputIndex();
+        }
+      });
+      buttons.save.addEventListener("click", () => saveCurrent());
+      buttons.autoDetect.addEventListener("click", () => {
+        toggleAutoAnnotate().catch((error) => {
+          console.error(error);
+          setStatus(error.message || "Auto annotation failed");
+        });
+      });
+      buttons.panMode.addEventListener("click", togglePanMode);
+      buttons.zoomOut.addEventListener("click", () => zoomAt(centerPoint(), 1 / ZOOM_STEP));
+      buttons.zoomIn.addEventListener("click", () => zoomAt(centerPoint(), ZOOM_STEP));
+      buttons.zoomReset.addEventListener("click", resetZoom);
+      buttons.clear.addEventListener("click", async () => {
+        box = null;
+        render();
+        await saveCurrent({ allowEmptyOverwrite: true });
+      });
+      buttons.exclude.addEventListener("click", () => {
+        toggleExcluded();
+      });
+
+      document.addEventListener("keydown", async (event) => {
+        if (isEditableTarget(event.target)) {
+          return;
+        }
+        if (event.code === "Space") {
+          event.preventDefault();
+          isSpaceDown = true;
+          updateCanvasCursor();
+          return;
+        }
+        if (event.ctrlKey || event.metaKey || event.altKey) {
+          return;
+        }
+        const key = event.key.toLowerCase();
+        if (key === "a") {
+          event.preventDefault();
+          await go(-1);
+        } else if (key === "d") {
+          event.preventDefault();
+          await saveAndGoNext();
+        } else if (key === "t") {
+          event.preventDefault();
+          await toggleAutoAnnotate();
+        } else if (key === "c") {
+          event.preventDefault();
+          await centerCurrentBoxOrAuto();
+        } else if (key === "p") {
+          event.preventDefault();
+          togglePanMode();
+        } else if (key === "x") {
+          event.preventDefault();
+          await toggleExcluded();
+        } else if (key === "q" || event.key === "Delete" || event.key === "Backspace") {
+          event.preventDefault();
+          box = null;
+          render();
+          await saveCurrent({ allowEmptyOverwrite: true });
+        } else if (key === "-" || key === "_") {
+          event.preventDefault();
+          zoomAt(centerPoint(), 1 / ZOOM_STEP);
+        } else if (key === "+" || key === "=") {
+          event.preventDefault();
+          zoomAt(centerPoint(), ZOOM_STEP);
+        } else if (key === "0") {
+          event.preventDefault();
+          resetZoom();
+        }
+      });
+
+      document.addEventListener("keyup", (event) => {
+        if (event.code === "Space") {
+          isSpaceDown = false;
+          updateCanvasCursor();
+        }
+      });
+
+      window.addEventListener("resize", resizeCanvas);
+      if ("ResizeObserver" in window) {
+        new ResizeObserver(resizeCanvas).observe(canvas);
+      }
+      updateUi();
+      resizeCanvas();
+      initBackend();
+    })();
+  </script>
+</body>
+</html>
