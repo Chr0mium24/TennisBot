@@ -168,6 +168,7 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 - [Target print check recorder](docs/target_print_check_recorder_20260629.md)
 - [Final runtime validation](docs/final_runtime_validation_20260629.md)
 - [Local runtime operator runbook](docs/local_runtime_operator_runbook_20260629.md)
+- [Local runtime launcher next action](docs/local_runtime_launcher_next_action_20260629.md)
 - [Local runtime preflight](docs/local_runtime_preflight_20260629.md)
 - [Local physical validation status](docs/local_physical_validation_status_20260629.md)
 - [Physical artifact import](docs/physical_artifact_import_20260629.md)

@@ -42,6 +42,13 @@ ready  Live3D           http://127.0.0.1:5178/
 ready  Calibration GUI  http://127.0.0.1:5188/
 ```
 
+Normal startup also prints the current physical validation next action. On
+2026-06-29, the observed next action is:
+
+```text
+Physical validation next action: Print the target SVG at 100%, measure one square, then record the measurement in this artifact.
+```
+
 ## Calibration Order
 
 Before taking calibration frames, run the preflight:

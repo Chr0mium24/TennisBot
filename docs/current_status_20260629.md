@@ -42,6 +42,7 @@ The latest committed runtime work added:
 - local physical validation checklist;
 - local physical validation status script;
 - target print measurement recorder;
+- local runtime launcher next-action output;
 - calibration target generation;
 - calibration GUI target print-check recording;
 - calibration GUI target, mono, stereo, and package verification presets;
