@@ -132,16 +132,23 @@ function displayPath(path: string): string {
 }
 
 async function cameraDeviceCheck(): Promise<CheckResult> {
-  const result = await runCommand(["v4l2-ctl", "--list-devices"], { cwd: repoRoot });
-  const hasLeft = result.stdout.includes("/dev/video0");
-  const hasRight = result.stdout.includes("/dev/video2");
-  const passed = result.exitCode === 0 && hasLeft && hasRight;
+  const detected = await runCommand(["bun", "scripts/detect-camera-devices.ts", "--json"], { cwd: repoRoot });
+  let captureCount = 0;
+  try {
+    const payload = JSON.parse(detected.stdout) as { devices?: unknown };
+    captureCount = Array.isArray(payload.devices) ? payload.devices.length : 0;
+  } catch {
+    captureCount = 0;
+  }
+  const passed = detected.exitCode === 0 && captureCount >= 2;
   return {
     id: "usb-cameras",
     label: "USB camera devices",
     status: passed ? "passed" : "failed",
-    detail: passed ? "/dev/video0 and /dev/video2 are present." : "Expected /dev/video0 and /dev/video2 were not both present.",
-    evidence: result.exitCode === 0 ? result.stdout.trim() : compactCommandEvidence(result),
+    detail: passed
+      ? `${captureCount} V4L2 capture devices detected.`
+      : "Fewer than two V4L2 capture devices were detected.",
+    evidence: compactCommandEvidence(detected),
   };
 }
 
@@ -231,6 +238,6 @@ Checks local TennisBot operator readiness:
 - Live3D URL at http://127.0.0.1:5178/
 - YOLO runtime package verification
 - Stereo calibration package verification
-- USB camera devices /dev/video0 and /dev/video2
+- At least two V4L2 capture devices
 `);
 }
