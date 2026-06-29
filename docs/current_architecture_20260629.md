@@ -246,7 +246,7 @@ cd tools/calibration && uv run pytest -q
 Result: 19 passing tests, 0 failures.
 
 cd tools/calibration/frontend/review && bun test && bun run build
-Result: 6 passing tests, build passed.
+Result: 8 passing tests, build passed.
 
 cd apps/live3d && bun test
 Result: 44 passing tests, 0 failures.

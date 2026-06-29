@@ -198,9 +198,10 @@ PORT=5188 bun run dev
 ```
 
 It imports artifact-shaped JSON from the capture/check/detect/solve workflow,
-shows the current gate status, displays inspection and ChArUco tables, and
-generates the next CLI commands. It does not import Python calibration modules,
-YOLO tooling, or legacy lab source code.
+shows the current gate status, previews local capture PNG frames served from
+`/artifacts/...`, displays inspection and ChArUco tables, and generates the next
+CLI commands. It does not import Python calibration modules, YOLO tooling, or
+legacy lab source code.
 
 ## Migration Checklist
 

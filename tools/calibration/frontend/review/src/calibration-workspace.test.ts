@@ -5,6 +5,7 @@ import {
   buildDetectCommand,
   buildInspectCommand,
   buildSolveCommand,
+  captureFramePreviews,
   classifyArtifact,
   frameRows,
   observationRows,
@@ -100,6 +101,72 @@ describe("calibration review workspace", () => {
         views: [{ path: "frames/cam1.png", side: "left", accepted: true, corner_count: 104, marker_count: 63 }],
       }),
     ).toEqual([{ path: "frames/cam1.png", side: "left", accepted: "true", corners: "104", markers: "63", reason: "none" }]);
+  });
+
+  test("builds local capture frame previews from manifest and inspection artifacts", () => {
+    const previews = captureFramePreviews(
+      {
+        schema_version: "calibration.capture_session.v1",
+        topology: "stereo",
+        session_id: "stereo_session",
+        camera_ids: ["cam1", "cam2"],
+        pairs: [{ index: 1, left: "frames/cam1_0001.png", right: "frames/cam2_0001.png" }],
+      },
+      {
+        schema_version: "calibration.capture_inspection.v1",
+        session_path: "../../artifacts/calibration_sessions/stereo_session",
+        frames: [
+          {
+            path: "frames/cam1_0001.png",
+            side: "left",
+            camera_id: "cam1",
+            index: 1,
+            status: "read",
+            width: 1280,
+            height: 720,
+            mean_luma: 74.002,
+            std_luma: 0.048,
+            issues: ["low contrast / likely blank frame"],
+          },
+        ],
+      },
+    );
+
+    expect(previews).toHaveLength(2);
+    expect(previews[0]).toMatchObject({
+      path: "frames/cam1_0001.png",
+      side: "left",
+      cameraId: "cam1",
+      status: "read",
+      luma: "74.002",
+      contrast: "0.048",
+      size: "1280x720",
+      issues: "low contrast / likely blank frame",
+      imageUrl: "/artifacts/calibration_sessions/stereo_session/frames/cam1_0001.png",
+    });
+    expect(previews[1]).toMatchObject({
+      path: "frames/cam2_0001.png",
+      side: "right",
+      cameraId: "cam2",
+      status: "captured",
+      imageUrl: "/artifacts/calibration_sessions/stereo_session/frames/cam2_0001.png",
+    });
+  });
+
+  test("does not build preview URLs outside the artifacts directory", () => {
+    const previews = captureFramePreviews(
+      {
+        schema_version: "calibration.capture_session.v1",
+        topology: "mono",
+        session_path: "../../artifacts/calibration_sessions/session",
+        camera_id: "cam1",
+        files: ["../secret.png", "frames/cam1_0001.png"],
+      },
+      undefined,
+    );
+
+    expect(previews[0].imageUrl).toBeUndefined();
+    expect(previews[1].imageUrl).toBe("/artifacts/calibration_sessions/session/frames/cam1_0001.png");
   });
 });
 

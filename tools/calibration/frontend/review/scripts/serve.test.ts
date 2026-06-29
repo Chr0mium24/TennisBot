@@ -27,6 +27,8 @@ describe("calibration review server", () => {
     expect(contentType("/assets/main.js")).toContain("text/javascript");
     expect(contentType("/styles.css")).toContain("text/css");
     expect(contentType("/artifacts/package.json")).toContain("application/json");
+    expect(contentType("/artifacts/calibration_sessions/session/frames/cam1_0001.png")).toBe("image/png");
+    expect(contentType("/artifacts/calibration_sessions/session/frames/cam1_0001.jpg")).toBe("image/jpeg");
   });
 });
 

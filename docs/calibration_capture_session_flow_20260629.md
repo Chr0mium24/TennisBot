@@ -215,4 +215,4 @@ for a mono or stereo solve.
 - Validate mono calibration solving from accepted real mono observations.
 - Validate stereo calibration solving from accepted real stereo observations and
   mono intrinsics.
-- Add a richer review GUI for accepting/rejecting captured frames before solve.
+- Add explicit accept/reject annotations in the review GUI before solve.

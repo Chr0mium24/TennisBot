@@ -12,6 +12,8 @@ export function contentType(pathname: string): string {
   if (pathname.endsWith(".js")) return "text/javascript; charset=utf-8";
   if (pathname.endsWith(".css")) return "text/css; charset=utf-8";
   if (pathname.endsWith(".json")) return "application/json; charset=utf-8";
+  if (pathname.endsWith(".png")) return "image/png";
+  if (pathname.endsWith(".jpg") || pathname.endsWith(".jpeg")) return "image/jpeg";
   return "application/octet-stream";
 }
 

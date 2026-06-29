@@ -3,6 +3,7 @@ import {
   buildDetectCommand,
   buildInspectCommand,
   buildSolveCommand,
+  captureFramePreviews,
   classifyArtifact,
   frameRows,
   latest,
@@ -71,6 +72,7 @@ if (app === null) {
 render();
 
 function render(): void {
+  const manifest = latest(state.artifacts, "captureManifest")?.payload;
   const inspection = latest(state.artifacts, "captureInspection")?.payload;
   const observations = latest(state.artifacts, "charucoObservations")?.payload;
   const monoPackage = latest(state.artifacts, "monoPackage")?.payload;
@@ -104,7 +106,7 @@ function render(): void {
           <button class="secondary" id="load-sample">Load Sample</button>
         </header>
         ${state.activeTab === "capture" ? renderCapturePanel() : ""}
-        ${state.activeTab === "review" ? renderReviewPanel(inspection, observations) : ""}
+        ${state.activeTab === "review" ? renderReviewPanel(manifest, inspection, observations) : ""}
         ${state.activeTab === "solve" ? renderSolvePanel() : ""}
         ${state.activeTab === "packages" ? renderPackagesPanel(monoPackage, stereoPackage) : ""}
       </section>
@@ -167,9 +169,18 @@ function renderCapturePanel(): string {
   `;
 }
 
-function renderReviewPanel(inspection: JsonObject | undefined, observations: JsonObject | undefined): string {
+function renderReviewPanel(
+  manifest: JsonObject | undefined,
+  inspection: JsonObject | undefined,
+  observations: JsonObject | undefined,
+): string {
+  const previews = captureFramePreviews(manifest, inspection);
   return `
     <section class="panel-stack">
+      <article class="panel">
+        <h2>Frame Preview</h2>
+        ${renderFramePreviewGallery(previews)}
+      </article>
       <article class="panel">
         <h2>Capture Quality</h2>
         ${renderTable(["path", "side", "status", "luma", "contrast", "issues"], frameRows(inspection))}
@@ -179,6 +190,36 @@ function renderReviewPanel(inspection: JsonObject | undefined, observations: Jso
         ${renderTable(["path", "side", "accepted", "corners", "markers", "reason"], observationRows(observations))}
       </article>
     </section>
+  `;
+}
+
+function renderFramePreviewGallery(previews: ReturnType<typeof captureFramePreviews>): string {
+  if (previews.length === 0) return `<p class="empty">No capture frames loaded.</p>`;
+  return `
+    <div class="frame-gallery">
+      ${previews
+        .map(
+          (preview) => `
+            <article class="frame-card">
+              <div class="frame-media">
+                ${
+                  preview.imageUrl === undefined
+                    ? `<span>No local preview URL</span>`
+                    : `<img src="${escapeHtml(preview.imageUrl)}" alt="${escapeHtml(preview.side)} ${escapeHtml(preview.path)}" loading="lazy">`
+                }
+              </div>
+              <div class="frame-meta">
+                <strong>${escapeHtml(preview.side)} ${escapeHtml(preview.index)}</strong>
+                <span>${escapeHtml(preview.cameraId)} &middot; ${escapeHtml(preview.status)}</span>
+                <span>${escapeHtml(preview.size)} &middot; luma ${escapeHtml(preview.luma)} &middot; contrast ${escapeHtml(preview.contrast)}</span>
+                <span>${escapeHtml(preview.issues)}</span>
+                <code>${escapeHtml(preview.path)}</code>
+              </div>
+            </article>
+          `,
+        )
+        .join("")}
+    </div>
   `;
 }
 

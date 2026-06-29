@@ -25,6 +25,20 @@ export type WorkflowStage = {
   metric?: string;
 };
 
+export type CaptureFramePreview = {
+  key: string;
+  path: string;
+  side: string;
+  cameraId: string;
+  index: string;
+  status: string;
+  luma: string;
+  contrast: string;
+  size: string;
+  issues: string;
+  imageUrl?: string;
+};
+
 export type CaptureCommandOptions = {
   topology: "mono" | "stereo";
   cameraId: string;
@@ -195,6 +209,30 @@ export function frameRows(payload: JsonObject | undefined): Array<Record<string,
   });
 }
 
+export function captureFramePreviews(
+  manifest: JsonObject | undefined,
+  inspection: JsonObject | undefined,
+): CaptureFramePreview[] {
+  const sessionPath = sessionPathForPreview(manifest, inspection);
+  const previews = new Map<string, CaptureFramePreview>();
+
+  for (const entry of manifestFrameEntries(manifest)) {
+    const path = stringField(entry, "path") ?? "-";
+    previews.set(path, previewFromFrame(entry, sessionPath, "captured"));
+  }
+
+  for (const frame of arrayField(inspection, "frames")) {
+    const entry = objectValue(frame);
+    const path = stringField(entry, "path") ?? "-";
+    previews.set(path, {
+      ...(previews.get(path) ?? previewFromFrame(entry, sessionPath, "captured")),
+      ...previewFromFrame(entry, sessionPath, stringField(entry, "status") ?? "read"),
+    });
+  }
+
+  return [...previews.values()];
+}
+
 export function observationRows(payload: JsonObject | undefined): Array<Record<string, string>> {
   const views = arrayField(payload, "views");
   return views.map((view) => {
@@ -212,6 +250,105 @@ export function observationRows(payload: JsonObject | undefined): Array<Record<s
 
 export function latest(artifacts: ImportedArtifact[], kind: ArtifactKind): ImportedArtifact | undefined {
   return [...artifacts].reverse().find((artifact) => artifact.kind === kind);
+}
+
+function manifestFrameEntries(manifest: JsonObject | undefined): JsonObject[] {
+  if (manifest === undefined) return [];
+  if (stringField(manifest, "topology") === "mono") {
+    return arrayField(manifest, "files").map((file, index) => ({
+      index: index + 1,
+      camera_id: stringField(manifest, "camera_id") ?? "mono",
+      side: "mono",
+      path: typeof file === "string" ? file : "-",
+    }));
+  }
+
+  if (stringField(manifest, "topology") === "stereo") {
+    const cameraIds = arrayField(manifest, "camera_ids");
+    const leftCameraId = typeof cameraIds[0] === "string" ? cameraIds[0] : "left";
+    const rightCameraId = typeof cameraIds[1] === "string" ? cameraIds[1] : "right";
+    return arrayField(manifest, "pairs").flatMap((pair, pairIndex) => {
+      const item = objectValue(pair);
+      const index = item["index"] ?? pairIndex + 1;
+      return [
+        {
+          index,
+          camera_id: leftCameraId,
+          side: "left",
+          path: stringField(item, "left") ?? "-",
+        },
+        {
+          index,
+          camera_id: rightCameraId,
+          side: "right",
+          path: stringField(item, "right") ?? "-",
+        },
+      ];
+    });
+  }
+
+  return [];
+}
+
+function previewFromFrame(
+  frame: JsonObject,
+  sessionPath: string | undefined,
+  fallbackStatus: string,
+): CaptureFramePreview {
+  const path = stringField(frame, "path") ?? "-";
+  return {
+    key: `${stringField(frame, "side") ?? "-"}:${path}`,
+    path,
+    side: stringField(frame, "side") ?? "-",
+    cameraId: stringField(frame, "camera_id") ?? "-",
+    index: numberDisplay(frame["index"]),
+    status: stringField(frame, "status") ?? fallbackStatus,
+    luma: numberDisplay(frame["mean_luma"]),
+    contrast: numberDisplay(frame["std_luma"]),
+    size: frameSize(frame),
+    issues: arrayField(frame, "issues").join(", ") || "none",
+    imageUrl: artifactImageUrl(sessionPath, path),
+  };
+}
+
+function frameSize(frame: JsonObject): string {
+  const width = frame["width"];
+  const height = frame["height"];
+  return typeof width === "number" && typeof height === "number" ? `${width}x${height}` : "-";
+}
+
+function sessionPathForPreview(
+  manifest: JsonObject | undefined,
+  inspection: JsonObject | undefined,
+): string | undefined {
+  return stringField(inspection, "session_path") ?? stringField(manifest, "session_path");
+}
+
+function artifactImageUrl(sessionPath: string | undefined, framePath: string): string | undefined {
+  if (framePath === "-" || framePath.trim() === "") return undefined;
+  const candidate =
+    framePath.startsWith("/artifacts/") || framePath.startsWith("artifacts/")
+      ? framePath
+      : sessionPath === undefined
+        ? undefined
+        : `${sessionPath}/${framePath}`;
+  if (candidate === undefined) return undefined;
+
+  const segments = candidate.replaceAll("\\", "/").split("/");
+  const artifactsIndex = segments.lastIndexOf("artifacts");
+  if (artifactsIndex < 0) return undefined;
+  const artifactSegments = segments.slice(artifactsIndex + 1);
+  if (
+    artifactSegments.length === 0 ||
+    artifactSegments.some((segment) => segment === "" || segment === "." || segment === "..")
+  ) {
+    return undefined;
+  }
+  const last = artifactSegments.at(-1)?.toLowerCase() ?? "";
+  if (![".png", ".jpg", ".jpeg"].some((extension) => last.endsWith(extension))) {
+    return undefined;
+  }
+  return `/artifacts/${artifactSegments.map((segment) => encodeURIComponent(segment)).join("/")}`;
 }
 
 function captureDetail(payload: JsonObject): string {
