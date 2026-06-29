@@ -299,6 +299,11 @@ Result: 13 tests passed. A real runtime YOLO package was written from the
   snapshot, artifact, stereo camera, and frame-quality gates, then marked
   left/right YOLO detection as blocked because no visible tennis ball was
   present.
+- `docs/live3d_hardware_readiness_gates_20260629.md` reran the hardware
+  verifier after Runtime Readiness Gates were added. It passed app server,
+  snapshot, YOLO artifact, calibration artifact, stereo cameras, and readable
+  non-black frames, then showed left/right detection, stereo 3D point, and
+  prediction as pending because no tennis ball was visible to YOLO.
 - Live3D now has a repeatable headless hardware verifier that reads
   `window.__tennisbotLive3dSnapshot` and records camera, YOLO, calibration,
   detection, runtime 3D state, frame captures, and frame brightness statistics
