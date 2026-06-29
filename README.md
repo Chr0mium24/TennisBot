@@ -149,6 +149,7 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 ## Architecture
 
 - [Current architecture](docs/current_architecture_20260629.md)
+- [Current status](docs/current_status_20260629.md)
 - [Final runtime validation](docs/final_runtime_validation_20260629.md)
 - [Local runtime operator runbook](docs/local_runtime_operator_runbook_20260629.md)
 - [Local runtime preflight](docs/local_runtime_preflight_20260629.md)
