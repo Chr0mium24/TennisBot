@@ -80,6 +80,9 @@ ready/pending/blocked sequence as the browser status panel.
 Dev server smoke:
 
 ```bash
+cd ../../
+bun scripts/start-local-runtime.ts --status
+cd apps/live3d
 PORT=5178 bun ./scripts/serve.js
 curl -I http://localhost:5178/
 curl -I http://localhost:5178/assets/main.js
@@ -87,7 +90,9 @@ curl -I http://localhost:5178/artifacts/models/tennis_ball_yolo/package.json
 curl -I http://localhost:5178/artifacts/calibration/stereo_cam1_cam2/package.json
 ```
 
-Result: all HTTP checks returned `200 OK`.
+Result: the local runtime launcher status check reported Live3D and Calibration
+GUI ready at `http://127.0.0.1:5178/` and `http://127.0.0.1:5188/`; all HTTP
+checks returned `200 OK`.
 
 Hardware smoke:
 
@@ -271,6 +276,9 @@ Result: 13 tests passed. A real runtime YOLO package was written from the
 
 - YOLO and calibration are separate standalone tool packages under `tools/`.
 - Live3D consumes only model/calibration artifacts under `artifacts/`.
+- `bun scripts/start-local-runtime.ts` is the root local operator launcher for
+  Live3D plus the Calibration GUI; `--status` verifies both URLs without
+  starting new services.
 - Runtime core algorithms live under `packages/core`.
 - Shared data contracts live under `packages/contracts`.
 - `artifacts/models/tennis_ball_yolo` now contains a real ONNX-default package

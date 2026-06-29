@@ -21,6 +21,18 @@ feed migration work; the live runtime consumes only exported artifacts from
 
 ## Common Commands
 
+Start the local operator surfaces:
+
+```bash
+bun scripts/start-local-runtime.ts
+```
+
+Check whether they are already serving:
+
+```bash
+bun scripts/start-local-runtime.ts --status
+```
+
 Run Live3D:
 
 ```bash
@@ -132,6 +144,7 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 
 - [Current architecture](docs/current_architecture_20260629.md)
 - [Final runtime validation](docs/final_runtime_validation_20260629.md)
+- [Local runtime operator runbook](docs/local_runtime_operator_runbook_20260629.md)
 - [Physical artifact import](docs/physical_artifact_import_20260629.md)
 - [Calibration candidate scan](docs/calibration_candidate_scan_20260629.md)
 - [Calibration capture session flow](docs/calibration_capture_session_flow_20260629.md)
