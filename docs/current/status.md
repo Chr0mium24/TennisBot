@@ -1,0 +1,101 @@
+# TennisBot Current Status
+
+Date: 2026-06-29
+
+## Current Step
+
+The project is at local operator validation. The main tracked paths are now:
+
+- `tools/calibration` for the fixed DFOptix ChArUco OpenCV capture GUI;
+- `tools/yolo` for annotation, model package operations, and pure YOLO detect
+  GUI;
+- `packages/core` and `packages/contracts` for runtime algorithms and shared
+  contracts;
+- `apps/live3d` for browser camera, YOLO, 3D display, and hardware verification.
+
+## Ready Now
+
+The local launcher has reported the browser surface ready:
+
+```text
+ready  Live3D           http://127.0.0.1:5178/
+```
+
+The latest known preflight passed these software and local-device gates:
+
+```text
+passed Live3D surface
+passed YOLO package
+passed Stereo calibration package
+passed USB camera devices
+```
+
+The current quick camera-device tool is:
+
+```bash
+bun scripts/check-camera-brightness.ts
+bun scripts/check-camera-brightness.ts --devices /dev/video0,/dev/video2
+```
+
+It prints average brightness for two USB cameras so a covered or dark camera can
+be identified before calibration or Live3D runs.
+
+## Important Gaps
+
+The latest imported calibration package is not final physical acceptance. It has
+`epipolar_rms_px=4.330`, above the `2.000` runtime review threshold. Fresh
+calibration is still needed after the cameras are fixed in their real positions.
+
+`tools/calibration` currently mainlines the capture GUI and target-specific
+backend. Fresh mono/stereo solve and runtime package export are still the next
+calibration migration gap.
+
+Live3D loads stereo calibration artifacts, but it does not know the camera rig's
+pose relative to the tennis court. Current 3D output is camera-frame geometry,
+not court coordinates.
+
+Live3D hardware verification has not completed a real ball pass yet. A complete
+run requires a visible tennis ball in both camera views and a final
+`prediction-ready` runtime snapshot.
+
+## Next Commands
+
+Run pure YOLO camera detection:
+
+```bash
+cd tools/yolo
+uv run --extra detect tennisbot-yolo detect-gui \
+  --devices /dev/video0,/dev/video2 \
+  --width 3840 \
+  --height 2160 \
+  --fourcc MJPG \
+  --model ../../artifacts/models/tennis_ball_yolo/model.pt \
+  --tile \
+  --imgsz 1280 \
+  --display-width 720
+```
+
+Capture calibration frames:
+
+```bash
+cd tools/calibration
+uv run camera-calib-lab capture charuco-auto-gui --device /dev/video0
+uv run camera-calib-lab capture stereo-charuco-auto-gui --left-device /dev/video0 --right-device /dev/video2
+```
+
+Start or check Live3D:
+
+```bash
+bun scripts/start-local-runtime.ts
+bun scripts/start-local-runtime.ts --status
+```
+
+Run a hardware evidence pass:
+
+```bash
+cd apps/live3d
+bun run verify:hardware -- --prepare-uvc-controls --timeout-ms 30000 --output ../../docs/archive/20260629/live3d/live3d_hardware_loop_ball_YYYYMMDD.md
+```
+
+The system should not be treated as physically accepted until the hardware
+report reaches `prediction-ready`.
