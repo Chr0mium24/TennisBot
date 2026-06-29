@@ -128,10 +128,15 @@ USB 2.0 Camera: USB Camera (usb-0000:00:14.0-9):
     const root = makeTempRoot();
     try {
       mkdirSync(join(root, "artifacts", "calibration_targets"), { recursive: true });
+      mkdirSync(join(root, "artifacts", "calibration_sessions", "cam1_session"), { recursive: true });
       mkdirSync(join(root, "artifacts", "calibration", "cam1"), { recursive: true });
       writeFileSync(
         join(root, "artifacts", "calibration_targets", "dfoptix_charuco_15mm_300dpi.json"),
         JSON.stringify({ schema_version: "calibration.target_sheet.v1", accepted: true }),
+      );
+      writeFileSync(
+        join(root, "artifacts", "calibration_sessions", "cam1_session", "manifest.json"),
+        JSON.stringify({ schema_version: "calibration.capture_session.v1", topology: "mono" }),
       );
       writeFileSync(
         join(root, "artifacts", "calibration", "cam1", "package.json"),
@@ -143,6 +148,11 @@ USB 2.0 Camera: USB Camera (usb-0000:00:14.0-9):
           name: "dfoptix_charuco_15mm_300dpi.json",
           path: "artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.json",
           payload: { schema_version: "calibration.target_sheet.v1", accepted: true },
+        },
+        {
+          name: "manifest.json",
+          path: "artifacts/calibration_sessions/cam1_session/manifest.json",
+          payload: { schema_version: "calibration.capture_session.v1", topology: "mono" },
         },
         {
           name: "package.json",
