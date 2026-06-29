@@ -74,6 +74,11 @@ uv run tennisbot-calibration calibrate mono \
   --observations ../../artifacts/calibration_sessions/cam1_session/observations.json \
   --output ../../artifacts/calibration/cam1 \
   --camera-id cam1
+uv run tennisbot-calibration calibrate stereo \
+  --observations ../../artifacts/calibration_sessions/stereo_session/observations.json \
+  --left-mono ../../artifacts/calibration/cam1 \
+  --right-mono ../../artifacts/calibration/cam2 \
+  --output ../../artifacts/calibration/stereo_cam1_cam2
 ```
 
 Import existing CameraCalibLab calibration into runtime artifacts:
@@ -128,6 +133,9 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 - [Calibration mono solve](docs/calibration_mono_solve_20260629.md)
 - [Calibration mono solve capture quality](docs/calibration_mono_solve_capture_quality_20260629.md)
 - [Calibration mono solve ChArUco detection](docs/calibration_charuco_detection_mono_solve_20260629.md)
+- [Calibration stereo solve](docs/calibration_stereo_solve_20260629.md)
+- [Calibration stereo solve capture quality](docs/calibration_stereo_solve_capture_quality_20260629.md)
+- [Calibration stereo solve ChArUco detection](docs/calibration_charuco_detection_stereo_solve_20260629.md)
 - [Legacy board/runtime shell retirement](docs/legacy_board_retirement_20260629.md)
 - [Live3D hardware smoke](docs/live3d_hardware_smoke_20260629.md)
 - [YOLO static sample validation](docs/yolo_static_sample_validation_20260629.md)

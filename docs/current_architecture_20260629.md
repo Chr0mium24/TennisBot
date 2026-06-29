@@ -165,6 +165,11 @@ uv run tennisbot-calibration calibrate mono \
   --observations ../../artifacts/calibration_sessions/cam1_session/observations.json \
   --output ../../artifacts/calibration/cam1 \
   --camera-id cam1
+uv run tennisbot-calibration calibrate stereo \
+  --observations ../../artifacts/calibration_sessions/stereo_session/observations.json \
+  --left-mono ../../artifacts/calibration/cam1 \
+  --right-mono ../../artifacts/calibration/cam2 \
+  --output ../../artifacts/calibration/stereo_cam1_cam2
 ```
 
 Import existing CameraCalibLab calibration:
@@ -218,7 +223,7 @@ Most recent software verification:
 
 ```text
 cd tools/calibration && uv run pytest -q
-Result: 18 passing tests, 0 failures.
+Result: 19 passing tests, 0 failures.
 
 cd apps/live3d && bun test
 Result: 42 passing tests, 0 failures.
@@ -265,7 +270,10 @@ ready for mono/stereo solve. ChArUco detection is implemented for the DFOptix
 corners and 63 markers, while the current real hardware probe detected 0
 corners in both views. Mono solve is implemented from accepted ChArUco
 observations; the rendered/perspective-warped dry-run produced an accepted mono
-package with RMS 3.551 px and package verification accepted.
+package with RMS 3.551 px and package verification accepted. Stereo solve is
+implemented from accepted stereo observations plus mono packages; the rendered
+dry-run produced an accepted stereo package with stereo RMS 3.598 px, baseline
+0.034805 m, and package verification accepted.
 ```
 
 Latest recalibrated hardware smoke:
@@ -290,6 +298,8 @@ hardware validation:
   `capture inspect` plus `capture detect-charuco` accepted before solving;
 - run `calibrate mono` on real `cam1` and `cam2` sessions and review RMS before
   replacing imported historical calibration;
+- run `calibrate stereo` on real stereo observations and review stereo RMS,
+  baseline, and rectification before replacing imported historical calibration;
 - rerun the Live3D hardware verifier with a tennis ball visible in both USB
   camera views;
 - verify nonzero ONNX detections on both live frames;

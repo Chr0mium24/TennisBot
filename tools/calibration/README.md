@@ -124,6 +124,11 @@ uv run tennisbot-calibration calibrate mono \
   --observations ../../artifacts/calibration_sessions/cam1_session/observations.json \
   --output ../../artifacts/calibration/cam1 \
   --camera-id cam1
+uv run tennisbot-calibration calibrate stereo \
+  --observations ../../artifacts/calibration_sessions/stereo_session/observations.json \
+  --left-mono ../../artifacts/calibration/cam1 \
+  --right-mono ../../artifacts/calibration/cam2 \
+  --output ../../artifacts/calibration/stereo_cam1_cam2
 ```
 
 Defaults are `1280x720`, `MJPG`, 30 fps, and 20 frames or pairs. Add
@@ -144,6 +149,11 @@ the next tool step after accepted observations is mono/stereo solve.
 calibration package (`package.json`, `camera.json`, OpenCV YAML, verification,
 summary, and review HTML). It can solve a mono capture session directly, or a
 single camera selected by `--camera-id` from stereo observations.
+
+`calibrate stereo` consumes accepted stereo ChArUco observations plus the two
+mono packages, runs fixed-intrinsics OpenCV stereo calibration, and writes the
+runtime stereo package with extrinsics, rectification, verification, summary,
+and review HTML.
 
 ## Import Existing CameraCalibLab Output
 

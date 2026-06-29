@@ -19,6 +19,7 @@ from tennisbot_calibration.scan_camera_calib_lab import (
     select_candidate,
     write_scan_report,
 )
+from tennisbot_calibration.stereo_solve import solve_stereo_calibration
 from tennisbot_calibration.verify import verify_package
 
 
@@ -26,9 +27,20 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="tennisbot-calibration",
         description="TennisBot calibration artifact tooling.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
-            "Workflows: capture mono, capture stereo, capture inspect, capture detect-charuco, calibrate mono, "
-            "gui mono, gui stereo, package verify, package scan-camera-calib-lab, package import-scanned-camera-calib-lab. "
+            "Workflows:\n"
+            "  capture mono\n"
+            "  capture stereo\n"
+            "  capture inspect\n"
+            "  capture detect-charuco\n"
+            "  calibrate mono\n"
+            "  calibrate stereo\n"
+            "  gui mono\n"
+            "  gui stereo\n"
+            "  package verify\n"
+            "  package scan-camera-calib-lab\n"
+            "  package import-scanned-camera-calib-lab\n\n"
             "Wave 5 GUI commands support dry-run/non-hardware output only."
         ),
     )
@@ -109,6 +121,16 @@ def configure_calibrate(subparsers: argparse._SubParsersAction[argparse.Argument
     mono.add_argument("--min-views", type=int, default=8)
     mono.add_argument("--max-rms-px", type=float, default=1.0)
     mono.set_defaults(handler=calibrate_mono)
+
+    stereo = calibrate_subparsers.add_parser("stereo", help="Solve a stereo calibration package.")
+    stereo.add_argument("--observations", required=True, help="Stereo ChArUco observations JSON from capture detect-charuco.")
+    stereo.add_argument("--left-mono", required=True, help="Left mono package directory.")
+    stereo.add_argument("--right-mono", required=True, help="Right mono package directory.")
+    stereo.add_argument("--output", required=True, help="Output stereo package directory under artifacts/calibration.")
+    stereo.add_argument("--min-pairs", type=int, default=8)
+    stereo.add_argument("--min-common-corners", type=int, default=12)
+    stereo.add_argument("--max-rms-px", type=float, default=2.0)
+    stereo.set_defaults(handler=calibrate_stereo)
 
 
 def configure_gui(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -281,6 +303,36 @@ def calibrate_mono(args: argparse.Namespace) -> int:
                 "camera_id": result["package"]["camera_id"],
                 "rms_reprojection_px": result["package"]["quality"]["rms_reprojection_px"],
                 "accepted_view_count": result["package"]["quality"]["accepted_view_count"],
+                "package": result["package"],
+                "verification": verification,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+    return 0 if verification["accepted"] else 1
+
+
+def calibrate_stereo(args: argparse.Namespace) -> int:
+    result = solve_stereo_calibration(
+        observations_path=Path(args.observations),
+        left_mono=Path(args.left_mono),
+        right_mono=Path(args.right_mono),
+        output=Path(args.output),
+        min_pairs=args.min_pairs,
+        min_common_corners=args.min_common_corners,
+        max_rms_px=args.max_rms_px,
+    )
+    verification = verify_package(Path(args.output))
+    print(
+        json.dumps(
+            {
+                "accepted": verification["accepted"],
+                "output": args.output,
+                "camera_ids": result["package"]["camera_ids"],
+                "stereo_rms_reprojection_px": result["package"]["quality"]["stereo_rms_reprojection_px"],
+                "accepted_pair_count": result["package"]["quality"]["accepted_pair_count"],
+                "baseline_m": result["stereo"]["baseline_m"],
                 "package": result["package"],
                 "verification": verification,
             },

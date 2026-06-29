@@ -129,6 +129,38 @@ uv run tennisbot-calibration package verify \
   --path ../../artifacts/calibration/cam1_mono_solve_dry_run
 ```
 
+Rendered ChArUco stereo solve dry-run:
+
+```bash
+cd tools/calibration
+uv run tennisbot-calibration capture stereo \
+  --left-camera-id cam1 \
+  --right-camera-id cam2 \
+  --output ../../artifacts/calibration_sessions/20260629_stereo_solve_dry_run \
+  --pair-count 5 \
+  --interval-ms 0 \
+  --width 960 \
+  --height 640 \
+  --dry-run
+# Replace the dry-run stereo frames with rendered/perspective-warped DFOptix ChArUco boards.
+uv run tennisbot-calibration capture inspect \
+  --session ../../artifacts/calibration_sessions/20260629_stereo_solve_dry_run \
+  --output-report ../../docs/calibration_stereo_solve_capture_quality_20260629.md
+uv run tennisbot-calibration capture detect-charuco \
+  --session ../../artifacts/calibration_sessions/20260629_stereo_solve_dry_run \
+  --output ../../artifacts/calibration_sessions/20260629_stereo_solve_dry_run/observations.json \
+  --output-report ../../docs/calibration_charuco_detection_stereo_solve_20260629.md
+uv run tennisbot-calibration calibrate stereo \
+  --observations ../../artifacts/calibration_sessions/20260629_stereo_solve_dry_run/observations.json \
+  --left-mono ../../artifacts/calibration/cam1_mono_solve_dry_run \
+  --right-mono ../../artifacts/calibration/cam2_mono_solve_dry_run \
+  --output ../../artifacts/calibration/stereo_solve_dry_run \
+  --min-pairs 3 \
+  --max-rms-px 50
+uv run tennisbot-calibration package verify \
+  --path ../../artifacts/calibration/stereo_solve_dry_run
+```
+
 Quality-gated real stereo hardware probe:
 
 ```bash
@@ -167,6 +199,7 @@ quality hardware inspection: accepted=false, 2/2 images read, both frames reject
 rendered ChArUco detection dry-run: accepted=true, 104 corners and 63 markers detected.
 hardware ChArUco detection: accepted=false, 0/2 views accepted, 0/1 stereo pairs accepted.
 rendered mono solve dry-run: accepted=true, rms_reprojection_px=3.551100557082021, package verify accepted.
+rendered stereo solve dry-run: accepted=true, stereo_rms_reprojection_px=3.5982434312593963, baseline_m=0.03480523495236254, package verify accepted.
 ```
 
 The hardware probe proves this tool can open and save frames from the two local
@@ -180,6 +213,6 @@ for a mono or stereo solve.
 - Capture real mono and stereo sessions with visible ChArUco targets that pass
   `capture inspect` and `capture detect-charuco`.
 - Validate mono calibration solving from accepted real mono observations.
-- Add stereo calibration solving from accepted stereo observations and mono
-  intrinsics.
+- Validate stereo calibration solving from accepted real stereo observations and
+  mono intrinsics.
 - Add a richer review GUI for accepting/rejecting captured frames before solve.

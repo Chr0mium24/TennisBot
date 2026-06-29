@@ -37,6 +37,7 @@ def test_cli_help_exposes_required_commands(capsys: pytest.CaptureFixture[str]) 
     assert "inspect" in capture_help
     assert "detect-charuco" in capture_help
     assert "mono" in calibrate_help
+    assert "stereo" in calibrate_help
     assert "gui mono" in top_help
     assert "gui stereo" in top_help
     assert "package verify" in top_help
@@ -350,6 +351,90 @@ def test_calibrate_mono_solves_rendered_charuco_observations(
     assert camera["camera_id"] == "cam1"
     assert len(camera["camera_matrix"]) == 3
     assert (package_dir / "summary.md").is_file()
+
+
+def test_calibrate_stereo_solves_rendered_charuco_observations(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    left_package = write_rendered_mono_package(tmp_path, capsys, camera_id="cam1", x_offset=0)
+    right_package = write_rendered_mono_package(tmp_path, capsys, camera_id="cam2", x_offset=30)
+    stereo_session = tmp_path / "stereo_session"
+    observations = tmp_path / "stereo_observations.json"
+    package_dir = tmp_path / "calibration" / "stereo_cam1_cam2"
+    assert (
+        main(
+            [
+                "capture",
+                "stereo",
+                "--left-camera-id",
+                "cam1",
+                "--right-camera-id",
+                "cam2",
+                "--output",
+                str(stereo_session),
+                "--pair-count",
+                "5",
+                "--interval-ms",
+                "0",
+                "--width",
+                "960",
+                "--height",
+                "640",
+                "--dry-run",
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+    write_warped_charuco_session(stereo_session, camera_id="cam1", image_size=(960, 640), x_offset=0)
+    write_warped_charuco_session(stereo_session, camera_id="cam2", image_size=(960, 640), x_offset=30)
+    assert (
+        main(
+            [
+                "capture",
+                "detect-charuco",
+                "--session",
+                str(stereo_session),
+                "--output",
+                str(observations),
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+
+    assert (
+        main(
+            [
+                "calibrate",
+                "stereo",
+                "--observations",
+                str(observations),
+                "--left-mono",
+                str(left_package),
+                "--right-mono",
+                str(right_package),
+                "--output",
+                str(package_dir),
+                "--min-pairs",
+                "3",
+                "--max-rms-px",
+                "50",
+            ]
+        )
+        == 0
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["accepted"] is True
+    assert payload["camera_ids"] == ["cam1", "cam2"]
+    assert payload["accepted_pair_count"] == 5
+    assert payload["stereo_rms_reprojection_px"] < 50
+    assert payload["baseline_m"] > 0
+    assert main(["package", "verify", "--path", str(package_dir)]) == 0
+    rectification = read_json(package_dir / "rectification.json")
+    assert len(rectification["q"]) == 4
 
 
 def test_capture_stereo_dry_run_writes_pair_session(tmp_path: Path) -> None:
@@ -778,6 +863,63 @@ def write_json_fixture(path: Path, payload: dict[str, object]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def write_rendered_mono_package(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    *,
+    camera_id: str,
+    x_offset: int,
+) -> Path:
+    session = tmp_path / f"{camera_id}_session"
+    observations = tmp_path / f"{camera_id}_observations.json"
+    package_dir = tmp_path / "calibration" / camera_id
+    assert (
+        main(
+            [
+                "capture",
+                "mono",
+                "--camera-id",
+                camera_id,
+                "--output",
+                str(session),
+                "--frame-count",
+                "5",
+                "--interval-ms",
+                "0",
+                "--width",
+                "960",
+                "--height",
+                "640",
+                "--dry-run",
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+    write_warped_charuco_session(session, camera_id=camera_id, image_size=(960, 640), x_offset=x_offset)
+    assert main(["capture", "detect-charuco", "--session", str(session), "--output", str(observations)]) == 0
+    capsys.readouterr()
+    assert (
+        main(
+            [
+                "calibrate",
+                "mono",
+                "--observations",
+                str(observations),
+                "--output",
+                str(package_dir),
+                "--min-views",
+                "3",
+                "--max-rms-px",
+                "5",
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+    return package_dir
+
+
 def write_rendered_charuco(path: Path, *, image_size: tuple[int, int]) -> None:
     dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_5X5_100)
     board = cv2.aruco.CharucoBoard((14, 9), 0.015, 0.011, dictionary)
@@ -785,7 +927,14 @@ def write_rendered_charuco(path: Path, *, image_size: tuple[int, int]) -> None:
     assert cv2.imwrite(str(path), image)
 
 
-def write_warped_charuco_session(session: Path, *, camera_id: str, image_size: tuple[int, int]) -> None:
+def write_warped_charuco_session(
+    session: Path,
+    *,
+    camera_id: str,
+    image_size: tuple[int, int],
+    x_offset: int = 0,
+    y_offset: int = 0,
+) -> None:
     width, height = image_size
     dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_5X5_100)
     board = cv2.aruco.CharucoBoard((14, 9), 0.015, 0.011, dictionary)
@@ -800,7 +949,8 @@ def write_warped_charuco_session(session: Path, *, camera_id: str, image_size: t
         [[65, 65], [835, 45], [915, 590], [145, 575]],
     ]
     for index, quad in enumerate(quads, start=1):
-        homography = cv2.getPerspectiveTransform(source, np.float32(quad))
+        shifted_quad = [[x + x_offset, y + y_offset] for x, y in quad]
+        homography = cv2.getPerspectiveTransform(source, np.float32(shifted_quad))
         image = np.full((height, width), 255, np.uint8)
         warped = cv2.warpPerspective(texture, homography, image_size, borderValue=255)
         mask = cv2.warpPerspective(full_mask, homography, image_size)
