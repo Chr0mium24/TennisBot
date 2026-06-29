@@ -101,6 +101,68 @@ def test_target_charuco_generates_printable_sheet(
     assert marker_ids is not None
 
 
+def test_target_record_print_check_writes_acceptance_artifacts(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    output = tmp_path / "print_check.json"
+    report = tmp_path / "print_check.md"
+
+    assert (
+        main(
+            [
+                "target",
+                "record-print-check",
+                "--measured-square-mm",
+                "15.05",
+                "--tolerance-mm",
+                "0.2",
+                "--output",
+                str(output),
+                "--output-report",
+                str(report),
+            ]
+        )
+        == 0
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["schema_version"] == "calibration.target_print_check.v1"
+    assert payload["accepted"] is True
+    assert payload["measured_square_mm"] == 15.05
+    assert output.is_file()
+    assert read_json(output)["accepted"] is True
+    assert "# Calibration Target Print Check" in report.read_text(encoding="utf-8")
+
+
+def test_target_record_print_check_rejects_out_of_tolerance_measurement(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    output = tmp_path / "print_check.json"
+
+    assert (
+        main(
+            [
+                "target",
+                "record-print-check",
+                "--measured-square-mm",
+                "14.5",
+                "--tolerance-mm",
+                "0.2",
+                "--output",
+                str(output),
+            ]
+        )
+        == 1
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["accepted"] is False
+    assert payload["delta_mm"] == 0.5
+    assert read_json(output)["accepted"] is False
+
+
 def test_capture_mono_dry_run_writes_session_frames_and_manifest(tmp_path: Path) -> None:
     output = tmp_path / "cam1_session"
 

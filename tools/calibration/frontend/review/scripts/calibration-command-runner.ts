@@ -57,6 +57,7 @@ const valueFlags = new Set([
   "--output-report",
   "--output-svg",
   "--output-metadata",
+  "--target-metadata",
   "--observations",
   "--left-mono",
   "--right-mono",
@@ -65,6 +66,8 @@ const valueFlags = new Set([
   "--max-rms-px",
   "--dpi",
   "--margin-mm",
+  "--measured-square-mm",
+  "--tolerance-mm",
   "--path",
 ]);
 const pathFlags = new Set([
@@ -72,6 +75,7 @@ const pathFlags = new Set([
   "--output-report",
   "--output-svg",
   "--output-metadata",
+  "--target-metadata",
   "--session",
   "--observations",
   "--left-mono",
@@ -88,6 +92,8 @@ const numericFlags = new Set([
   "--fps",
   "--dpi",
   "--margin-mm",
+  "--measured-square-mm",
+  "--tolerance-mm",
   "--min-views",
   "--min-pairs",
   "--max-rms-px",
@@ -142,6 +148,10 @@ const allowedCommandFlags = new Map<string, Set<string>>([
     "target charuco",
     new Set(["--output", "--output-svg", "--output-metadata", "--output-report", "--dpi", "--margin-mm"]),
   ],
+  [
+    "target record-print-check",
+    new Set(["--measured-square-mm", "--tolerance-mm", "--target-metadata", "--output", "--output-report"]),
+  ],
   ["package verify", new Set(["--path"])],
 ]);
 
@@ -192,6 +202,8 @@ export function collectGeneratedCalibrationArtifacts(
     pushJsonArtifact(artifacts, plan, pathFromFlag(plan, "--output", "package.json"));
   } else if (plan.commandKey === "target charuco") {
     pushJsonArtifact(artifacts, plan, targetMetadataPath(plan));
+  } else if (plan.commandKey === "target record-print-check") {
+    pushJsonArtifact(artifacts, plan, pathFromFlag(plan, "--output"));
   } else if (plan.commandKey === "package verify") {
     const payload = parseJsonObject(stdout);
     if (payload !== undefined) {

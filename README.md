@@ -48,7 +48,8 @@ bun scripts/physical-validation-status.ts --output docs/local_physical_validatio
 Record the printed target measurement:
 
 ```bash
-bun scripts/record-target-print-check.ts --measured-square-mm 15.0
+cd tools/calibration
+uv run tennisbot-calibration target record-print-check --measured-square-mm 15.0
 ```
 
 Run Live3D:
@@ -187,6 +188,7 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 - [Calibration review GUI command bridge](docs/calibration_review_gui_command_bridge_20260629.md)
 - [Calibration GUI target command bridge fix](docs/calibration_gui_target_command_bridge_fix_20260629.md)
 - [Calibration GUI target file links](docs/calibration_gui_target_file_links_20260629.md)
+- [Calibration GUI target print check](docs/calibration_gui_target_print_check_20260629.md)
 - [Tool boundary audit](docs/tool_boundary_audit_20260629.md)
 - [Legacy board/runtime shell retirement](docs/legacy_board_retirement_20260629.md)
 - [Live3D hardware smoke](docs/live3d_hardware_smoke_20260629.md)

@@ -20,7 +20,7 @@ from tennisbot_calibration.scan_camera_calib_lab import (
     write_scan_report,
 )
 from tennisbot_calibration.stereo_solve import solve_stereo_calibration
-from tennisbot_calibration.target_generation import generate_charuco_target
+from tennisbot_calibration.target_generation import generate_charuco_target, record_target_print_check
 from tennisbot_calibration.verify import verify_package
 
 
@@ -40,6 +40,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  gui mono\n"
             "  gui stereo\n"
             "  target charuco\n"
+            "  target record-print-check\n"
             "  package verify\n"
             "  package scan-camera-calib-lab\n"
             "  package import-scanned-camera-calib-lab\n\n"
@@ -166,6 +167,25 @@ def configure_target(subparsers: argparse._SubParsersAction[argparse.ArgumentPar
     charuco.add_argument("--dpi", type=int, default=300)
     charuco.add_argument("--margin-mm", type=float, default=10.0)
     charuco.set_defaults(handler=target_charuco)
+
+    print_check = target_subparsers.add_parser(
+        "record-print-check",
+        help="Record the measured square size after printing the target.",
+    )
+    print_check.add_argument("--measured-square-mm", type=float, required=True)
+    print_check.add_argument("--tolerance-mm", type=float, default=0.2)
+    print_check.add_argument(
+        "--target-metadata",
+        default="../../artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.json",
+        help="Target metadata JSON used for printing.",
+    )
+    print_check.add_argument(
+        "--output",
+        default="../../artifacts/calibration_targets/dfoptix_charuco_15mm_print_check.json",
+        help="Output print-check JSON path.",
+    )
+    print_check.add_argument("--output-report", default=None, help="Optional Markdown report path.")
+    print_check.set_defaults(handler=target_record_print_check)
 
 
 def configure_package(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -385,6 +405,18 @@ def target_charuco(args: argparse.Namespace) -> int:
     )
     print(json.dumps(metadata, indent=2, sort_keys=True))
     return 0
+
+
+def target_record_print_check(args: argparse.Namespace) -> int:
+    result = record_target_print_check(
+        measured_square_mm=args.measured_square_mm,
+        tolerance_mm=args.tolerance_mm,
+        target_metadata=Path(args.target_metadata) if args.target_metadata else None,
+        output=Path(args.output),
+        output_report=Path(args.output_report) if args.output_report else None,
+    )
+    print(json.dumps(result, indent=2, sort_keys=True))
+    return 0 if result["accepted"] else 1
 
 
 def package_verify(args: argparse.Namespace) -> int:

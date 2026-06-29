@@ -87,6 +87,45 @@ def generate_charuco_target(
     return metadata
 
 
+def record_target_print_check(
+    *,
+    measured_square_mm: float,
+    output: Path,
+    output_report: Path | None = None,
+    target_metadata: Path | None = None,
+    expected_square_mm: float = 15.0,
+    tolerance_mm: float = 0.2,
+) -> dict[str, Any]:
+    if measured_square_mm <= 0:
+        raise ValueError("measured_square_mm must be positive")
+    if expected_square_mm <= 0:
+        raise ValueError("expected_square_mm must be positive")
+    if tolerance_mm < 0:
+        raise ValueError("tolerance_mm must be non-negative")
+
+    delta_mm = abs(measured_square_mm - expected_square_mm)
+    accepted = delta_mm <= tolerance_mm
+    result = {
+        "schema_version": "calibration.target_print_check.v1",
+        "created_at": now_utc(),
+        "target_metadata": str(target_metadata) if target_metadata else "../../artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.json",
+        "expected_square_mm": expected_square_mm,
+        "measured_square_mm": measured_square_mm,
+        "tolerance_mm": tolerance_mm,
+        "delta_mm": round(delta_mm, 4),
+        "accepted": accepted,
+        "next_step": (
+            "Proceed to cam1 mono, cam2 mono, and stereo calibration captures."
+            if accepted
+            else "Fix printer scaling and reprint the target before camera capture."
+        ),
+    }
+    write_json(output, result)
+    if output_report is not None:
+        write_target_print_check_report(output_report, result)
+    return result
+
+
 def mm_to_pixels(mm: float, dpi: int) -> int:
     return max(1, int(round((mm / MM_PER_INCH) * dpi)))
 
@@ -130,6 +169,24 @@ def write_target_report(path: Path, metadata: dict[str, Any]) -> None:
         "- Print the SVG at 100% scale with no fit-to-page scaling.",
         "- Measure one printed square; it should be 15.0 mm.",
         "- Keep the target flat, sharp, and visible in both camera views.",
+        "",
+    ]
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def write_target_print_check_report(path: Path, result: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# Calibration Target Print Check",
+        "",
+        f"- created_at: {result['created_at']}",
+        f"- accepted: {result['accepted']}",
+        f"- target_metadata: `{result['target_metadata']}`",
+        f"- expected_square_mm: {result['expected_square_mm']}",
+        f"- measured_square_mm: {result['measured_square_mm']}",
+        f"- tolerance_mm: {result['tolerance_mm']}",
+        f"- delta_mm: {result['delta_mm']}",
+        f"- next_step: {result['next_step']}",
         "",
     ]
     path.write_text("\n".join(lines), encoding="utf-8")

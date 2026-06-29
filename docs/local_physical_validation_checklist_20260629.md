@@ -48,6 +48,8 @@ Print gate:
 - Print the SVG at 100% scale.
 - Measure one printed square.
 - Continue only if one square is 15.0 mm.
+- Record the measurement from the Calibration GUI Target tab with
+  `Record print check`.
 
 If the printed square is not 15.0 mm, fix printer scaling and reprint before
 capturing any camera frames.

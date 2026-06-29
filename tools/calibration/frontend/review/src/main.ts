@@ -4,6 +4,7 @@ import {
   buildInspectCommand,
   buildSolveCommand,
   buildTargetCommand,
+  buildTargetPrintCheckCommand,
   buildVerifyCommand,
   captureFramePreviews,
   classifyArtifact,
@@ -17,10 +18,11 @@ import {
   type JsonObject,
   type SolveCommandOptions,
   type TargetCommandOptions,
+  type TargetPrintCheckCommandOptions,
 } from "./calibration-workspace";
 
 type Tab = "target" | "capture" | "review" | "solve" | "packages";
-type CommandId = "target" | "capture" | "inspect" | "detect" | "solve" | "verify";
+type CommandId = "target" | "targetPrintCheck" | "capture" | "inspect" | "detect" | "solve" | "verify";
 type FlowPreset = "cam1Mono" | "cam2Mono" | "stereo";
 
 type CommandRunView = {
@@ -35,6 +37,7 @@ type AppState = {
   activeTab: Tab;
   activePreset: FlowPreset;
   targetOptions: TargetCommandOptions;
+  targetPrintCheckOptions: TargetPrintCheckCommandOptions;
   captureOptions: CaptureCommandOptions;
   solveOptions: SolveCommandOptions;
   sessionPath: string;
@@ -60,6 +63,12 @@ const state: AppState = {
     outputReport: "../../docs/calibration_charuco_target_sheet_YYYYMMDD.md",
     dpi: 300,
     marginMm: 10,
+  },
+  targetPrintCheckOptions: {
+    measuredSquareMm: 15,
+    toleranceMm: 0.2,
+    output: "../../artifacts/calibration_targets/dfoptix_charuco_15mm_print_check.json",
+    outputReport: "../../docs/calibration_target_print_check_YYYYMMDD.md",
   },
   captureOptions: {
     topology: "stereo",
@@ -99,6 +108,7 @@ render();
 
 function render(): void {
   const targetSheet = latest(state.artifacts, "targetSheet")?.payload;
+  const targetPrintCheck = latest(state.artifacts, "targetPrintCheck")?.payload;
   const manifest = latest(state.artifacts, "captureManifest")?.payload;
   const inspection = latest(state.artifacts, "captureInspection")?.payload;
   const observations = latest(state.artifacts, "charucoObservations")?.payload;
@@ -139,7 +149,7 @@ function render(): void {
           </div>
           <button class="secondary" id="load-sample">Load Sample</button>
         </header>
-        ${state.activeTab === "target" ? renderTargetPanel(targetSheet) : ""}
+        ${state.activeTab === "target" ? renderTargetPanel(targetSheet, targetPrintCheck) : ""}
         ${state.activeTab === "capture" ? renderCapturePanel() : ""}
         ${state.activeTab === "review" ? renderReviewPanel(manifest, inspection, observations) : ""}
         ${state.activeTab === "solve" ? renderSolvePanel() : ""}
@@ -170,7 +180,7 @@ function renderPresetButton(preset: FlowPreset, label: string): string {
   return `<button class="${state.activePreset === preset ? "active" : ""}" data-flow-preset="${preset}">${label}</button>`;
 }
 
-function renderTargetPanel(targetSheet: JsonObject | undefined): string {
+function renderTargetPanel(targetSheet: JsonObject | undefined, targetPrintCheck: JsonObject | undefined): string {
   return `
     <section class="panel-grid">
       <article class="panel">
@@ -187,9 +197,26 @@ function renderTargetPanel(targetSheet: JsonObject | undefined): string {
         ${commandBlock("target", "Generate target", buildCommand("target"))}
       </article>
       <article class="panel">
+        <h2>Print Check</h2>
+        <div class="form-grid">
+          ${targetPrintCheckNumberField("measuredSquareMm", "Measured square mm", state.targetPrintCheckOptions.measuredSquareMm)}
+          ${targetPrintCheckNumberField("toleranceMm", "Tolerance mm", state.targetPrintCheckOptions.toleranceMm)}
+          ${targetPrintCheckField("output", "Output", state.targetPrintCheckOptions.output)}
+          ${targetPrintCheckField("outputReport", "Report", state.targetPrintCheckOptions.outputReport)}
+        </div>
+      </article>
+      <article class="panel command-panel">
+        <h2>Print Command</h2>
+        ${commandBlock("targetPrintCheck", "Record print check", buildCommand("targetPrintCheck"))}
+      </article>
+      <article class="panel">
         <h2>Target Sheet</h2>
         ${targetSheetMetrics(targetSheet)}
         ${targetSheetFiles(targetSheet)}
+      </article>
+      <article class="panel">
+        <h2>Print Status</h2>
+        ${targetPrintCheckMetrics(targetPrintCheck)}
       </article>
     </section>
   `;
@@ -372,6 +399,19 @@ function targetSheetMetrics(payload: JsonObject | undefined): string {
   return `<dl class="metrics">${rows.map(([key, value]) => `<dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd>`).join("")}</dl>`;
 }
 
+function targetPrintCheckMetrics(payload: JsonObject | undefined): string {
+  if (payload === undefined) return `<p class="empty">No printed target measurement loaded.</p>`;
+  const rows = [
+    ["accepted", display(payload.accepted)],
+    ["expected_square_mm", display(payload.expected_square_mm)],
+    ["measured_square_mm", display(payload.measured_square_mm)],
+    ["tolerance_mm", display(payload.tolerance_mm)],
+    ["delta_mm", display(payload.delta_mm)],
+    ["next_step", display(payload.next_step)],
+  ];
+  return `<dl class="metrics">${rows.map(([key, value]) => `<dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd>`).join("")}</dl>`;
+}
+
 function targetSheetFiles(payload: JsonObject | undefined): string {
   const links = targetSheetFileLinks(payload);
   if (links.length === 0) return "";
@@ -450,6 +490,7 @@ function renderCommandRun(run: CommandRunView): string {
 
 function buildCommand(id: CommandId): string {
   if (id === "target") return buildTargetCommand(state.targetOptions);
+  if (id === "targetPrintCheck") return buildTargetPrintCheckCommand(state.targetPrintCheckOptions);
   if (id === "capture") return buildCaptureCommand(state.captureOptions);
   if (id === "inspect") return buildInspectCommand(state.sessionPath, state.inspectionReportPath);
   if (id === "detect") return buildDetectCommand(state.sessionPath, state.observationsPath, state.detectionReportPath);
@@ -463,6 +504,14 @@ function targetField(key: keyof TargetCommandOptions, label: string, value: stri
 
 function targetNumberField(key: keyof TargetCommandOptions, label: string, value: number): string {
   return `<label>${label}<input data-target-field="${key}" type="number" step="0.1" value="${value}"></label>`;
+}
+
+function targetPrintCheckField(key: keyof TargetPrintCheckCommandOptions, label: string, value: string | number): string {
+  return `<label>${label}<input data-target-print-check-field="${key}" value="${escapeHtml(String(value))}"></label>`;
+}
+
+function targetPrintCheckNumberField(key: keyof TargetPrintCheckCommandOptions, label: string, value: number): string {
+  return `<label>${label}<input data-target-print-check-field="${key}" type="number" step="0.01" value="${value}"></label>`;
 }
 
 function field(key: keyof CaptureCommandOptions, label: string, value: string, visible: boolean): string {
@@ -515,6 +564,14 @@ function wireEvents(): void {
     input.addEventListener("input", () => {
       const key = input.dataset.targetField as keyof TargetCommandOptions;
       (state.targetOptions[key] as string | number) = input.type === "number" ? Number(input.value) : input.value;
+      render();
+    });
+  });
+  document.querySelectorAll<HTMLInputElement>("[data-target-print-check-field]").forEach((input) => {
+    input.addEventListener("input", () => {
+      const key = input.dataset.targetPrintCheckField as keyof TargetPrintCheckCommandOptions;
+      (state.targetPrintCheckOptions[key] as string | number) =
+        input.type === "number" ? Number(input.value) : input.value;
       render();
     });
   });

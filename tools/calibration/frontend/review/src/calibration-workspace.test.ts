@@ -6,6 +6,7 @@ import {
   buildInspectCommand,
   buildSolveCommand,
   buildTargetCommand,
+  buildTargetPrintCheckCommand,
   buildVerifyCommand,
   captureFramePreviews,
   classifyArtifact,
@@ -19,6 +20,7 @@ import {
 describe("calibration review workspace", () => {
   test("classifies calibration JSON artifacts", () => {
     expect(classifyArtifact({ schema_version: "calibration.target_sheet.v1" })).toBe("targetSheet");
+    expect(classifyArtifact({ schema_version: "calibration.target_print_check.v1" })).toBe("targetPrintCheck");
     expect(classifyArtifact({ schema_version: "calibration.capture_session.v1" })).toBe("captureManifest");
     expect(classifyArtifact({ schema_version: "calibration.capture_inspection.v1" })).toBe("captureInspection");
     expect(classifyArtifact({ schema_version: "calibration.charuco_observations.v1" })).toBe("charucoObservations");
@@ -58,10 +60,10 @@ describe("calibration review workspace", () => {
 
     const stages = summarizeWorkflow(artifacts);
 
-    expect(stages.map((stage) => stage.state)).toEqual(["ready", "ready", "ready", "blocked", "missing", "missing"]);
+    expect(stages.map((stage) => stage.state)).toEqual(["ready", "missing", "ready", "ready", "blocked", "missing", "missing"]);
     expect(stages[0].detail).toContain("dfoptix_charuco_15mm");
-    expect(stages[1].detail).toContain("stereo_session");
-    expect(stages[3].metric).toBe("0 / 5");
+    expect(stages[2].detail).toContain("stereo_session");
+    expect(stages[4].metric).toBe("0 / 5");
   });
 
   test("builds capture, review, detection, and solve commands", () => {
@@ -73,6 +75,14 @@ describe("calibration review workspace", () => {
         marginMm: 10,
       }),
     ).toContain("target charuco");
+    expect(
+      buildTargetPrintCheckCommand({
+        measuredSquareMm: 15.05,
+        toleranceMm: 0.2,
+        output: "../../artifacts/calibration_targets/print_check.json",
+        outputReport: "../../docs/calibration_target_print_check.md",
+      }),
+    ).toContain("target record-print-check");
     expect(
       buildCaptureCommand({
         topology: "stereo",

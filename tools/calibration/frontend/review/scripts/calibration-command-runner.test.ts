@@ -133,6 +133,29 @@ describe("calibration command runner", () => {
         path: "artifacts/calibration_targets/target.json",
         payload: { schema_version: "calibration.target_sheet.v1", accepted: true },
       });
+
+      writeFileSync(
+        join(targetDir, "print_check.json"),
+        JSON.stringify({
+          schema_version: "calibration.target_print_check.v1",
+          accepted: true,
+        }),
+      );
+      const printCheckPlan = createCalibrationCommandPlan(
+        [
+          "uv run tennisbot-calibration target record-print-check",
+          "--measured-square-mm 15.0",
+          "--tolerance-mm 0.2",
+          "--output ../../artifacts/calibration_targets/print_check.json",
+          "--output-report ../../docs/calibration_target_print_check.md",
+        ].join(" "),
+        roots,
+      );
+      expect(collectGeneratedCalibrationArtifacts(printCheckPlan)[0]).toMatchObject({
+        name: "print_check.json",
+        path: "artifacts/calibration_targets/print_check.json",
+        payload: { schema_version: "calibration.target_print_check.v1", accepted: true },
+      });
     } finally {
       rmSync(roots.repoRoot, { recursive: true, force: true });
     }
