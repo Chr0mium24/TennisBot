@@ -48,6 +48,7 @@ The latest committed runtime work added:
 - calibration GUI physical validation status panel with per-gate details;
 - calibration GUI startup current artifact loader;
 - calibration GUI camera devices status panel;
+- calibration GUI separate cam1/cam2 mono gates;
 - calibration GUI target, mono, stereo, and package verification presets;
 - Live3D readiness gates and hardware reports.
 

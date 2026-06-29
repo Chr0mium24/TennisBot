@@ -61,10 +61,47 @@ describe("calibration review workspace", () => {
 
     const stages = summarizeWorkflow(artifacts);
 
-    expect(stages.map((stage) => stage.state)).toEqual(["ready", "missing", "ready", "ready", "blocked", "missing", "missing"]);
+    expect(stages.map((stage) => stage.state)).toEqual([
+      "ready",
+      "missing",
+      "ready",
+      "ready",
+      "blocked",
+      "missing",
+      "missing",
+      "missing",
+    ]);
     expect(stages[0].detail).toContain("dfoptix_charuco_15mm");
     expect(stages[2].detail).toContain("stereo_session");
     expect(stages[4].metric).toBe("0 / 5");
+  });
+
+  test("summarizes cam1 and cam2 mono packages separately", () => {
+    const stages = summarizeWorkflow([
+      artifact("cam1", "monoPackage", {
+        schema_version: "calibration.mono.v1",
+        camera_id: "cam1",
+        accepted: true,
+        quality: { rms_reprojection_px: 0.42 },
+      }),
+      artifact("cam2", "monoPackage", {
+        schema_version: "calibration.mono.v1",
+        camera_id: "cam2",
+        accepted: false,
+        quality: { rms_reprojection_px: 1.8 },
+      }),
+    ]);
+
+    expect(stages.find((stage) => stage.id === "cam1-mono")).toMatchObject({
+      label: "Cam1 Mono",
+      state: "ready",
+      metric: "0.420 px",
+    });
+    expect(stages.find((stage) => stage.id === "cam2-mono")).toMatchObject({
+      label: "Cam2 Mono",
+      state: "blocked",
+      metric: "1.800 px",
+    });
   });
 
   test("builds capture, review, detection, and solve commands", () => {

@@ -117,7 +117,8 @@ export function summarizeWorkflow(artifacts: ImportedArtifact[]): WorkflowStage[
   const manifest = latest(artifacts, "captureManifest");
   const inspection = latest(artifacts, "captureInspection");
   const observations = latest(artifacts, "charucoObservations");
-  const monoPackage = latest(artifacts, "monoPackage");
+  const cam1MonoPackage = latestMonoPackage(artifacts, "cam1");
+  const cam2MonoPackage = latestMonoPackage(artifacts, "cam2");
   const stereoPackage = latest(artifacts, "stereoPackage");
 
   return [
@@ -160,11 +161,18 @@ export function summarizeWorkflow(artifacts: ImportedArtifact[]): WorkflowStage[
       metric: observations ? observationMetric(observations.payload) : undefined,
     },
     {
-      id: "mono",
-      label: "Mono Solve",
-      state: booleanField(monoPackage?.payload, "accepted") ? "ready" : monoPackage ? "blocked" : "missing",
-      detail: monoPackage ? monoPackageDetail(monoPackage.payload) : "No mono package loaded.",
-      metric: qualityMetric(monoPackage?.payload, "rms_reprojection_px"),
+      id: "cam1-mono",
+      label: "Cam1 Mono",
+      state: booleanField(cam1MonoPackage?.payload, "accepted") ? "ready" : cam1MonoPackage ? "blocked" : "missing",
+      detail: cam1MonoPackage ? monoPackageDetail(cam1MonoPackage.payload) : "No cam1 mono package loaded.",
+      metric: qualityMetric(cam1MonoPackage?.payload, "rms_reprojection_px"),
+    },
+    {
+      id: "cam2-mono",
+      label: "Cam2 Mono",
+      state: booleanField(cam2MonoPackage?.payload, "accepted") ? "ready" : cam2MonoPackage ? "blocked" : "missing",
+      detail: cam2MonoPackage ? monoPackageDetail(cam2MonoPackage.payload) : "No cam2 mono package loaded.",
+      metric: qualityMetric(cam2MonoPackage?.payload, "rms_reprojection_px"),
     },
     {
       id: "stereo",
@@ -341,6 +349,12 @@ export function targetSheetFileLinks(payload: JsonObject | undefined): ArtifactF
 
 export function latest(artifacts: ImportedArtifact[], kind: ArtifactKind): ImportedArtifact | undefined {
   return [...artifacts].reverse().find((artifact) => artifact.kind === kind);
+}
+
+function latestMonoPackage(artifacts: ImportedArtifact[], cameraId: string): ImportedArtifact | undefined {
+  return [...artifacts]
+    .reverse()
+    .find((artifact) => artifact.kind === "monoPackage" && stringField(artifact.payload, "camera_id") === cameraId);
 }
 
 function manifestFrameEntries(manifest: JsonObject | undefined): JsonObject[] {
