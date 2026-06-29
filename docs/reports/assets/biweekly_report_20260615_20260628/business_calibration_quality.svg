@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="460" viewBox="0 0 920 460" role="img" aria-labelledby="title desc">
+  <title id="title">标定质量概览</title>
+  <desc id="desc">主相机、副相机和双目组合的标定误差结果。</desc>
+  <rect width="920" height="460" fill="#f8fafc"/>
+  <text x="46" y="54" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#172033">标定质量概览</text>
+  <text x="46" y="86" font-family="Arial, sans-serif" font-size="15" fill="#516070">单位：像素级误差，数值越低越好</text>
+  <line x1="130" y1="370" x2="850" y2="370" stroke="#aab4c2" stroke-width="2"/>
+  <line x1="130" y1="170" x2="850" y2="170" stroke="#22c55e" stroke-width="2" stroke-dasharray="8 8"/>
+  <text x="732" y="162" font-family="Arial, sans-serif" font-size="15" fill="#15803d">继续验证门槛</text>
+  <g font-family="Arial, sans-serif">
+    <rect x="190" y="285" width="130" height="85" rx="6" fill="#2563eb"/>
+    <text x="218" y="274" font-size="22" font-weight="700" fill="#1f2937">0.213</text>
+    <text x="199" y="404" font-size="16" fill="#334155">主相机</text>
+    <text x="208" y="426" font-size="14" fill="#64748b">75 张</text>
+    <rect x="395" y="243" width="130" height="127" rx="6" fill="#0f766e"/>
+    <text x="424" y="232" font-size="22" font-weight="700" fill="#1f2937">0.318</text>
+    <text x="404" y="404" font-size="16" fill="#334155">副相机</text>
+    <text x="414" y="426" font-size="14" fill="#64748b">35 张</text>
+    <rect x="600" y="200" width="130" height="170" rx="6" fill="#f97316"/>
+    <text x="628" y="189" font-size="22" font-weight="700" fill="#1f2937">0.424</text>
+    <text x="604" y="404" font-size="16" fill="#334155">双目组合</text>
+    <text x="618" y="426" font-size="14" fill="#64748b">33 组</text>
+  </g>
+  <text x="46" y="438" font-family="Arial, sans-serif" font-size="14" fill="#64748b">结论：标定质量已可支撑下一阶段实机三维定位验证。</text>
+</svg>

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="460" viewBox="0 0 920 460" role="img" aria-labelledby="title desc">
+  <title id="title">识别速度达标情况</title>
+  <desc id="desc">对比当前稳定速度、目标速度和候选优化方案单项测试速度。</desc>
+  <rect width="920" height="460" fill="#f8fafc"/>
+  <text x="46" y="54" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#172033">识别速度达标情况</text>
+  <text x="46" y="86" font-family="Arial, sans-serif" font-size="15" fill="#516070">单位：FPS，目标线为 30 FPS</text>
+  <line x1="130" y1="370" x2="850" y2="370" stroke="#aab4c2" stroke-width="2"/>
+  <line x1="130" y1="130" x2="850" y2="130" stroke="#d21f3c" stroke-width="2" stroke-dasharray="8 8"/>
+  <text x="756" y="122" font-family="Arial, sans-serif" font-size="15" fill="#b91c1c">目标 30</text>
+  <g font-family="Arial, sans-serif">
+    <rect x="190" y="216" width="130" height="154" rx="6" fill="#64748b"/>
+    <text x="221" y="205" font-size="22" font-weight="700" fill="#1f2937">19.3</text>
+    <text x="178" y="404" font-size="16" fill="#334155">当前稳定结果</text>
+    <rect x="395" y="130" width="130" height="240" rx="6" fill="#ef4444"/>
+    <text x="431" y="119" font-size="22" font-weight="700" fill="#1f2937">30.0</text>
+    <text x="430" y="404" font-size="16" fill="#334155">目标</text>
+    <rect x="600" y="99" width="130" height="271" rx="6" fill="#16a34a"/>
+    <text x="635" y="88" font-size="22" font-weight="700" fill="#1f2937">33.9</text>
+    <text x="587" y="404" font-size="16" fill="#334155">候选单项测试</text>
+  </g>
+  <text x="46" y="438" font-family="Arial, sans-serif" font-size="14" fill="#64748b">结论：当前稳定性较好，但速度未达实时闭环目标；候选方案需继续做真实场景验证。</text>
+</svg>

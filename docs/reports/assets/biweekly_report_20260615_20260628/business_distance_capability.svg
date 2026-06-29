@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="460" viewBox="0 0 920 460" role="img" aria-labelledby="title desc">
+  <title id="title">远距离定位能力对比</title>
+  <desc id="desc">不同相机间距下保持十厘米以内深度误差的最大距离。</desc>
+  <rect width="920" height="460" fill="#f8fafc"/>
+  <text x="46" y="54" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#172033">远距离定位能力对比</text>
+  <text x="46" y="86" font-family="Arial, sans-serif" font-size="15" fill="#516070">指标：保持 <=10cm 深度误差的最大距离</text>
+  <line x1="130" y1="370" x2="850" y2="370" stroke="#aab4c2" stroke-width="2"/>
+  <line x1="616" y1="116" x2="616" y2="370" stroke="#d21f3c" stroke-width="2" stroke-dasharray="8 8"/>
+  <text x="560" y="106" font-family="Arial, sans-serif" font-size="15" fill="#b91c1c">标准球场约 23.77m</text>
+  <g font-family="Arial, sans-serif">
+    <rect x="130" y="310" width="154" height="42" rx="6" fill="#94a3b8"/>
+    <text x="296" y="338" font-size="18" font-weight="700" fill="#1f2937">8.3m</text>
+    <text x="132" y="396" font-size="16" fill="#334155">2.8cm 间距</text>
+    <rect x="130" y="226" width="412" height="42" rx="6" fill="#f59e0b"/>
+    <text x="556" y="254" font-size="18" font-weight="700" fill="#1f2937">22.2m</text>
+    <text x="132" y="292" font-size="16" fill="#334155">20cm 间距</text>
+    <rect x="130" y="142" width="653" height="42" rx="6" fill="#16a34a"/>
+    <text x="798" y="170" font-size="18" font-weight="700" fill="#1f2937">35.2m</text>
+    <text x="132" y="208" font-size="16" fill="#334155">50cm 间距</text>
+  </g>
+  <text x="46" y="438" font-family="Arial, sans-serif" font-size="14" fill="#64748b">结论：短间距只适合近距离验证；覆盖标准球场需要更合理的相机间距和镜头方案。</text>
+</svg>
