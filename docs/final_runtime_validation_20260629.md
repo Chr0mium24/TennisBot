@@ -94,6 +94,16 @@ Result: the local runtime launcher status check reported Live3D and Calibration
 GUI ready at `http://127.0.0.1:5178/` and `http://127.0.0.1:5188/`; all HTTP
 checks returned `200 OK`.
 
+Local operator preflight:
+
+```bash
+bun scripts/operator-preflight.ts --output docs/local_runtime_preflight_20260629.md
+```
+
+Result: passed. The preflight verified Live3D, Calibration GUI, the YOLO runtime
+package, the accepted stereo calibration package, and USB camera devices
+`/dev/video0` plus `/dev/video2`.
+
 Hardware smoke:
 
 ```bash
@@ -279,6 +289,9 @@ Result: 13 tests passed. A real runtime YOLO package was written from the
 - `bun scripts/start-local-runtime.ts` is the root local operator launcher for
   Live3D plus the Calibration GUI; `--status` verifies both URLs without
   starting new services.
+- `bun scripts/operator-preflight.ts` verifies both browser surfaces, the YOLO
+  package, stereo calibration package, and the two expected local USB camera
+  device paths before field capture or Live3D validation.
 - Runtime core algorithms live under `packages/core`.
 - Shared data contracts live under `packages/contracts`.
 - `artifacts/models/tennis_ball_yolo` now contains a real ONNX-default package

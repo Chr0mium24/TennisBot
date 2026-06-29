@@ -44,6 +44,22 @@ ready  Calibration GUI  http://127.0.0.1:5188/
 
 ## Calibration Order
 
+Before taking calibration frames, run the preflight:
+
+```bash
+bun scripts/operator-preflight.ts --output docs/local_runtime_preflight_YYYYMMDD.md
+```
+
+Observed result on 2026-06-29:
+
+```text
+passed Live3D surface
+passed Calibration GUI surface
+passed YOLO package
+passed Stereo calibration package
+passed USB camera devices
+```
+
 Open `http://127.0.0.1:5188/` and use the presets in order:
 
 1. `Target`: run `target charuco`, print the generated SVG at 100% scale, and
@@ -80,3 +96,8 @@ It proves the app server, runtime snapshot, YOLO artifact, calibration artifact,
 two USB camera streams, and non-black browser frames are working. It is still
 blocked at left/right YOLO detection because no tennis ball is visible in the
 current scene.
+
+The latest preflight report is
+[`local_runtime_preflight_20260629.md`](local_runtime_preflight_20260629.md).
+It verifies both browser surfaces, the YOLO package, the stereo calibration
+package, and `/dev/video0` plus `/dev/video2`.
