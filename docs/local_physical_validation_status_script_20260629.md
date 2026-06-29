@@ -32,6 +32,12 @@ artifact, and device readiness.
 bun scripts/physical-validation-status.ts --output docs/local_physical_validation_status_YYYYMMDD.md
 ```
 
+Optional JSON output for launchers or dashboards:
+
+```bash
+bun scripts/physical-validation-status.ts --output docs/local_physical_validation_status_YYYYMMDD.md --output-json /tmp/tennisbot_physical_status.json
+```
+
 ## Verification
 
 Observed on 2026-06-29:
@@ -39,5 +45,6 @@ Observed on 2026-06-29:
 ```text
 physical-validation-status: wrote docs/local_physical_validation_status_20260629.md and exited non-zero because physical gates remain incomplete.
 stereo gate: blocked while cam1/cam2 mono packages are still dry-run, even though the current stereo package is hardware validated.
+next_action: Print the target SVG at 100%, measure one square, then record the measurement in this artifact.
 operator-preflight: passed.
 ```

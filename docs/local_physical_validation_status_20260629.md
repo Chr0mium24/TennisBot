@@ -1,7 +1,8 @@
 # Local Physical Validation Status
 
-- created_at: 2026-06-29T04:11:20.996Z
+- created_at: 2026-06-29T04:21:35.375Z
 - result: incomplete
+- next_action: Print the target SVG at 100%, measure one square, then record the measurement in this artifact.
 
 ## Gates
 
@@ -11,6 +12,10 @@
 - blocked: cam2 mono calibration - cam2 mono package is accepted but not hardware validated.
 - blocked: Stereo calibration - stereo package is hardware validated, but mono prerequisites are incomplete.
 - blocked: Live3D prediction-ready hardware run - no Live3D hardware report has reached prediction-ready.
+
+## Next Action
+
+Print the target SVG at 100%, measure one square, then record the measurement in this artifact.
 
 ## Details
 

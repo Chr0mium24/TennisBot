@@ -13,6 +13,14 @@ type GateResult = {
   next?: string;
 };
 
+type StatusPayload = {
+  schema_version: "tennisbot.physical_validation_status.v1";
+  created_at: string;
+  result: "passed" | "incomplete";
+  next_action: string | null;
+  gates: GateResult[];
+};
+
 type JsonObject = Record<string, unknown>;
 
 const repoRoot = resolve(import.meta.dirname, "..");
@@ -26,12 +34,22 @@ if (args.help) {
 
 const gates = runValidationStatus();
 const outputPath = args.output ?? defaultOutput;
-writeReport(outputPath, gates);
+const payload = buildStatusPayload(gates);
+writeReport(outputPath, payload);
+if (args.outputJson !== undefined) {
+  writeJsonReport(args.outputJson, payload);
+}
 for (const gate of gates) {
   console.log(`${gate.status.padEnd(7)} ${gate.label} - ${gate.detail}`);
 }
+if (payload.next_action !== null) {
+  console.log(`next=${payload.next_action}`);
+}
 console.log(`report=${outputPath}`);
-process.exit(gates.every((gate) => gate.status === "passed") ? 0 : 1);
+if (args.outputJson !== undefined) {
+  console.log(`json=${args.outputJson}`);
+}
+process.exit(payload.result === "passed" ? 0 : 1);
 
 function runValidationStatus(): GateResult[] {
   const targetMetadata = targetMetadataCheck();
@@ -306,22 +324,43 @@ function displayPath(path: string): string {
     : resolvedPath.slice(resolvedRoot.length + 1);
 }
 
-function writeReport(outputPath: string, gates: GateResult[]): void {
-  mkdirSync(dirname(outputPath), { recursive: true });
+function buildStatusPayload(gates: GateResult[]): StatusPayload {
   const result = gates.every((gate) => gate.status === "passed") ? "passed" : "incomplete";
+  return {
+    schema_version: "tennisbot.physical_validation_status.v1",
+    created_at: new Date().toISOString(),
+    result,
+    next_action: nextAction(gates),
+    gates,
+  };
+}
+
+function nextAction(gates: GateResult[]): string | null {
+  const gate = gates.find((item) => item.status !== "passed");
+  if (gate === undefined) return null;
+  return gate.next ?? `${gate.label}: ${gate.detail}`;
+}
+
+function writeReport(outputPath: string, payload: StatusPayload): void {
+  mkdirSync(dirname(outputPath), { recursive: true });
   const lines = [
     "# Local Physical Validation Status",
     "",
-    `- created_at: ${new Date().toISOString()}`,
-    `- result: ${result}`,
+    `- created_at: ${payload.created_at}`,
+    `- result: ${payload.result}`,
+    `- next_action: ${payload.next_action ?? "none"}`,
     "",
     "## Gates",
     "",
-    ...gates.map((gate) => `- ${gate.status}: ${gate.label} - ${gate.detail}`),
+    ...payload.gates.map((gate) => `- ${gate.status}: ${gate.label} - ${gate.detail}`),
+    "",
+    "## Next Action",
+    "",
+    payload.next_action ?? "All physical validation gates have passed.",
     "",
     "## Details",
     "",
-    ...gates.flatMap((gate) => [
+    ...payload.gates.flatMap((gate) => [
       `### ${gate.label}`,
       "",
       `- status: ${gate.status}`,
@@ -337,8 +376,13 @@ function writeReport(outputPath: string, gates: GateResult[]): void {
   writeFileSync(outputPath, `${lines.join("\n")}\n`, "utf-8");
 }
 
-function parseArgs(args: string[]): { help: boolean; output?: string } {
-  const parsed: { help: boolean; output?: string } = { help: false };
+function writeJsonReport(outputPath: string, payload: StatusPayload): void {
+  mkdirSync(dirname(outputPath), { recursive: true });
+  writeFileSync(outputPath, `${JSON.stringify(payload, null, 2)}\n`, "utf-8");
+}
+
+function parseArgs(args: string[]): { help: boolean; output?: string; outputJson?: string } {
+  const parsed: { help: boolean; output?: string; outputJson?: string } = { help: false };
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === "--help" || arg === "-h") {
@@ -349,6 +393,13 @@ function parseArgs(args: string[]): { help: boolean; output?: string } {
         throw new Error("--output requires a path.");
       }
       parsed.output = resolve(repoRoot, value);
+      index += 1;
+    } else if (arg === "--output-json") {
+      const value = args[index + 1];
+      if (value === undefined || value.startsWith("--")) {
+        throw new Error("--output-json requires a path.");
+      }
+      parsed.outputJson = resolve(repoRoot, value);
       index += 1;
     } else {
       throw new Error(`Unknown argument: ${arg}`);
@@ -365,7 +416,7 @@ function yyyymmdd(date: Date): string {
 }
 
 function printUsage(): void {
-  console.log(`Usage: bun scripts/physical-validation-status.ts [--output docs/local_physical_validation_status_YYYYMMDD.md]
+  console.log(`Usage: bun scripts/physical-validation-status.ts [--output docs/local_physical_validation_status_YYYYMMDD.md] [--output-json /tmp/status.json]
 
 Checks the physical TennisBot acceptance gates:
 - generated ChArUco target metadata
