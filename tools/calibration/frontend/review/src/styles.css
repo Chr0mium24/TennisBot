@@ -103,6 +103,74 @@ input {
   white-space: nowrap;
 }
 
+.physical-gates {
+  margin-top: 10px;
+}
+
+.physical-gates summary {
+  cursor: pointer;
+  color: #d1d5db;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.physical-gate-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.physical-gate {
+  display: grid;
+  gap: 5px;
+  border-left: 3px solid #64748b;
+  padding-left: 8px;
+}
+
+.physical-gate.passed {
+  border-left-color: #5eead4;
+}
+
+.physical-gate.blocked,
+.physical-gate.failed {
+  border-left-color: #fca5a5;
+}
+
+.physical-gate-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.physical-gate-heading strong {
+  min-width: 0;
+  font-size: 12px;
+}
+
+.physical-gate-heading span {
+  border-radius: 999px;
+  padding: 2px 6px;
+  color: #111827;
+  background: #cbd5e1;
+  font-size: 11px;
+}
+
+.physical-gate.passed .physical-gate-heading span {
+  background: #7dd3fc;
+}
+
+.physical-gate.blocked .physical-gate-heading span,
+.physical-gate.failed .physical-gate-heading span {
+  background: #fca5a5;
+}
+
+.physical-gate code {
+  color: #cbd5e1;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
 .stage.ready span {
   background: #7dd3fc;
 }

@@ -37,6 +37,16 @@ type PhysicalStatusView = {
   result: string;
   nextAction: string;
   detail: string;
+  gates: PhysicalGateView[];
+};
+
+type PhysicalGateView = {
+  id: string;
+  label: string;
+  status: string;
+  detail: string;
+  evidence: string;
+  next: string;
 };
 
 type AppState = {
@@ -65,6 +75,7 @@ const state: AppState = {
     result: "loading",
     nextAction: "Loading physical validation status.",
     detail: "",
+    gates: [],
   },
   sessionPath: "../../artifacts/calibration_sessions/stereo_session",
   observationsPath: "../../artifacts/calibration_sessions/stereo_session/observations.json",
@@ -187,9 +198,36 @@ function renderPhysicalStatus(): string {
         <strong>Physical Status</strong>
         <p>${escapeHtml(state.physicalStatus.nextAction)}</p>
         ${state.physicalStatus.detail === "" ? "" : `<p>${escapeHtml(state.physicalStatus.detail)}</p>`}
+        ${renderPhysicalGateList(state.physicalStatus.gates)}
       </div>
       <button class="stage-action" id="refresh-physical-status" type="button">${state.physicalStatus.status === "loading" ? "..." : "Refresh"}</button>
     </article>
+  `;
+}
+
+function renderPhysicalGateList(gates: PhysicalGateView[]): string {
+  if (gates.length === 0) return "";
+  return `
+    <details class="physical-gates">
+      <summary>Gate details</summary>
+      <div class="physical-gate-list">
+        ${gates
+          .map(
+            (gate) => `
+              <section class="physical-gate ${physicalGateStatusClass(gate.status)}">
+                <div class="physical-gate-heading">
+                  <strong>${escapeHtml(gate.label)}</strong>
+                  <span>${escapeHtml(gate.status)}</span>
+                </div>
+                <p>${escapeHtml(gate.detail)}</p>
+                ${gate.next === "" ? "" : `<p>${escapeHtml(gate.next)}</p>`}
+                ${gate.evidence === "" ? "" : `<code>${escapeHtml(gate.evidence)}</code>`}
+              </section>
+            `,
+          )
+          .join("")}
+      </div>
+    </details>
   `;
 }
 
@@ -905,9 +943,8 @@ async function refreshPhysicalStatus(): Promise<void> {
     if (!response.ok) {
       throw new Error(typeof payload.error === "string" ? payload.error : `Status request failed with ${response.status}.`);
     }
-    const incompleteGateCount = Array.isArray(payload.gates)
-      ? payload.gates.filter((gate) => isJsonObject(gate) && gate.status !== "passed").length
-      : 0;
+    const gates = Array.isArray(payload.gates) ? payload.gates.map(physicalGateFromPayload).filter(isPhysicalGateView) : [];
+    const incompleteGateCount = gates.filter((gate) => gate.status !== "passed").length;
     state.physicalStatus = {
       status: "ready",
       result: typeof payload.result === "string" ? payload.result : "unknown",
@@ -916,6 +953,7 @@ async function refreshPhysicalStatus(): Promise<void> {
           ? payload.next_action
           : "All physical validation gates have passed.",
       detail: incompleteGateCount > 0 ? `${incompleteGateCount} gate(s) incomplete.` : "",
+      gates,
     };
   } catch (error) {
     state.physicalStatus = {
@@ -923,9 +961,34 @@ async function refreshPhysicalStatus(): Promise<void> {
       result: "error",
       nextAction: "Physical validation status is unavailable.",
       detail: error instanceof Error ? error.message : String(error),
+      gates: [],
     };
   }
   render();
+}
+
+function physicalGateFromPayload(value: unknown): PhysicalGateView | null {
+  if (!isJsonObject(value)) return null;
+  return {
+    id: stringValue(value.id),
+    label: stringValue(value.label),
+    status: stringValue(value.status),
+    detail: stringValue(value.detail),
+    evidence: stringValue(value.evidence),
+    next: stringValue(value.next),
+  };
+}
+
+function isPhysicalGateView(value: PhysicalGateView | null): value is PhysicalGateView {
+  return value !== null;
+}
+
+function physicalGateStatusClass(status: string): string {
+  return ["passed", "blocked", "failed"].includes(status) ? status : "unknown";
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value : "";
 }
 
 function escapeHtml(value: string): string {

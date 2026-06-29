@@ -19,6 +19,7 @@ The Calibration GUI sidebar now shows:
 - physical validation result;
 - current next action;
 - incomplete gate count;
+- expandable gate details with per-gate status, blocker detail, next action, and evidence;
 - refresh button.
 
 After any calibration command runs, the GUI refreshes the physical status so the
@@ -31,4 +32,11 @@ tools/calibration/frontend/review bun test: 16 passed, 0 failed.
 tools/calibration/frontend/review bun run build: passed.
 GET http://127.0.0.1:5188/api/physical/status: returned schema tennisbot.physical_validation_status.v1, result incomplete, 6 gates.
 operator-preflight: passed.
+```
+
+Follow-up gate detail check:
+
+```text
+tools/calibration/frontend/review bun test: 16 passed, 0 failed.
+tools/calibration/frontend/review bun run build: passed.
 ```

@@ -45,7 +45,7 @@ The latest committed runtime work added:
 - local runtime launcher next-action output;
 - calibration target generation;
 - calibration GUI target print-check recording;
-- calibration GUI physical validation status panel;
+- calibration GUI physical validation status panel with per-gate details;
 - calibration GUI target, mono, stereo, and package verification presets;
 - Live3D readiness gates and hardware reports.
 
