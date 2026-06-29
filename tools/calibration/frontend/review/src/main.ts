@@ -159,6 +159,7 @@ if (app === null) {
 }
 
 render();
+void loadCurrentArtifacts({ reportError: false });
 void refreshPhysicalStatus();
 void refreshCameraStatus();
 
@@ -714,7 +715,7 @@ function wireEvents(): void {
     render();
   });
   document.querySelector("#load-current")?.addEventListener("click", () => {
-    void loadCurrentArtifacts();
+    void loadCurrentArtifacts({ reportError: true });
   });
   document.querySelector("#refresh-physical-status")?.addEventListener("click", () => {
     void refreshPhysicalStatus();
@@ -955,7 +956,7 @@ function importGeneratedArtifacts(artifacts: unknown[] | undefined): number {
   return importedCount;
 }
 
-async function loadCurrentArtifacts(): Promise<void> {
+async function loadCurrentArtifacts(options: { reportError: boolean }): Promise<void> {
   try {
     const response = await fetch("/api/calibration/current-artifacts");
     const payload = (await response.json()) as { artifacts?: unknown[]; error?: unknown };
@@ -964,12 +965,14 @@ async function loadCurrentArtifacts(): Promise<void> {
     }
     importGeneratedArtifacts(payload.artifacts);
   } catch (error) {
-    state.commandRuns.verify = {
-      status: "error",
-      detail: error instanceof Error ? error.message : String(error),
-      stdout: "",
-      stderr: "",
-    };
+    if (options.reportError) {
+      state.commandRuns.verify = {
+        status: "error",
+        detail: error instanceof Error ? error.message : String(error),
+        stdout: "",
+        stderr: "",
+      };
+    }
   }
   render();
 }

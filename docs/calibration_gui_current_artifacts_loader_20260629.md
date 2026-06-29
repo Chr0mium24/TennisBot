@@ -19,9 +19,11 @@ It loads the canonical local calibration artifacts from `artifacts/`:
 - cam1 and cam2 mono packages and verification JSON;
 - stereo package and verification JSON.
 
-The Calibration GUI toolbar now has a `Load Current` button that imports those
-artifacts into the review workspace without manual JSON selection. Repeated
-loads replace artifacts with the same path instead of appending duplicates.
+The Calibration GUI now loads those current artifacts on startup, so the first
+view can show the local target sheet links and package/session state without
+manual JSON selection. The toolbar still has a `Load Current` button for manual
+refresh. Repeated loads replace artifacts with the same path instead of
+appending duplicates.
 
 ## Verification
 
@@ -36,5 +38,12 @@ Follow-up default-session loader check:
 
 ```text
 tools/calibration/frontend/review bun test: 20 passed, 0 failed.
+tools/calibration/frontend/review bun run build: passed.
+```
+
+Follow-up startup auto-load check:
+
+```text
+tools/calibration/frontend/review bun test: 21 passed, 0 failed.
 tools/calibration/frontend/review bun run build: passed.
 ```
