@@ -78,7 +78,7 @@ if (physicalStatus === undefined) {
   console.log(`Physical validation next action: ${physicalStatus.next_action}`);
 }
 console.log("");
-console.log("Use desperate/CameraCalibLab OpenCV GUI for local stereo calibration capture when the local archive is present.");
+console.log("Use tools/calibration OpenCV GUI for local mono/stereo calibration capture.");
 console.log("Use Live3D after calibration and put a visible tennis ball in both camera views.");
 
 const childProcesses = started.flatMap((item) => (item.process === undefined ? [] : [item.process]));
@@ -214,17 +214,22 @@ function sleep(ms: number): Promise<void> {
 }
 
 function printUsage(): void {
-  console.log(`Usage: bun scripts/start-local-runtime.ts [--status] [--no-build]
+  console.log(`用法: bun scripts/start-local-runtime.ts [--status] [--no-build]
 
-Starts or checks the local TennisBot operator surfaces:
+默认值:
+  URL      http://127.0.0.1:5178/
+  日志     /tmp/tennisbot_live3d.log
+  行为     构建并启动缺失服务
+
+启动或检查本机 TennisBot 操作员界面:
 - Live3D at http://127.0.0.1:5178/
 
-Options:
-  --status    Only check whether configured URLs are serving.
-  --no-build  Start missing services without running frontend builds first.
+选项:
+  --status    只检查 URL 是否已经可访问。
+  --no-build  启动缺失服务时跳过前端构建。
 
-Normal startup also prints the current physical validation next action. Run the
-original calibration GUI from desperate/CameraCalibLab with:
+正常启动还会打印当前物理验收下一步。标定 GUI 使用:
+  cd tools/calibration
   uv run camera-calib-lab capture stereo-charuco-auto-gui
 `);
 }

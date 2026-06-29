@@ -24,7 +24,14 @@ type StatusPayload = {
 type JsonObject = Record<string, unknown>;
 
 const repoRoot = resolve(import.meta.dirname, "..");
-const defaultOutput = resolve(repoRoot, "docs", `local_physical_validation_status_${yyyymmdd(new Date())}.md`);
+const defaultOutput = resolve(
+  repoRoot,
+  "docs",
+  "archive",
+  yyyymmdd(new Date()),
+  "probes",
+  `local_physical_validation_status_${yyyymmdd(new Date())}.md`,
+);
 
 const args = parseArgs(Bun.argv.slice(2));
 if (args.help) {
@@ -137,7 +144,7 @@ function monoPackageCheck(cameraId: string, path: string): GateResult {
       status: "blocked",
       detail: `${cameraId} mono package is missing.`,
       evidence: displayPath(path),
-      next: `Use desperate/CameraCalibLab OpenCV capture for ${cameraId} when the local archive is present, then solve and verify the mono package.`,
+      next: `Use tools/calibration OpenCV capture for ${cameraId}, then solve and verify the mono package.`,
     };
   }
   const quality = objectField(payload, "quality");
@@ -184,7 +191,7 @@ function stereoPackageCheck(path: string, monoPrerequisites: GateResult[]): Gate
       status: "blocked",
       detail: "stereo package is missing.",
       evidence: displayPath(path),
-      next: "Use desperate/CameraCalibLab OpenCV stereo capture after cam1 and cam2 mono packages are accepted when the local archive is present.",
+      next: "Use tools/calibration OpenCV stereo capture after cam1 and cam2 mono packages are accepted.",
     };
   }
   const quality = objectField(payload, "quality");
@@ -258,7 +265,7 @@ function live3dPredictionCheck(): GateResult {
     label: "Live3D prediction-ready hardware run",
     status: "blocked",
     detail: "no Live3D hardware report has reached prediction-ready.",
-    evidence: latest === undefined ? "No docs/live3d_hardware*.md reports found." : live3dEvidence(latest.path),
+    evidence: latest === undefined ? "No docs/archive/**/live3d_hardware*.md reports found." : live3dEvidence(latest.path),
     next: "Put a visible tennis ball in both camera views and run apps/live3d verify:hardware until it passes.",
   };
 }
@@ -271,13 +278,23 @@ function stereoBaselineFromFile(): number | undefined {
 function latestLive3dReports(): Array<{ path: string; mtimeMs: number }> {
   const docsDir = resolve(repoRoot, "docs");
   if (!existsSync(docsDir)) return [];
-  return readdirSync(docsDir)
-    .filter((name) => /^live3d_hardware.*\.md$/u.test(name))
-    .map((name) => {
-      const path = join(docsDir, name);
-      return { path, mtimeMs: statSync(path).mtimeMs };
-    })
+  return collectMarkdownFiles(docsDir)
+    .filter((path) => /(^|\/)live3d_hardware.*\.md$/u.test(path))
+    .map((path) => ({ path, mtimeMs: statSync(path).mtimeMs }))
     .sort((left, right) => right.mtimeMs - left.mtimeMs);
+}
+
+function collectMarkdownFiles(dir: string): string[] {
+  const files: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...collectMarkdownFiles(path));
+    } else if (entry.isFile() && entry.name.endsWith(".md")) {
+      files.push(path);
+    }
+  }
+  return files;
 }
 
 function live3dEvidence(path: string): string {
@@ -448,13 +465,17 @@ function yyyymmdd(date: Date): string {
 }
 
 function printUsage(): void {
-  console.log(`Usage: bun scripts/physical-validation-status.ts [--output docs/local_physical_validation_status_YYYYMMDD.md] [--output-json /tmp/status.json]
+  console.log(`用法: bun scripts/physical-validation-status.ts [--output docs/archive/YYYYMMDD/probes/local_physical_validation_status_YYYYMMDD.md] [--output-json /tmp/status.json]
 
-Checks the physical TennisBot acceptance gates:
-- generated ChArUco target metadata
-- recorded printed target square measurement
-- cam1 and cam2 real mono calibration packages
-- real stereo calibration package
-- Live3D hardware report reaching prediction-ready
+默认值:
+  --output       ${displayPath(defaultOutput)}
+  --output-json  不写 JSON 文件
+
+检查 TennisBot 物理验收门槛:
+- ChArUco 标定板元数据
+- 打印标定板方格实测记录
+- cam1 和 cam2 真实单目标定包
+- 真实双目标定包
+- Live3D 硬件报告达到 prediction-ready
 `);
 }

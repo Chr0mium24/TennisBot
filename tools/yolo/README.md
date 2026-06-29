@@ -1,21 +1,14 @@
-# TennisBot YOLO Tool Boundary
+# TennisBot YOLO 工具
 
-Date: 2026-06-28
+`tools/yolo` 是当前主线网球检测工具入口，包含：
 
-`tools/yolo` is the home for TennisBot tennis-ball detector tooling:
-annotation, dataset validation, training, evaluation, model export, and model
-package publication. In Wave 6 this directory owns the standalone runtime
-model package creation and verification surface. The remaining training,
-annotation, and dataset workflows still live in the local-only
-`desperate/TennisBallDetectorLab` archive until a later migration wave.
+- 标注前端/后端
+- 运行时模型包创建与验证
+- 纯 YOLO OpenCV 检测 GUI
 
-The live runtime must consume exported model packages from `artifacts/models/`.
-It must not import training, annotation, dataset, or export internals from this
-tool.
+它不负责标定、双目几何、轨迹预测或 Live3D 状态。
 
-## Runtime Package Commands
-
-Install and test the standalone `uv` package:
+## 安装和测试
 
 ```bash
 cd tools/yolo
@@ -23,146 +16,104 @@ uv sync
 uv run pytest -q
 ```
 
-Create a runtime package from an ONNX model:
+## 标注前端
+
+```bash
+uv run tennisbot-yolo annotate
+```
+
+默认值：
+
+- `--images-root tools/yolo/yolo/dataset/images`
+- `--labels-root tools/yolo/yolo/dataset/labels`
+- `--excluded-file tools/yolo/yolo/dataset/excluded_images.txt`
+- `--host 127.0.0.1`
+- `--port 8765`
+
+打开地址：
+
+```text
+http://127.0.0.1:8765
+```
+
+## 验证模型包
+
+```bash
+uv run tennisbot-yolo package verify
+```
+
+默认值：
+
+- `--path ../../artifacts/models/tennis_ball_yolo`
+
+## 创建 dry-run 模型包
+
+```bash
+uv run tennisbot-yolo package create --dry-run
+```
+
+默认值：
+
+- `--output-dir ../../artifacts/models/tennis_ball_yolo`
+- `--default-model onnx`
+
+dry-run 包只用于 loader 和流程验证，不代表真实推理能力。
+
+## 创建真实模型包
+
+创建真实包时必须显式传入至少一个模型文件：
 
 ```bash
 uv run tennisbot-yolo package create \
-  --output-dir ../../artifacts/models/tennis_ball_yolo \
-  --model-onnx path/to/model.onnx \
-  --eval-report path/to/eval_report.md \
-  --eval-metrics path/to/eval_metrics.json \
-  --default-model onnx
+  --model-pt ../../artifacts/model_candidates/tennis_ball_yolo/best.pt \
+  --default-model pt
 ```
 
-`--eval-report` and `--eval-metrics` are optional, but should be supplied for
-runtime packages used beyond loader smoke tests. Without them the package keeps
-null model metrics and an explicit gap in `eval_report.md`.
+可选输入：
 
-Create a contract-only dry-run package for loader validation:
+- `--model-pt`
+- `--model-onnx`
+- `--model-rknn`
+- `--eval-report`
+- `--eval-metrics`
+
+如果同时提供多个模型，`--default-model` 必须指向其中一个。
+
+## 纯 YOLO 检测 GUI
 
 ```bash
-uv run tennisbot-yolo package create \
-  --output-dir ../../artifacts/models/tennis_ball_yolo \
-  --dry-run
+uv run --extra detect tennisbot-yolo detect-gui
 ```
 
-Dry-run packages include a deterministic placeholder file and are marked as
-non-inference in `package.json`, `metadata.json`, `eval_report.md`, and
-`eval_metrics.json`. They do not claim training, inference, or accuracy.
+默认值：
 
-Verify a package before runtime use:
+- `--devices /dev/video0,/dev/video2`
+- `--width 3840`
+- `--height 2160`
+- `--fps 30`
+- `--fourcc MJPG`
+- `--model ../../artifacts/models/tennis_ball_yolo/model.pt`
+- `--conf 0.05`
+- `--iou 0.5`
+- `--imgsz 1280`
+- `--max-detections 6`
+- `--class-id 0`
+- `--tile-width 2048`
+- `--tile-height 1216`
+- `--tile-overlap 160`
+- `--display-width 720`
+- `--warmup-frames 5`
+
+小球在 4K 画面里太小时：
 
 ```bash
-uv run tennisbot-yolo package verify \
-  --path ../../artifacts/models/tennis_ball_yolo
+uv run --extra detect tennisbot-yolo detect-gui --tile
 ```
 
-## Pure YOLO Detection GUI
-
-Run a local OpenCV preview that opens USB cameras, runs YOLO, and draws
-detection boxes only. It does not load calibration, triangulate, or predict.
+只查看解析后的配置，不打开相机：
 
 ```bash
-cd tools/yolo
-uv run --extra detect tennisbot-yolo detect-gui \
-  --devices /dev/video0,/dev/video2 \
-  --width 3840 \
-  --height 2160 \
-  --fourcc MJPG \
-  --model ../../artifacts/models/tennis_ball_yolo/model.pt \
-  --tile \
-  --imgsz 1280 \
-  --display-width 720
+uv run --extra detect tennisbot-yolo detect-gui --dry-run
 ```
 
-Use `q` or `Esc` to exit. `--tile` keeps the detector useful for small balls in
-4K frames while the GUI still shows a downscaled preview.
-
-## Current To Target Command Map
-
-Run current legacy commands from `desperate/TennisBallDetectorLab/` when that
-local archive is present. Target commands are the intended post-migration shape
-from the TennisBot repository root.
-
-| Workflow | Current command | Target command |
-| --- | --- | --- |
-| Install Python deps | `uv sync` | `uv sync --package tennisbot-yolo` |
-| Run Python tests | `uv run pytest` | `uv run pytest tools/yolo/tests` |
-| Install annotator deps | `bun install` | `cd tools/yolo/web/yolo-annotator && bun install` |
-| Typecheck annotator | `bun run check` | `cd tools/yolo/web/yolo-annotator && bun run check` |
-| Serve annotator | `uv run tbl annotate` | `uv run tennisbot-yolo annotate` |
-| Open annotator | `http://127.0.0.1:8765` | `http://127.0.0.1:8765` |
-| Capture camera frames | `uv run tbl collect-camera --device /dev/video0 --camera cam1 ...` | `uv run tennisbot-yolo collect-camera --device /dev/video0 --camera cam1 ...` |
-| Validate dataset | `uv run tbl validate-dataset` | `uv run tennisbot-yolo validate-dataset` |
-| Validate labels without images | `uv run tbl validate-dataset --allow-missing-images` | `uv run tennisbot-yolo validate-dataset --allow-missing-images` |
-| Build train/val manifests | `uv run tbl build-dataset` | `uv run tennisbot-yolo build-dataset` |
-| Build per-camera manifests | `uv run tbl build-dataset --camera cam1` | `uv run tennisbot-yolo build-dataset --camera cam1` |
-| Dry-run training | `uv run tbl train --data-yaml yolo/dataset_configs/current_plus_low_bitrate_backup/data.yaml --dry-run` | `uv run tennisbot-yolo train --data-yaml tools/yolo/dataset_configs/current_plus_low_bitrate_backup/data.yaml --dry-run` |
-| Train model | `uv run tbl train --data-yaml yolo/dataset_configs/current_plus_low_bitrate_backup/data.yaml --model yolov8n.pt --device 0 --name tennis_ball_yolov8n` | `uv run tennisbot-yolo train --data-yaml tools/yolo/dataset_configs/current_plus_low_bitrate_backup/data.yaml --model yolov8n.pt --device 0 --name tennis_ball_yolov8n` |
-| Write eval report | `uv run tbl eval --allow-missing-images` | `uv run tennisbot-yolo eval --allow-missing-images` |
-| Export ONNX only | `uv run tbl export-rknn --model yolo/runs/training/tennis_ball_yolov8n/weights/best.pt --skip-rknn` | `uv run tennisbot-yolo export-rknn --model artifacts/models/training/tennis_ball_yolov8n/weights/best.pt --skip-rknn` |
-| Export RKNN | `uv run --with rknn-toolkit2 --with torchvision==0.19.0 --with onnx==1.17.0 tbl export-rknn --model yolo/runs/training/tennis_ball_yolov8n/weights/best.pt --target-platform rk3576 --calibration-count 200` | `uv run --with rknn-toolkit2 --with torchvision==0.19.0 --with onnx==1.17.0 tennisbot-yolo export-rknn --model artifacts/models/training/tennis_ball_yolov8n/weights/best.pt --target-platform rk3576 --calibration-count 200` |
-| Publish runtime model package | `uv run tbl package --model-pt ... --model-onnx ... --model-rknn ... --eval-report runs/eval/eval_report.md --eval-metrics runs/eval/eval_metrics.json` | `uv run tennisbot-yolo package --output-dir artifacts/models/tennis_ball_yolo --model-pt ... --model-onnx ... --model-rknn ... --eval-report artifacts/models/eval/eval_report.md --eval-metrics artifacts/models/eval/eval_metrics.json` |
-| Extract sprites for UI/debug assets | `uv run tbl extract-sprites ...` | `uv run tennisbot-yolo extract-sprites ...` |
-| Legacy direct frame extraction | `uv run python yolo/scripts/extract_frames.py` | `uv run tennisbot-yolo extract-frames ...` |
-| Legacy direct image resize | `uv run python yolo/scripts/resize_images.py` | `uv run tennisbot-yolo resize-images ...` |
-| Legacy CUDA zip bundle | `uv run python yolo/scripts/make_yolo_zip.py` | `uv run tennisbot-yolo export-training-bundle ...` |
-
-The target CLI name is provisional. The important boundary is that future
-commands are invoked as a TennisBot YOLO tool and publish only runtime packages
-to apps.
-
-## Target Layout
-
-```text
-tools/yolo/
-  README.md
-  MODEL_PACKAGE_CONTRACT.md
-  MIGRATION_CHECKLIST.md
-  src/                         # Python package
-  tests/                       # tool tests
-  web/yolo-annotator/          # future TypeScript annotator
-  dataset_configs/             # lightweight generated/curated configs only
-  configs/                     # model and experiment configs
-  scripts/                     # temporary migration shims only
-```
-
-Large or generated content must stay out of this tracked tool directory unless
-the lead explicitly approves a small, reviewable fixture:
-
-- datasets and labels in active user work;
-- training runs;
-- exported `.pt`, `.onnx`, `.rknn`, and similar model artifacts;
-- local package outputs.
-
-Canonical runtime model packages belong under:
-
-```text
-artifacts/models/tennis_ball_yolo/
-```
-
-## Runtime Boundary
-
-`apps/live3d` consumes the model package contract in
-[`MODEL_PACKAGE_CONTRACT.md`](MODEL_PACKAGE_CONTRACT.md). It should load:
-
-- package metadata;
-- label names;
-- preprocessing settings;
-- postprocessing settings;
-- exactly one compatible runtime model artifact.
-
-`apps/live3d` should not consume:
-
-- YOLO dataset folders;
-- annotator source;
-- training scripts;
-- Ultralytics run directories;
-- RKNN calibration workspaces.
-
-## Migration Checklist
-
-Use [`MIGRATION_CHECKLIST.md`](MIGRATION_CHECKLIST.md) for the later
-`TennisBallDetectorLab` migration. The checklist is intentionally separate
-because the legacy lab archive is local-only and ignored by the parent
-repository.
+退出 GUI：按 `q` 或 `Esc`。

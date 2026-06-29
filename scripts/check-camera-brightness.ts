@@ -297,18 +297,27 @@ function parsePositiveInteger(flag: string, value: string): number {
 }
 
 function printUsage(): void {
-  console.log(`Usage: bun scripts/check-camera-brightness.ts [options]
+  console.log(`用法: bun scripts/check-camera-brightness.ts [options]
 
-Captures one grayscale frame from two USB V4L2 cameras and prints average
-brightness. A covered lens should have a much lower average brightness.
+默认值:
+  --devices       自动选择前两个 USB V4L2 采集设备
+  --width         1280
+  --height        720
+  --fps           30
+  --input-format  mjpeg
+  --timeout-ms    5000
+  --json          false
 
-Options:
-  --devices <left,right>      Comma-separated devices. Default: first two USB V4L2 capture devices.
-  --width <px>                Capture width. Default: 1280
-  --height <px>               Capture height. Default: 720
-  --fps <fps>                 Capture FPS request. Default: 30
-  --input-format <format>     V4L2 input format. Default: mjpeg; fallback without format is automatic.
-  --timeout-ms <ms>           Per-device capture timeout. Default: 5000
-  --json                      Print machine-readable JSON.
+从两个 USB V4L2 相机各采一帧灰度图并打印平均亮度。镜头盖没摘或被挡住的
+相机平均亮度会明显更低。
+
+选项:
+  --devices <left,right>      逗号分隔的设备路径。
+  --width <px>                采集宽度。
+  --height <px>               采集高度。
+  --fps <fps>                 请求帧率。
+  --input-format <format>     V4L2 输入格式；失败时会自动尝试不指定格式。
+  --timeout-ms <ms>           每个设备采集超时。
+  --json                      输出机器可读 JSON。
 `);
 }

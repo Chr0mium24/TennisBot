@@ -84,7 +84,14 @@ function parseArgs(values: string[]): Args {
     help: false,
     toleranceMm: 0.2,
     output: resolve(repoRoot, "artifacts/calibration_targets/dfoptix_charuco_15mm_print_check.json"),
-    report: resolve(repoRoot, "docs", `calibration_target_print_check_${yyyymmdd(new Date())}.md`),
+    report: resolve(
+      repoRoot,
+      "docs",
+      "archive",
+      yyyymmdd(new Date()),
+      "calibration",
+      `calibration_target_print_check_${yyyymmdd(new Date())}.md`,
+    ),
   };
   for (let index = 0; index < values.length; index += 1) {
     const arg = values[index];
@@ -143,10 +150,16 @@ function yyyymmdd(date: Date): string {
 }
 
 function printUsage(): void {
-  console.log(`Usage: bun scripts/record-target-print-check.ts --measured-square-mm 15.0 [--tolerance-mm 0.2]
+  console.log(`用法: bun scripts/record-target-print-check.ts --measured-square-mm 15.0 [--tolerance-mm 0.2]
 
-Records the physical print measurement for the generated ChArUco target:
-- writes artifacts/calibration_targets/dfoptix_charuco_15mm_print_check.json
-- writes docs/calibration_target_print_check_YYYYMMDD.md
+默认值:
+  --tolerance-mm  0.2
+  --output        ${displayPath(resolve(repoRoot, "artifacts/calibration_targets/dfoptix_charuco_15mm_print_check.json"))}
+  --report        ${displayPath(resolve(repoRoot, "docs", "archive", yyyymmdd(new Date()), "calibration", `calibration_target_print_check_${yyyymmdd(new Date())}.md`))}
+
+必须显式填写:
+  --measured-square-mm  打印出来的一格实测毫米数，不能用默认值，避免伪造物理验收。
+
+记录生成的 ChArUco 标定板打印测量结果。
 `);
 }

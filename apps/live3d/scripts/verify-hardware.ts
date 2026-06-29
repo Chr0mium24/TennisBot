@@ -1174,7 +1174,7 @@ function parseArgs(args: string[]): Options {
   let chromeDebugPort = Number(process.env.LIVE3D_CHROME_DEBUG_PORT ?? defaultChromeDebugPort);
   let chromeBin = process.env.CHROME_BIN;
   let keepChrome = false;
-  let outputPath = resolve(repoRoot, "docs", `live3d_hardware_loop_${timestampForFilename(new Date())}.md`);
+  let outputPath = defaultOutputPath(new Date());
   let captureDir = process.env.LIVE3D_VERIFY_CAPTURE_DIR;
   let prepareUvcControls = process.env.LIVE3D_VERIFY_PREPARE_UVC === "1";
   let uvcDevicePaths = (process.env.LIVE3D_VERIFY_UVC_DEVICES ?? "/dev/video0,/dev/video2")
@@ -1251,19 +1251,28 @@ function requireValue(args: string[], index: number, flag: string): string {
 }
 
 function printHelp(): void {
-  console.log(`Usage: bun run verify:hardware [options]
+  console.log(`用法: bun run verify:hardware [options]
 
-Options:
-  --app-url <url>              Live3D app URL. Default: http://localhost:5178
-  --timeout-ms <ms>            Timeout for camera and runtime checks. Default: ${defaultTimeoutMs}
-  --poll-ms <ms>               Snapshot polling interval. Default: ${defaultPollMs}
-  --chrome-debug-port <port>   Chrome DevTools Protocol port. Default: ${defaultChromeDebugPort}
-  --chrome-bin <path>          Chrome/Chromium executable. Also supports CHROME_BIN.
-  --keep-chrome                Leave Chrome and profile directory running for manual inspection.
-  --output <path>              Markdown report path.
-  --capture-dir <path>         Directory for left/right video PNG captures.
-  --prepare-uvc-controls       Apply high-brightness UVC controls before launching Chrome.
-  --uvc-devices <csv>          Device paths for UVC preparation. Default: /dev/video0,/dev/video2
+默认值:
+  --app-url                 http://localhost:5178
+  --timeout-ms              ${defaultTimeoutMs}
+  --poll-ms                 ${defaultPollMs}
+  --chrome-debug-port       ${defaultChromeDebugPort}
+  --output                  ${displayPath(defaultOutputPath(new Date()))}
+  --capture-dir             <output>_frames
+  --uvc-devices             /dev/video0,/dev/video2
+
+选项:
+  --app-url <url>              Live3D 页面地址。
+  --timeout-ms <ms>            相机和运行时检查超时。
+  --poll-ms <ms>               快照轮询间隔。
+  --chrome-debug-port <port>   Chrome DevTools Protocol 端口。
+  --chrome-bin <path>          Chrome/Chromium 可执行文件；也支持 CHROME_BIN。
+  --keep-chrome                保留 Chrome 和 profile 目录，便于人工检查。
+  --output <path>              Markdown 报告路径。
+  --capture-dir <path>         左右视频 PNG 截图目录。
+  --prepare-uvc-controls       启动 Chrome 前设置本机高亮度 UVC 参数。
+  --uvc-devices <csv>          UVC 参数设置设备列表。
 `);
 }
 
@@ -1336,6 +1345,32 @@ function chromeDebugUrl(opts: Options, path: string): string {
 
 function timestampForFilename(date: Date): string {
   return date.toISOString().replaceAll(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+}
+
+function yyyymmdd(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}${month}${day}`;
+}
+
+function defaultOutputPath(date: Date): string {
+  return resolve(
+    repoRoot,
+    "docs",
+    "archive",
+    yyyymmdd(date),
+    "live3d",
+    `live3d_hardware_loop_${timestampForFilename(date)}.md`,
+  );
+}
+
+function displayPath(path: string): string {
+  const resolvedRoot = resolve(repoRoot);
+  const resolvedPath = resolve(path);
+  return resolvedPath === resolvedRoot || !resolvedPath.startsWith(`${resolvedRoot}/`)
+    ? path
+    : resolvedPath.slice(resolvedRoot.length + 1);
 }
 
 function defaultCaptureDir(outputPath: string): string {

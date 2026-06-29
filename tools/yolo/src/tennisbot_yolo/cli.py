@@ -10,9 +10,11 @@ from .package import PackageVerificationError, create_model_package, verify_mode
 
 
 TOOL_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = TOOL_ROOT.parents[1]
 DEFAULT_IMAGES_ROOT = TOOL_ROOT / "yolo" / "dataset" / "images"
 DEFAULT_LABELS_ROOT = TOOL_ROOT / "yolo" / "dataset" / "labels"
 DEFAULT_EXCLUDED_FILE = TOOL_ROOT / "yolo" / "dataset" / "excluded_images.txt"
+DEFAULT_MODEL_PACKAGE = REPO_ROOT / "artifacts" / "models" / "tennis_ball_yolo"
 ANNOTATOR_SCRIPT = TOOL_ROOT / "yolo" / "scripts" / "serve_annotator.py"
 
 
@@ -65,38 +67,40 @@ def cmd_package_verify(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    parser_kwargs = {"formatter_class": argparse.ArgumentDefaultsHelpFormatter}
     parser = argparse.ArgumentParser(
         prog="tennisbot-yolo",
-        description="TennisBot YOLO runtime package tools.",
+        description="TennisBot YOLO 标注、检测和运行时模型包工具。",
+        **parser_kwargs,
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    annotate = subparsers.add_parser("annotate", help="Serve the local YOLO annotation frontend/backend.")
-    annotate.add_argument("--images-root", type=Path, default=DEFAULT_IMAGES_ROOT)
-    annotate.add_argument("--labels-root", type=Path, default=DEFAULT_LABELS_ROOT)
-    annotate.add_argument("--excluded-file", type=Path, default=DEFAULT_EXCLUDED_FILE)
-    annotate.add_argument("--host", default="127.0.0.1")
-    annotate.add_argument("--port", type=int, default=8765)
+    annotate = subparsers.add_parser("annotate", help="启动本机 YOLO 标注前端/后端。", **parser_kwargs)
+    annotate.add_argument("--images-root", type=Path, default=DEFAULT_IMAGES_ROOT, help="图片根目录")
+    annotate.add_argument("--labels-root", type=Path, default=DEFAULT_LABELS_ROOT, help="YOLO 标签根目录")
+    annotate.add_argument("--excluded-file", type=Path, default=DEFAULT_EXCLUDED_FILE, help="排除图片列表")
+    annotate.add_argument("--host", default="127.0.0.1", help="HTTP 监听地址")
+    annotate.add_argument("--port", type=int, default=8765, help="HTTP 监听端口")
     annotate.set_defaults(func=cmd_annotate)
 
     add_detect_gui_parser(subparsers)
 
-    package = subparsers.add_parser("package", help="Create and verify runtime model packages.")
+    package = subparsers.add_parser("package", help="创建和验证运行时模型包。", **parser_kwargs)
     package_subparsers = package.add_subparsers(dest="package_command", required=True)
 
-    create = package_subparsers.add_parser("create", help="Create a YOLO runtime model package.")
-    create.add_argument("--output-dir", type=Path, required=True)
-    create.add_argument("--model-pt", type=Path)
-    create.add_argument("--model-onnx", type=Path)
-    create.add_argument("--model-rknn", type=Path)
-    create.add_argument("--eval-report", type=Path)
-    create.add_argument("--eval-metrics", type=Path)
-    create.add_argument("--default-model", choices=("pt", "onnx", "rknn"), default="onnx")
-    create.add_argument("--dry-run", action="store_true")
+    create = package_subparsers.add_parser("create", help="创建 YOLO 运行时模型包。", **parser_kwargs)
+    create.add_argument("--output-dir", type=Path, default=DEFAULT_MODEL_PACKAGE, help="运行时模型包输出目录")
+    create.add_argument("--model-pt", type=Path, help="源 PyTorch .pt 模型")
+    create.add_argument("--model-onnx", type=Path, help="源 ONNX 模型")
+    create.add_argument("--model-rknn", type=Path, help="源 RKNN 模型")
+    create.add_argument("--eval-report", type=Path, help="源评估 Markdown 报告")
+    create.add_argument("--eval-metrics", type=Path, help="源评估指标 JSON")
+    create.add_argument("--default-model", choices=("pt", "onnx", "rknn"), default="onnx", help="默认使用的模型类型")
+    create.add_argument("--dry-run", action="store_true", help="创建不可推理的占位模型包")
     create.set_defaults(func=cmd_package_create)
 
-    verify = package_subparsers.add_parser("verify", help="Verify a YOLO runtime model package.")
-    verify.add_argument("--path", type=Path, required=True)
+    verify = package_subparsers.add_parser("verify", help="验证 YOLO 运行时模型包。", **parser_kwargs)
+    verify.add_argument("--path", type=Path, default=DEFAULT_MODEL_PACKAGE, help="运行时模型包目录")
     verify.set_defaults(func=cmd_package_verify)
 
     return parser

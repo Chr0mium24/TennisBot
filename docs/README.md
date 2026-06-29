@@ -1,28 +1,34 @@
-# TennisBot Docs
+# TennisBot 文档入口
 
-Date: 2026-06-29
+日期：2026-06-29
 
-## Read First
+## 先读这里
 
-- [Current Architecture](current/architecture.md)
-- [Current Status](current/status.md)
-- [Operator Runbook](current/operator_runbook.md)
-- [Camera Device Checks](current/camera_devices.md)
-- [YOLO Detect GUI](current/yolo_detect_gui.md)
-- [Live3D Hardware Acceptance](current/live3d_hardware_acceptance.md)
+- [当前架构](current/architecture.md)
+- [当前状态](current/status.md)
+- [命令入口使用说明](current/command_usage.md)
+- [操作员运行手册](current/operator_runbook.md)
+- [相机设备检查](current/camera_devices.md)
+- [YOLO 检测 GUI](current/yolo_detect_gui.md)
+- [Live3D 硬件验收](current/live3d_hardware_acceptance.md)
 
-## Reports
+## 工具入口
 
-- [Biweekly Business Report, 2026-06-15 to 2026-06-28](reports/biweekly_report_20260615_20260628.md)
+- [标定工具](../tools/calibration/README.md)
+- [YOLO 工具](../tools/yolo/README.md)
+- [Live3D 前端](../apps/live3d/README.md)
 
-Report images and generated assets live under `reports/assets/`.
+## 报告
 
-## Archive
+- [2026-06-15 至 2026-06-28 双周业务报告](reports/biweekly_report_20260615_20260628.md)
 
-Historical plans, experiments, probes, reviews, and migration notes live under
-`archive/YYYYMMDD/`.
+报告图片和生成资产放在 `reports/assets/`。
 
-Current archive categories include:
+## 归档
+
+历史计划、实验、探针、评审和迁移记录放在 `archive/YYYYMMDD/`。
+
+常见分类：
 
 - `plans/`
 - `results/`
@@ -34,8 +40,7 @@ Current archive categories include:
 - `refactor/`
 - `yolo/`
 
-## Documentation Rule
+## 写文档规则
 
-Keep `docs/` root small. `docs/README.md` is the entry point, `docs/current/`
-is the current operational truth, `docs/reports/` is for formal reports, and
-dated work evidence belongs under `docs/archive/YYYYMMDD/`.
+`docs/` 根目录只保留入口文档。当前事实放在 `docs/current/`，正式报告放在
+`docs/reports/`，计划、实验结果和历史记录放在 `docs/archive/YYYYMMDD/`。

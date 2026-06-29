@@ -19,7 +19,14 @@ type CommandResult = {
 };
 
 const repoRoot = resolve(import.meta.dirname, "..");
-const defaultOutput = resolve(repoRoot, "docs", `local_runtime_preflight_${yyyymmdd(new Date())}.md`);
+const defaultOutput = resolve(
+  repoRoot,
+  "docs",
+  "archive",
+  yyyymmdd(new Date()),
+  "probes",
+  `local_runtime_preflight_${yyyymmdd(new Date())}.md`,
+);
 
 const args = parseArgs(Bun.argv.slice(2));
 if (args.help) {
@@ -252,12 +259,15 @@ function yyyymmdd(date: Date): string {
 }
 
 function printUsage(): void {
-  console.log(`Usage: bun scripts/operator-preflight.ts [--output docs/local_runtime_preflight_YYYYMMDD.md]
+  console.log(`用法: bun scripts/operator-preflight.ts [--output docs/archive/YYYYMMDD/probes/local_runtime_preflight_YYYYMMDD.md]
 
-Checks local TennisBot operator readiness:
-- Live3D URL at http://127.0.0.1:5178/
-- YOLO runtime package verification
-- Stereo calibration package verification
-- At least two USB V4L2 capture devices
+默认值:
+  --output  ${displayPath(defaultOutput)}
+
+检查本机 TennisBot 操作员准备状态:
+- Live3D 地址 http://127.0.0.1:5178/
+- YOLO 运行时模型包
+- 双目标定运行时包
+- 至少两个 USB V4L2 采集设备
 `);
 }
