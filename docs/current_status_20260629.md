@@ -9,7 +9,8 @@ The project is at the local operator validation stage.
 The architecture simplification and main runtime split are in place:
 
 - `tools/yolo` is the standalone YOLO package tool.
-- `tools/calibration` is the standalone calibration package CLI.
+- `desperate/CameraCalibLab` is the retained original OpenCV calibration GUI
+  workflow when the local archive is present.
 - `packages/core` owns artifact validation, stereo pairing, triangulation, and
   trajectory prediction.
 - `apps/live3d` owns the real-machine browser runtime for two USB cameras, YOLO
@@ -39,10 +40,7 @@ The latest committed runtime work added:
 - local runtime preflight;
 - local physical validation checklist;
 - local physical validation status script;
-- target print measurement recorder;
 - local runtime launcher next-action output;
-- calibration target generation;
-- target print-check recording with explicit measured-value gate;
 - local physical validation status script with per-gate details;
 - CameraCalibLab OpenCV GUI retained for local mono/stereo calibration capture;
 - Live3D readiness gates and hardware reports.

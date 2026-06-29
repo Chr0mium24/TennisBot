@@ -6,8 +6,8 @@ Date: 2026-06-29
 
 This runbook is the local-machine sequence for the current TennisBot runtime:
 
-1. CameraCalibLab OpenCV GUI for mono/stereo calibration capture, plus CLI
-   commands for target generation and package verification.
+1. CameraCalibLab OpenCV GUI for mono/stereo calibration capture and artifact
+   production.
 2. Live3D for two USB camera streams, ONNX YOLO inference, stereo 3D point,
    trajectory prediction, and hardware verification.
 
@@ -64,17 +64,16 @@ passed Stereo calibration package
 passed USB camera devices
 ```
 
-Use the CLI and the original OpenCV GUI in order:
+Use the original OpenCV GUI in order:
 
-1. `cd tools/calibration && uv run tennisbot-calibration target charuco ...`
-   to generate the target, then print the SVG at 100% scale and confirm one
-   printed square measures 15 mm.
+1. Generate or select the DFOptix ChArUco target from CameraCalibLab, then
+   print the SVG at 100% scale and confirm one printed square measures 15 mm.
 2. `cd desperate/CameraCalibLab && uv run camera-calib-lab capture charuco-auto-gui ...`
    for each mono camera capture.
 3. `cd desperate/CameraCalibLab && uv run camera-calib-lab capture stereo-charuco-auto-gui ...`
    for stereo capture.
-4. Use `tools/calibration` CLI commands to inspect, detect, solve, and verify
-   the resulting runtime packages.
+4. Export the resulting runtime calibration package under
+   `artifacts/calibration/stereo_cam1_cam2`.
 
 ## Live3D Order
 

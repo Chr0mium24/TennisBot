@@ -32,13 +32,12 @@ Pass condition:
 
 ## 1. Target
 
-Generate the target from the calibration CLI:
+Generate or select the DFOptix ChArUco target from the retained CameraCalibLab
+workflow:
 
 ```bash
-cd tools/calibration
-uv run tennisbot-calibration target charuco \
-  --output ../../artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.png \
-  --output-report ../../docs/calibration_charuco_target_sheet_YYYYMMDD.md
+cd desperate/CameraCalibLab
+uv run camera-calib-lab target generate --help
 ```
 
 Expected artifacts:
@@ -53,15 +52,16 @@ Print gate:
 - Print the SVG at 100% scale.
 - Measure one printed square.
 - Continue only if one square is 15.0 mm.
-- Record the measurement with `uv run tennisbot-calibration target record-print-check --measured-square-mm <measured-mm>`.
+- Record the measurement in
+  `artifacts/calibration_targets/dfoptix_charuco_15mm_print_check.json`.
 
 If the printed square is not 15.0 mm, fix printer scaling and reprint before
 capturing any camera frames.
 
 ## 2. Cam1 Mono
 
-Use the original OpenCV GUI to capture Cam1 mono frames, then run the CLI
-inspection, detection, solve, and package verification steps:
+Use the original OpenCV GUI to capture Cam1 mono frames and produce the mono
+calibration package:
 
 ```bash
 cd desperate/CameraCalibLab
@@ -75,10 +75,8 @@ uv run camera-calib-lab capture charuco-auto-gui \
 
 Pass condition:
 
-- `capture inspect` reports `accepted: true`.
-- `detect-charuco` reports `accepted: true`.
-- `calibrate mono` produces `artifacts/calibration/cam1/package.json`.
-- `package verify` accepts the package.
+- CameraCalibLab reports accepted capture/detection/solve results.
+- The workflow produces `artifacts/calibration/cam1/package.json`.
 - The mono package has `hardware_validated: true`.
 
 Default solve gate:
@@ -96,10 +94,8 @@ paths for the second camera.
 
 Pass condition:
 
-- `capture inspect` reports `accepted: true`.
-- `detect-charuco` reports `accepted: true`.
-- `calibrate mono` produces `artifacts/calibration/cam2/package.json`.
-- `package verify` accepts the package.
+- CameraCalibLab reports accepted capture/detection/solve results.
+- The workflow produces `artifacts/calibration/cam2/package.json`.
 - The mono package has `hardware_validated: true`.
 
 Default solve gate:
@@ -126,10 +122,8 @@ uv run camera-calib-lab capture stereo-charuco-auto-gui \
 
 Pass condition:
 
-- `capture inspect` reports `accepted: true`.
-- `detect-charuco` reports accepted stereo pairs.
-- `calibrate stereo` produces `artifacts/calibration/stereo_cam1_cam2/package.json`.
-- `package verify` accepts the package.
+- CameraCalibLab reports accepted capture/detection/solve results.
+- The workflow produces `artifacts/calibration/stereo_cam1_cam2/package.json`.
 - The stereo package has `hardware_validated: true`.
 
 Default solve gate:

@@ -2,10 +2,11 @@
 
 Local-machine-first workspace for the TennisBot stereo vision runtime.
 
-The active architecture now lives in top-level `apps/`, `packages/`, and
-`tools/`. Legacy lab code is local-only reference material under ignored
-`desperate/` when present; the live runtime consumes only exported artifacts
-from `artifacts/`.
+The active repository code lives in top-level `apps/`, `packages/`, and
+`tools/`. Local legacy lab code remains under ignored `desperate/` when
+present. Calibration is handled by the retained original OpenCV
+`desperate/CameraCalibLab` workflow; the deleted standalone
+`tools/calibration` package is no longer part of the active architecture.
 
 ## Projects
 
@@ -14,7 +15,6 @@ from `artifacts/`.
 | `apps/live3d` | Browser USB stereo camera UI, ONNX YOLO inference, runtime 3D visualization |
 | `packages/contracts` | Shared TypeScript data contracts |
 | `packages/core` | Artifact validation, stereo pairing, triangulation, trajectory prediction |
-| `tools/calibration` | Standalone mono/stereo calibration package tooling |
 | `tools/yolo` | Standalone YOLO runtime model package tooling |
 | `artifacts/` | Ignored local runtime outputs for calibration and model packages |
 | `desperate/` | Ignored local-only archive for legacy lab code, not part of the parent Git repository |
@@ -43,13 +43,6 @@ Check physical acceptance status:
 
 ```bash
 bun scripts/physical-validation-status.ts --output docs/local_physical_validation_status_YYYYMMDD.md
-```
-
-Record the printed target measurement:
-
-```bash
-cd tools/calibration
-uv run tennisbot-calibration target record-print-check --measured-square-mm 15.0
 ```
 
 Run Live3D:
@@ -82,65 +75,6 @@ uv run camera-calib-lab capture stereo-charuco-auto-gui \
   --right-device /dev/video2
 ```
 
-Create dry-run calibration artifacts:
-
-```bash
-cd tools/calibration
-uv run tennisbot-calibration gui mono --camera-id cam1 --dry-run --output ../../artifacts/calibration/cam1
-uv run tennisbot-calibration gui mono --camera-id cam2 --dry-run --output ../../artifacts/calibration/cam2
-uv run tennisbot-calibration gui stereo --left-camera-id cam1 --right-camera-id cam2 --dry-run --output ../../artifacts/calibration/stereo_cam1_cam2
-uv run tennisbot-calibration package verify --path ../../artifacts/calibration/stereo_cam1_cam2
-```
-
-Capture calibration sessions from local USB cameras:
-
-```bash
-cd tools/calibration
-uv run tennisbot-calibration capture mono \
-  --camera-id cam1 \
-  --device /dev/video0 \
-  --output ../../artifacts/calibration_sessions/cam1_session
-uv run tennisbot-calibration capture stereo \
-  --left-camera-id cam1 \
-  --right-camera-id cam2 \
-  --left-device /dev/video0 \
-  --right-device /dev/video2 \
-  --output ../../artifacts/calibration_sessions/stereo_session \
-  --prepare-uvc-controls
-uv run tennisbot-calibration capture inspect \
-  --session ../../artifacts/calibration_sessions/stereo_session \
-  --output-report ../../docs/calibration_capture_quality_YYYYMMDD.md
-uv run tennisbot-calibration capture detect-charuco \
-  --session ../../artifacts/calibration_sessions/stereo_session \
-  --output ../../artifacts/calibration_sessions/stereo_session/observations.json \
-  --output-report ../../docs/calibration_charuco_detection_YYYYMMDD.md
-uv run tennisbot-calibration calibrate mono \
-  --observations ../../artifacts/calibration_sessions/cam1_session/observations.json \
-  --output ../../artifacts/calibration/cam1 \
-  --camera-id cam1
-uv run tennisbot-calibration calibrate stereo \
-  --observations ../../artifacts/calibration_sessions/stereo_session/observations.json \
-  --left-mono ../../artifacts/calibration/cam1 \
-  --right-mono ../../artifacts/calibration/cam2 \
-  --output ../../artifacts/calibration/stereo_cam1_cam2
-```
-
-Import existing CameraCalibLab calibration into runtime artifacts:
-
-```bash
-cd tools/calibration
-uv run tennisbot-calibration package import-scanned-camera-calib-lab \
-  --root ../../desperate/CameraCalibLab/runs/calibrations \
-  --cam1-pattern dfoptix_charuco_auto_combined_rational_20260620_top_right_eps1e7 \
-  --cam2-pattern dfoptix_charuco_auto_cam2 \
-  --output ../../artifacts/calibration/stereo_cam1_cam2 \
-  --left-camera-id cam1 \
-  --right-camera-id cam2 \
-  --limit 12 \
-  --output-report ../../docs/calibration_candidate_scan_YYYYMMDD.md
-uv run tennisbot-calibration package verify --path ../../artifacts/calibration/stereo_cam1_cam2
-```
-
 Create dry-run YOLO artifacts:
 
 ```bash
@@ -170,14 +104,11 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 - [Desperate legacy code retirement](docs/desperate_legacy_code_retirement_20260629.md)
 - [Local physical validation checklist](docs/local_physical_validation_checklist_20260629.md)
 - [Local physical validation status script](docs/local_physical_validation_status_script_20260629.md)
-- [Target print check recorder](docs/target_print_check_recorder_20260629.md)
 - [Final runtime validation](docs/final_runtime_validation_20260629.md)
 - [Local runtime operator runbook](docs/local_runtime_operator_runbook_20260629.md)
 - [Local runtime launcher next action](docs/local_runtime_launcher_next_action_20260629.md)
 - [Local runtime preflight](docs/local_runtime_preflight_20260629.md)
 - [Local physical validation status](docs/local_physical_validation_status_20260629.md)
-- [Physical artifact import](docs/physical_artifact_import_20260629.md)
-- [Calibration candidate scan](docs/calibration_candidate_scan_20260629.md)
 - [Calibration capture session flow](docs/calibration_capture_session_flow_20260629.md)
 - [Calibration capture quality dry run](docs/calibration_capture_quality_20260629.md)
 - [Calibration capture quality hardware probe](docs/calibration_capture_quality_hardware_probe_20260629.md)
@@ -191,6 +122,7 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 - [Calibration stereo solve capture quality](docs/calibration_stereo_solve_capture_quality_20260629.md)
 - [Calibration stereo solve ChArUco detection](docs/calibration_charuco_detection_stereo_solve_20260629.md)
 - [Calibration frontend review revert](docs/calibration_frontend_review_revert_20260629.md)
+- [Calibration tool deletion result](docs/calibration_tool_deletion_result_20260629.md)
 - [Tool boundary audit](docs/tool_boundary_audit_20260629.md)
 - [Legacy board/runtime shell retirement](docs/legacy_board_retirement_20260629.md)
 - [Live3D hardware smoke](docs/live3d_hardware_smoke_20260629.md)

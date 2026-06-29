@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 type CheckStatus = "passed" | "failed";
@@ -85,35 +85,50 @@ async function yoloPackageCheck(): Promise<CheckResult> {
 }
 
 async function calibrationPackageCheck(): Promise<CheckResult> {
-  const result = await runCommand(
-    [
-      "uv",
-      "run",
-      "tennisbot-calibration",
-      "package",
-      "verify",
-      "--path",
-      "../../artifacts/calibration/stereo_cam1_cam2",
-    ],
-    { cwd: resolve(repoRoot, "tools/calibration") },
-  );
+  const packageJsonPath = resolve(repoRoot, "artifacts/calibration/stereo_cam1_cam2/package.json");
+  const payload = readJson(packageJsonPath);
   let accepted = false;
-  try {
-    const payload = JSON.parse(result.stdout) as { accepted?: unknown; package_kind?: unknown };
-    accepted = payload.accepted === true && payload.package_kind === "stereo";
-  } catch {
-    accepted = false;
-  }
+  accepted = payload?.accepted === true && payload?.package_kind === "stereo";
   return {
     id: "calibration-package",
     label: "Stereo calibration package",
-    status: result.exitCode === 0 && accepted ? "passed" : "failed",
+    status: accepted ? "passed" : "failed",
     detail:
-      result.exitCode === 0 && accepted
-        ? "artifacts/calibration/stereo_cam1_cam2 verified as accepted stereo package."
-        : "Stereo calibration package verification failed.",
-    evidence: compactCommandEvidence(result),
+      accepted
+        ? "artifacts/calibration/stereo_cam1_cam2 is present as an accepted stereo package."
+        : "Stereo calibration package is missing or not accepted.",
+    evidence:
+      payload === undefined
+        ? `missing ${displayPath(packageJsonPath)}`
+        : JSON.stringify(
+            {
+              path: displayPath(packageJsonPath),
+              accepted: payload.accepted,
+              package_kind: payload.package_kind,
+              schema_version: payload.schema_version,
+            },
+            null,
+            2,
+          ),
   };
+}
+
+function readJson(path: string): Record<string, unknown> | undefined {
+  if (!existsSync(path)) return undefined;
+  try {
+    const value = JSON.parse(readFileSync(path, "utf-8")) as unknown;
+    return value !== null && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function displayPath(path: string): string {
+  const resolvedRoot = resolve(repoRoot);
+  const resolvedPath = resolve(path);
+  return resolvedPath === resolvedRoot || !resolvedPath.startsWith(`${resolvedRoot}/`)
+    ? path
+    : resolvedPath.slice(resolvedRoot.length + 1);
 }
 
 async function cameraDeviceCheck(): Promise<CheckResult> {

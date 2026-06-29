@@ -5,9 +5,10 @@ Date: 2026-06-29
 ## Current Shape
 
 TennisBot is now a local-machine-first workspace. The active runtime code lives
-in top-level `apps/`, `packages/`, and `tools/`; older lab code is local-only
-reference material under ignored `desperate/` when present and is not the
-runtime boundary.
+in top-level `apps/`, `packages/`, and `tools/`. Local legacy lab code remains
+under ignored `desperate/` when present. Calibration now uses the retained
+original OpenCV `desperate/CameraCalibLab` workflow; the standalone
+`tools/calibration` package has been deleted.
 
 ```text
 TennisBot/
@@ -19,7 +20,6 @@ TennisBot/
     core/            stereo pairing, triangulation, prediction, artifact loaders
 
   tools/
-    calibration/     standalone calibration package tool
     yolo/            standalone YOLO model package tool
 
   artifacts/         ignored local runtime artifacts
@@ -56,14 +56,12 @@ Default runtime output:
 artifacts/models/tennis_ball_yolo/
 ```
 
-### `tools/calibration`
+### `desperate/CameraCalibLab`
 
-Owns mono/stereo calibration package production and verification. It does not
-own YOLO inference, trajectory prediction, or Live3D rendering. It can import
-existing CameraCalibLab calibration JSON into the runtime artifact contract
-without making the main runtime depend on CameraCalibLab source code.
-The TypeScript/Bun calibration review GUI has been reverted. Local calibration
-capture should use the original `CameraCalibLab` OpenCV GUI.
+Owns local OpenCV calibration capture and calibration artifact production when
+the ignored local archive is present. Runtime code should still consume exported
+calibration artifacts from `artifacts/calibration/...`; it should not import
+CameraCalibLab source modules.
 
 Default runtime output:
 
@@ -100,9 +98,9 @@ Owns the real-machine UI:
 ## Runtime Flow
 
 ```text
-1. tools/calibration mono cam1
-2. tools/calibration mono cam2
-3. tools/calibration stereo
+1. CameraCalibLab produces mono cam1 calibration artifacts
+2. CameraCalibLab produces mono cam2 calibration artifacts
+3. CameraCalibLab produces stereo calibration artifacts
 4. tools/yolo package create/verify
 5. apps/live3d loads /artifacts/models/tennis_ball_yolo
 6. apps/live3d loads /artifacts/calibration/stereo_cam1_cam2
@@ -138,66 +136,6 @@ frame quality, left/right detections, stereo triangulation, and trajectory
 prediction. The overall run only passes when Live3D reaches `prediction-ready`.
 Readable scenes with no visible tennis ball are classified as blocked detection
 gates in the report, not as completed validation.
-
-Create dry-run calibration artifacts:
-
-```bash
-cd tools/calibration
-uv run tennisbot-calibration target charuco --output ../../artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.png --output-report ../../docs/calibration_charuco_target_sheet_YYYYMMDD.md
-uv run tennisbot-calibration gui mono --camera-id cam1 --dry-run --output ../../artifacts/calibration/cam1
-uv run tennisbot-calibration gui mono --camera-id cam2 --dry-run --output ../../artifacts/calibration/cam2
-uv run tennisbot-calibration gui stereo --left-camera-id cam1 --right-camera-id cam2 --dry-run --output ../../artifacts/calibration/stereo_cam1_cam2
-uv run tennisbot-calibration package verify --path ../../artifacts/calibration/stereo_cam1_cam2
-```
-
-Capture local calibration sessions:
-
-```bash
-cd tools/calibration
-uv run tennisbot-calibration capture mono \
-  --camera-id cam1 \
-  --device /dev/video0 \
-  --output ../../artifacts/calibration_sessions/cam1_session
-uv run tennisbot-calibration capture stereo \
-  --left-camera-id cam1 \
-  --right-camera-id cam2 \
-  --left-device /dev/video0 \
-  --right-device /dev/video2 \
-  --output ../../artifacts/calibration_sessions/stereo_session \
-  --prepare-uvc-controls
-uv run tennisbot-calibration capture inspect \
-  --session ../../artifacts/calibration_sessions/stereo_session \
-  --output-report ../../docs/calibration_capture_quality_YYYYMMDD.md
-uv run tennisbot-calibration capture detect-charuco \
-  --session ../../artifacts/calibration_sessions/stereo_session \
-  --output ../../artifacts/calibration_sessions/stereo_session/observations.json \
-  --output-report ../../docs/calibration_charuco_detection_YYYYMMDD.md
-uv run tennisbot-calibration calibrate mono \
-  --observations ../../artifacts/calibration_sessions/cam1_session/observations.json \
-  --output ../../artifacts/calibration/cam1 \
-  --camera-id cam1
-uv run tennisbot-calibration calibrate stereo \
-  --observations ../../artifacts/calibration_sessions/stereo_session/observations.json \
-  --left-mono ../../artifacts/calibration/cam1 \
-  --right-mono ../../artifacts/calibration/cam2 \
-  --output ../../artifacts/calibration/stereo_cam1_cam2
-```
-
-Import existing CameraCalibLab calibration:
-
-```bash
-cd tools/calibration
-uv run tennisbot-calibration package import-scanned-camera-calib-lab \
-  --root ../../desperate/CameraCalibLab/runs/calibrations \
-  --cam1-pattern dfoptix_charuco_auto_combined_rational_20260620_top_right_eps1e7 \
-  --cam2-pattern dfoptix_charuco_auto_cam2 \
-  --output ../../artifacts/calibration/stereo_cam1_cam2 \
-  --left-camera-id cam1 \
-  --right-camera-id cam2 \
-  --limit 12 \
-  --output-report ../../docs/calibration_candidate_scan_YYYYMMDD.md
-uv run tennisbot-calibration package verify --path ../../artifacts/calibration/stereo_cam1_cam2
-```
 
 Create dry-run YOLO artifacts:
 
@@ -246,9 +184,6 @@ uv run camera-calib-lab capture stereo-charuco-auto-gui \
 Most recent software verification:
 
 ```text
-cd tools/calibration && uv run pytest -q
-Result: 20 passing tests, 0 failures.
-
 cd apps/live3d && bun test
 Result: 44 passing tests, 0 failures.
 
@@ -287,21 +222,10 @@ artifacts live under artifacts/calibration_targets/ and use 15 mm squares,
 Calibration quality warning: epipolar_rms=4.330 px exceeds the 2.000 px
 runtime-quality review threshold. stereo_rms=0.424 px,
 rectification_y_p95=0.830 px, baseline=0.052486 m.
-Calibration capture sessions: dry-run mono/stereo sessions wrote manifests,
-frames, summary, and review files; a real 1-pair stereo hardware probe opened
-/dev/video0 and /dev/video2 at 1280x720 MJPG. The capture tool can also apply
-the local high-brightness UVC preset and inspect sessions before target
-detection. The latest dry-run inspection accepted 4/4 images; the latest real
-hardware probe rejected both images as low contrast / likely blank, so it is not
-ready for mono/stereo solve. ChArUco detection is implemented for the DFOptix
-14x9 `DICT_5X5_100` target profile; a rendered target dry-run detected 104
-corners and 63 markers, while the current real hardware probe detected 0
-corners in both views. Mono solve is implemented from accepted ChArUco
-observations; the rendered/perspective-warped dry-run produced an accepted mono
-package with RMS 3.551 px and package verification accepted. Stereo solve is
-implemented from accepted stereo observations plus mono packages; the rendered
-dry-run produced an accepted stereo package with stereo RMS 3.598 px, baseline
-0.034805 m, and package verification accepted.
+Calibration capture sessions: historical dry-run mono/stereo sessions wrote
+manifests, frames, summary, and review files; a real 1-pair stereo hardware
+probe opened /dev/video0 and /dev/video2 at 1280x720 MJPG. The retained
+calibration path is now the original CameraCalibLab OpenCV workflow.
 ```
 
 Latest recalibrated hardware smoke:

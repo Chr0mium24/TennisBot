@@ -71,7 +71,7 @@ function targetMetadataCheck(): GateResult {
       status: "blocked",
       detail: "target metadata is missing.",
       evidence: path,
-      next: "Generate the target with `cd tools/calibration && uv run tennisbot-calibration target charuco ...`.",
+      next: "Generate the DFOptix ChArUco target with the retained CameraCalibLab tooling, then write the target metadata artifact.",
     };
   }
   const target = objectField(payload, "target");
@@ -124,8 +124,7 @@ function targetPrintNextAction(): string {
   const files = objectField(targetMetadata, "files");
   const svgPath = stringField(files, "svg") ?? "artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.svg";
   return [
-    `Print ${displayReferencePath(svgPath)} at 100% scale, measure one square, then record it with the CLI.`,
-    "Command: cd tools/calibration && uv run tennisbot-calibration target record-print-check --measured-square-mm <measured-mm>",
+    `Print ${displayReferencePath(svgPath)} at 100% scale, measure one square, then record the measurement in ${displayPath(resolve(repoRoot, "artifacts/calibration_targets/dfoptix_charuco_15mm_print_check.json"))}.`,
   ].join(" ");
 }
 
@@ -340,7 +339,10 @@ function displayPath(path: string): string {
 }
 
 function displayReferencePath(path: string): string {
-  const bases = [repoRoot, resolve(repoRoot, "tools/calibration")];
+  if (path.startsWith("../../artifacts/")) {
+    return path.slice("../../".length);
+  }
+  const bases = [repoRoot];
   for (const base of bases) {
     const resolved = resolve(base, path);
     if (isInsideRepo(resolved)) return displayPath(resolved);
