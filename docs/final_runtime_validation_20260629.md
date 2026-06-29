@@ -73,6 +73,9 @@ server, snapshot, artifacts, stereo cameras, frame quality, left/right
 detections, triangulation, and prediction. Unit tests cover the no-ball
 classification as blocked detection gates and the `prediction-ready` success
 case. Shared runtime readiness gates now cover the browser UI and snapshot.
+The hardware verifier report also renders those snapshot gates as a dedicated
+Runtime Readiness Gates section, so a saved Markdown report shows the same
+ready/pending/blocked sequence as the browser status panel.
 
 Dev server smoke:
 
@@ -303,7 +306,7 @@ Result: 13 tests passed. A real runtime YOLO package was written from the
 - Live3D now publishes and renders runtime readiness gates for YOLO artifact,
   calibration artifact, stereo cameras, left/right detections, stereo 3D point,
   and prediction so the browser UI shows the same blocked/pending/ready sequence
-  as the hardware verifier.
+  as the hardware verifier report.
 - Live3D now decodes the current ONNX package's `xyxy_pixels` output correctly.
 - The current YOLO model package passed the static detection-quality smoke at
   `confidence_threshold: 0.05` on 109 matched labeled images.

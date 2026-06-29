@@ -813,6 +813,7 @@ export function createAcceptanceChecklist(result: VerificationResult): Verificat
 export function renderReport(result: VerificationResult): string {
   const last = result.observation.lastSnapshot;
   const checklist = renderAcceptanceChecklist(createAcceptanceChecklist(result));
+  const readinessGates = renderRuntimeReadinessGates(last?.readinessGates ?? []);
   const steps =
     result.steps.length === 0
       ? "- No steps completed.\n"
@@ -841,6 +842,9 @@ export function renderReport(result: VerificationResult): string {
 ## Acceptance Checklist
 
 ${checklist}
+## Runtime Readiness Gates
+
+${readinessGates}
 ## Steps
 
 ${steps}
@@ -874,6 +878,13 @@ function renderAcceptanceChecklist(gates: VerificationGate[]): string {
       })
       .join("\n") + "\n"
   );
+}
+
+function renderRuntimeReadinessGates(gates: NonNullable<Live3dRuntimeSnapshot["readinessGates"]>): string {
+  if (gates.length === 0) {
+    return "- No runtime readiness gates were published.\n";
+  }
+  return gates.map((gate) => `- ${gate.state}: ${gate.label} - ${gate.detail}`).join("\n") + "\n";
 }
 
 function stepGate(

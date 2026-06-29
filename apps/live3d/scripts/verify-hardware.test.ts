@@ -31,7 +31,9 @@ describe("Live3D hardware verification report", () => {
 
     const report = renderReport(result);
     expect(report).toContain("## Acceptance Checklist");
+    expect(report).toContain("## Runtime Readiness Gates");
     expect(report).toContain("blocked: Left YOLO detection");
+    expect(report).toContain("pending: Left detection - No left tennis ball.");
     expect(report).toContain("Put a visible tennis ball in both camera views");
   });
 
@@ -51,6 +53,7 @@ describe("Live3D hardware verification report", () => {
     expect(gates.find((gate) => gate.id === "right-yolo-detection")?.status).toBe("passed");
     expect(gates.find((gate) => gate.id === "stereo-triangulation")?.status).toBe("passed");
     expect(gates.find((gate) => gate.id === "trajectory-prediction")?.status).toBe("passed");
+    expect(renderReport(result)).toContain("ready: Prediction curve - 12 prediction sample(s).");
   });
 });
 
