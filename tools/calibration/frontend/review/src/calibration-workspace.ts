@@ -91,6 +91,11 @@ export type SolveCommandOptions = {
   maxRmsPx: number;
 };
 
+export type CommandReadiness = {
+  ready: boolean;
+  detail: string;
+};
+
 export function classifyArtifact(payload: JsonObject): ArtifactKind {
   const schema = stringField(payload, "schema_version");
   const packageType = stringField(payload, "package_type");
@@ -190,6 +195,12 @@ export function buildTargetPrintCheckCommand(options: TargetPrintCheckCommandOpt
     `--output ${quote(options.output)}`,
     `--output-report ${quote(options.outputReport)}`,
   ]);
+}
+
+export function targetPrintCheckReadiness(options: TargetPrintCheckCommandOptions): CommandReadiness {
+  return Number.isFinite(options.measuredSquareMm) && options.measuredSquareMm > 0
+    ? { ready: true, detail: "Measured printed square size is ready to record." }
+    : { ready: false, detail: "Enter the measured printed square size before recording the print check." };
 }
 
 export function buildCaptureCommand(options: CaptureCommandOptions): string {

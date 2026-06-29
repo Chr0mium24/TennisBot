@@ -25,6 +25,11 @@ metadata. If the target PNG output path changes in the GUI, the print-check
 metadata path follows the matching `.json` path so the measured print check
 stays bound to the target that was actually generated.
 
+The measured square input now defaults to `0` and the `Record print check`
+button stays disabled until a positive measured value is entered. This prevents
+accidentally recording a passing 15.0 mm measurement before physically printing
+and measuring the target.
+
 ## Reason
 
 The physical loop cannot proceed from target generation to camera capture until
@@ -62,4 +67,11 @@ Follow-up metadata-path check:
 tools/calibration/frontend/review bun test: 16 passed, 0 failed.
 tools/calibration/frontend/review bun run build: passed.
 Print Check command now includes --target-metadata.
+```
+
+Follow-up explicit-measurement gate check:
+
+```text
+tools/calibration/frontend/review bun test: 21 passed, 0 failed.
+tools/calibration/frontend/review bun run build: passed.
 ```

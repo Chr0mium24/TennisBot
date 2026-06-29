@@ -14,6 +14,7 @@ import {
   observationRows,
   summarizeWorkflow,
   targetSheetFileLinks,
+  targetPrintCheckReadiness,
   type ImportedArtifact,
 } from "./calibration-workspace";
 
@@ -118,6 +119,19 @@ describe("calibration review workspace", () => {
       }),
     ).toContain("calibrate stereo");
     expect(buildVerifyCommand("../../artifacts/calibration/stereo_cam1_cam2")).toContain("package verify");
+  });
+
+  test("requires an explicit measured print-check square size", () => {
+    const base = {
+      toleranceMm: 0.2,
+      targetMetadata: "../../artifacts/calibration_targets/target.json",
+      output: "../../artifacts/calibration_targets/print_check.json",
+      outputReport: "../../docs/calibration_target_print_check.md",
+    };
+
+    expect(targetPrintCheckReadiness({ ...base, measuredSquareMm: 0 })).toMatchObject({ ready: false });
+    expect(targetPrintCheckReadiness({ ...base, measuredSquareMm: Number.NaN })).toMatchObject({ ready: false });
+    expect(targetPrintCheckReadiness({ ...base, measuredSquareMm: 15.02 })).toMatchObject({ ready: true });
   });
 
   test("extracts inspection and observation table rows", () => {

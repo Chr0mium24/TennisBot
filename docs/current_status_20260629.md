@@ -44,7 +44,7 @@ The latest committed runtime work added:
 - target print measurement recorder;
 - local runtime launcher next-action output;
 - calibration target generation;
-- calibration GUI target print-check recording;
+- calibration GUI target print-check recording with explicit measured-value gate;
 - calibration GUI physical validation status panel with per-gate details;
 - calibration GUI current artifact loader;
 - calibration GUI camera devices status panel;

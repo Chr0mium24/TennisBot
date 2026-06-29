@@ -345,6 +345,17 @@ pre {
   font-size: 13px;
 }
 
+.command-warning {
+  margin: 0;
+  border: 1px solid #fbbf24;
+  border-radius: 8px;
+  padding: 9px 10px;
+  color: #78350f;
+  background: #fffbeb;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .command-result pre {
   margin: 0;
   max-height: 220px;

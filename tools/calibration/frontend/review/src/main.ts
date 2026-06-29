@@ -13,6 +13,7 @@ import {
   observationRows,
   summarizeWorkflow,
   targetSheetFileLinks,
+  targetPrintCheckReadiness,
   type CaptureCommandOptions,
   type ImportedArtifact,
   type JsonObject,
@@ -117,7 +118,7 @@ const state: AppState = {
     marginMm: 10,
   },
   targetPrintCheckOptions: {
-    measuredSquareMm: 15,
+    measuredSquareMm: 0,
     toleranceMm: 0.2,
     targetMetadata: "../../artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.json",
     output: "../../artifacts/calibration_targets/dfoptix_charuco_15mm_print_check.json",
@@ -612,18 +613,27 @@ function renderTable(columns: string[], rows: Array<Record<string, string>>): st
 function commandBlock(id: CommandId, label: string, command: string): string {
   const run = state.commandRuns[id];
   const running = run?.status === "running";
+  const blockedReason = commandBlockedReason(id);
+  const disabled = running || blockedReason !== null;
   return `
     <div class="command-block">
       <div class="command-header">
         <strong>${escapeHtml(label)}</strong>
-        <button class="run-command" data-run-command-id="${id}" ${running ? "disabled" : ""}>
+        <button class="run-command" data-run-command-id="${id}" ${disabled ? "disabled" : ""}>
           ${running ? "Running" : "Run"}
         </button>
       </div>
       <pre><code>${escapeHtml(command)}</code></pre>
+      ${blockedReason === null ? "" : `<p class="command-warning">${escapeHtml(blockedReason)}</p>`}
       ${run === undefined ? "" : renderCommandRun(run)}
     </div>
   `;
+}
+
+function commandBlockedReason(id: CommandId): string | null {
+  if (id !== "targetPrintCheck") return null;
+  const readiness = targetPrintCheckReadiness(state.targetPrintCheckOptions);
+  return readiness.ready ? null : readiness.detail;
 }
 
 function renderCommandRun(run: CommandRunView): string {
@@ -660,7 +670,7 @@ function targetPrintCheckField(key: keyof TargetPrintCheckCommandOptions, label:
 }
 
 function targetPrintCheckNumberField(key: keyof TargetPrintCheckCommandOptions, label: string, value: number): string {
-  return `<label>${label}<input data-target-print-check-field="${key}" type="number" step="0.01" value="${value}"></label>`;
+  return `<label>${label}<input data-target-print-check-field="${key}" type="number" min="0" step="0.01" value="${value}"></label>`;
 }
 
 function field(key: keyof CaptureCommandOptions, label: string, value: string, visible: boolean): string {
@@ -873,6 +883,17 @@ function metadataPathForTargetOutput(output: string): string {
 }
 
 async function runCalibrationCommand(id: CommandId): Promise<void> {
+  const blockedReason = commandBlockedReason(id);
+  if (blockedReason !== null) {
+    state.commandRuns[id] = {
+      status: "rejected",
+      detail: blockedReason,
+      stdout: "",
+      stderr: "",
+    };
+    render();
+    return;
+  }
   const command = buildCommand(id);
   state.commandRuns[id] = {
     status: "running",
