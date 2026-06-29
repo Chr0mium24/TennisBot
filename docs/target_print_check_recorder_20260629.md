@@ -5,8 +5,8 @@ Date: 2026-06-29
 ## Change
 
 Added calibration target print-check recording to the standalone calibration
-tool and Calibration GUI. The root `scripts/record-target-print-check.ts`
-remains as a convenience wrapper, but the primary workflow is now
+tool. The root `scripts/record-target-print-check.ts` remains as a convenience
+wrapper, but the primary workflow is now
 `tennisbot-calibration target record-print-check`.
 
 ## Command
@@ -24,8 +24,6 @@ The command writes:
 - `docs/calibration_target_print_check_YYYYMMDD.md`
 
 The physical validation status script consumes the JSON artifact.
-The Calibration GUI Target tab exposes the same command as `Record print
-check`.
 
 ## Acceptance
 

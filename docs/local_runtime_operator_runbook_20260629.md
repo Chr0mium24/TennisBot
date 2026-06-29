@@ -6,8 +6,8 @@ Date: 2026-06-29
 
 This runbook is the local-machine sequence for the current TennisBot runtime:
 
-1. Calibration GUI for target generation, mono calibration, stereo calibration,
-   and package verification.
+1. CameraCalibLab OpenCV GUI for mono/stereo calibration capture, plus CLI
+   commands for target generation and package verification.
 2. Live3D for two USB camera streams, ONNX YOLO inference, stereo 3D point,
    trajectory prediction, and hardware verification.
 
@@ -21,12 +21,11 @@ From the repository root:
 bun scripts/start-local-runtime.ts
 ```
 
-The launcher builds and starts the two browser surfaces when they are not
-already serving:
+The launcher builds and starts the browser surface when it is not already
+serving:
 
 ```text
 Live3D:          http://127.0.0.1:5178/
-Calibration GUI: http://127.0.0.1:5188/
 ```
 
 For a quick status check without starting anything:
@@ -39,7 +38,6 @@ Observed result on 2026-06-29:
 
 ```text
 ready  Live3D           http://127.0.0.1:5178/
-ready  Calibration GUI  http://127.0.0.1:5188/
 ```
 
 Normal startup also prints the current physical validation next action. On
@@ -61,22 +59,22 @@ Observed result on 2026-06-29:
 
 ```text
 passed Live3D surface
-passed Calibration GUI surface
 passed YOLO package
 passed Stereo calibration package
 passed USB camera devices
 ```
 
-Open `http://127.0.0.1:5188/` and use the presets in order:
+Use the CLI and the original OpenCV GUI in order:
 
-1. `Target`: run `target charuco`, print the generated SVG at 100% scale, and
-   confirm one printed square measures 15 mm.
-2. `Cam1 Mono`: capture, inspect, detect ChArUco, solve, then package verify.
-3. `Cam2 Mono`: capture, inspect, detect ChArUco, solve, then package verify.
-4. `Stereo`: capture, inspect, detect ChArUco, solve, then package verify.
-
-Generated JSON artifacts are automatically imported into the GUI workspace when
-commands run through the local command bridge.
+1. `cd tools/calibration && uv run tennisbot-calibration target charuco ...`
+   to generate the target, then print the SVG at 100% scale and confirm one
+   printed square measures 15 mm.
+2. `cd CameraCalibLab && uv run camera-calib-lab capture charuco-auto-gui ...`
+   for each mono camera capture.
+3. `cd CameraCalibLab && uv run camera-calib-lab capture stereo-charuco-auto-gui ...`
+   for stereo capture.
+4. Use `tools/calibration` CLI commands to inspect, detect, solve, and verify
+   the resulting runtime packages.
 
 ## Live3D Order
 
@@ -106,5 +104,5 @@ current scene.
 
 The latest preflight report is
 [`local_runtime_preflight_20260629.md`](local_runtime_preflight_20260629.md).
-It verifies both browser surfaces, the YOLO package, the stereo calibration
+It verifies the Live3D browser surface, the YOLO package, the stereo calibration
 package, and `/dev/video0` plus `/dev/video2`.

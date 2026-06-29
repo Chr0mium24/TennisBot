@@ -37,12 +37,11 @@ tools/calibration/
   configs/
   src/
   tests/
-  frontend/
-    review/
 ```
 
-`configs/`, `src/`, `tests/`, and `frontend/review/` are planned migration
-targets. They are intentionally not created as implementation surfaces in Wave 1.
+`configs/`, `src/`, and `tests/` are planned migration targets. Frontend review
+UI work has been reverted; local calibration capture should use the original
+OpenCV GUI in `CameraCalibLab`.
 
 ## Current Command Mapping
 
@@ -78,8 +77,6 @@ point may change.
 | `uv run camera-calib-lab hardware finalize ...` | Produce final hardware validation evidence from saved artifacts. |
 | `uv run camera-calib-lab hardware audit ...` | Re-run the final hardware evidence audit gate. |
 | `uv run camera-calib-lab hardware complete ...` | Verify the final hardware completion bundle without reopening devices. |
-| `cd frontend/review && bun test` | Run calibration artifact review UI tests. |
-| `cd frontend/review && bun run build` | Build the calibration artifact review UI. |
 
 ## Runtime Artifact Outputs
 
@@ -203,40 +200,29 @@ If stereo quality metrics exceed runtime warning thresholds, the package remains
 loadable for smoke testing but its summary records the warning before relying on
 3D prediction accuracy.
 
-## Review GUI
+## OpenCV Calibration App
 
-The review GUI lives under `frontend/review` as an isolated TypeScript/Bun
-frontend:
+Use the original `CameraCalibLab` OpenCV GUI for local mono/stereo calibration
+capture:
 
 ```bash
-cd tools/calibration/frontend/review
-bun test
-bun run build
-PORT=5188 bun run dev
+cd ../../CameraCalibLab
+uv run camera-calib-lab capture stereo-charuco-auto-gui \
+  --config configs/dfoptix_charuco_15mm_capture.yaml \
+  --output captures/local/dfoptix_stereo_charuco_auto_session \
+  --calibration-output runs/calibrations/dfoptix_stereo_charuco_auto \
+  --views 30 \
+  --left-device /dev/video0 \
+  --right-device /dev/video2
 ```
-
-It imports artifact-shaped JSON from the capture/check/detect/solve workflow,
-shows the current gate status, previews local capture PNG frames served from
-`/artifacts/...`, displays inspection and ChArUco tables, and generates the next
-CLI commands. The visible workflow begins with the printable Target step, then
-continues through capture, inspect, detect, solve, and package verification.
-`Cam1 Mono`, `Cam2 Mono`, and `Stereo` presets keep capture, observations,
-solve, report, and verify paths aligned. The local Bun server can also execute a
-whitelisted subset of `uv run tennisbot-calibration ...` commands without
-invoking a shell, then return generated JSON artifacts for automatic import into
-the workspace. It does not import Python calibration modules, YOLO tooling, or
-legacy lab source code.
 
 ## Migration Checklist
 
 - [ ] Freeze the current `CameraCalibLab` baseline and record its commit.
 - [ ] Confirm `uv run pytest -q` passes inside `CameraCalibLab`.
-- [x] Confirm `cd frontend/review && bun test && bun run build` passes inside
-      `tools/calibration`.
 - [ ] Copy implementation files into `tools/calibration` without changing
       behavior.
-- [ ] Preserve `uv` for the Python project and `bun` for the TypeScript review
-      frontend.
+- [ ] Preserve `uv` for the Python project.
 - [ ] Keep generated captures, runs, and packages ignored by git.
 - [ ] Export mono packages that satisfy the mono artifact contract.
 - [ ] Export stereo packages that satisfy the stereo artifact contract.

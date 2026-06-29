@@ -69,13 +69,17 @@ bun run typecheck
 bun run build
 ```
 
-Run calibration review GUI:
+Run the original OpenCV stereo calibration GUI:
 
 ```bash
-cd tools/calibration/frontend/review
-bun test
-bun run build
-PORT=5188 bun run dev
+cd CameraCalibLab
+uv run camera-calib-lab capture stereo-charuco-auto-gui \
+  --config configs/dfoptix_charuco_15mm_capture.yaml \
+  --output captures/local/dfoptix_stereo_charuco_auto_session \
+  --calibration-output runs/calibrations/dfoptix_stereo_charuco_auto \
+  --views 30 \
+  --left-device /dev/video0 \
+  --right-device /dev/video2
 ```
 
 Create dry-run calibration artifacts:
@@ -185,16 +189,7 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 - [Calibration stereo solve](docs/calibration_stereo_solve_20260629.md)
 - [Calibration stereo solve capture quality](docs/calibration_stereo_solve_capture_quality_20260629.md)
 - [Calibration stereo solve ChArUco detection](docs/calibration_charuco_detection_stereo_solve_20260629.md)
-- [Calibration review GUI](docs/calibration_review_gui_20260629.md)
-- [Calibration review GUI command bridge](docs/calibration_review_gui_command_bridge_20260629.md)
-- [Calibration GUI target command bridge fix](docs/calibration_gui_target_command_bridge_fix_20260629.md)
-- [Calibration GUI target file links](docs/calibration_gui_target_file_links_20260629.md)
-- [Calibration GUI target print check](docs/calibration_gui_target_print_check_20260629.md)
-- [Calibration GUI physical status panel](docs/calibration_gui_physical_status_panel_20260629.md)
-- [Calibration GUI current artifacts loader](docs/calibration_gui_current_artifacts_loader_20260629.md)
-- [Calibration GUI camera devices status](docs/calibration_gui_camera_devices_status_20260629.md)
-- [Calibration GUI mono gate split](docs/calibration_gui_mono_gate_split_20260629.md)
-- [Calibration GUI capture gate](docs/calibration_gui_capture_gate_20260629.md)
+- [Calibration frontend review revert](docs/calibration_frontend_review_revert_20260629.md)
 - [Tool boundary audit](docs/tool_boundary_audit_20260629.md)
 - [Legacy board/runtime shell retirement](docs/legacy_board_retirement_20260629.md)
 - [Live3D hardware smoke](docs/live3d_hardware_smoke_20260629.md)

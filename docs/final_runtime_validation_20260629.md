@@ -90,9 +90,8 @@ curl -I http://localhost:5178/artifacts/models/tennis_ball_yolo/package.json
 curl -I http://localhost:5178/artifacts/calibration/stereo_cam1_cam2/package.json
 ```
 
-Result: the local runtime launcher status check reported Live3D and Calibration
-GUI ready at `http://127.0.0.1:5178/` and `http://127.0.0.1:5188/`; all HTTP
-checks returned `200 OK`.
+Result: the local runtime launcher status check reported Live3D ready at
+`http://127.0.0.1:5178/`; all Live3D HTTP checks returned `200 OK`.
 
 Local operator preflight:
 
@@ -100,8 +99,8 @@ Local operator preflight:
 bun scripts/operator-preflight.ts --output docs/local_runtime_preflight_20260629.md
 ```
 
-Result: passed. The preflight verified Live3D, Calibration GUI, the YOLO runtime
-package, the accepted stereo calibration package, and USB camera devices
+Result: passed. The preflight verified Live3D, the YOLO runtime package, the
+accepted stereo calibration package, and USB camera devices
 `/dev/video0` plus `/dev/video2`.
 
 Hardware smoke:
@@ -287,11 +286,10 @@ Result: 13 tests passed. A real runtime YOLO package was written from the
 - YOLO and calibration are separate standalone tool packages under `tools/`.
 - Live3D consumes only model/calibration artifacts under `artifacts/`.
 - `bun scripts/start-local-runtime.ts` is the root local operator launcher for
-  Live3D plus the Calibration GUI; `--status` verifies both URLs without
-  starting new services.
-- `bun scripts/operator-preflight.ts` verifies both browser surfaces, the YOLO
-  package, stereo calibration package, and the two expected local USB camera
-  device paths before field capture or Live3D validation.
+  Live3D; calibration capture uses the original CameraCalibLab OpenCV GUI.
+- `bun scripts/operator-preflight.ts` verifies the Live3D browser surface, the
+  YOLO package, stereo calibration package, and the two expected local USB
+  camera device paths before field capture or Live3D validation.
 - Runtime core algorithms live under `packages/core`.
 - Shared data contracts live under `packages/contracts`.
 - `artifacts/models/tennis_ball_yolo` now contains a real ONNX-default package

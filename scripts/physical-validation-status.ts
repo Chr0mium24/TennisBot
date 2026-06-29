@@ -71,7 +71,7 @@ function targetMetadataCheck(): GateResult {
       status: "blocked",
       detail: "target metadata is missing.",
       evidence: path,
-      next: "Generate the target from the Calibration GUI Target tab.",
+      next: "Generate the target with `cd tools/calibration && uv run tennisbot-calibration target charuco ...`.",
     };
   }
   const target = objectField(payload, "target");
@@ -124,8 +124,8 @@ function targetPrintNextAction(): string {
   const files = objectField(targetMetadata, "files");
   const svgPath = stringField(files, "svg") ?? "artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.svg";
   return [
-    `Print ${displayReferencePath(svgPath)} at 100% scale, measure one square, then record it in Calibration GUI Target > Print Check.`,
-    "CLI fallback: cd tools/calibration && uv run tennisbot-calibration target record-print-check --measured-square-mm <measured-mm>",
+    `Print ${displayReferencePath(svgPath)} at 100% scale, measure one square, then record it with the CLI.`,
+    "Command: cd tools/calibration && uv run tennisbot-calibration target record-print-check --measured-square-mm <measured-mm>",
   ].join(" ");
 }
 
@@ -138,7 +138,7 @@ function monoPackageCheck(cameraId: string, path: string): GateResult {
       status: "blocked",
       detail: `${cameraId} mono package is missing.`,
       evidence: displayPath(path),
-      next: `Run the Calibration GUI ${cameraId === "cam1" ? "Cam1 Mono" : "Cam2 Mono"} flow through package verification.`,
+      next: `Use CameraCalibLab OpenCV capture for ${cameraId}, then solve and verify the mono package.`,
     };
   }
   const quality = objectField(payload, "quality");
@@ -185,7 +185,7 @@ function stereoPackageCheck(path: string, monoPrerequisites: GateResult[]): Gate
       status: "blocked",
       detail: "stereo package is missing.",
       evidence: displayPath(path),
-      next: "Run the Calibration GUI Stereo flow after cam1 and cam2 mono packages are accepted.",
+      next: "Use CameraCalibLab OpenCV stereo capture after cam1 and cam2 mono packages are accepted.",
     };
   }
   const quality = objectField(payload, "quality");

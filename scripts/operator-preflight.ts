@@ -37,14 +37,13 @@ console.log(`report=${outputPath}`);
 process.exit(checks.every((check) => check.status === "passed") ? 0 : 1);
 
 async function runPreflight(): Promise<CheckResult[]> {
-  const [live3d, calibrationGui, yoloPackage, calibrationPackage, cameras] = await Promise.all([
+  const [live3d, yoloPackage, calibrationPackage, cameras] = await Promise.all([
     urlCheck("live3d", "Live3D surface", "http://127.0.0.1:5178/"),
-    urlCheck("calibration-gui", "Calibration GUI surface", "http://127.0.0.1:5188/"),
     yoloPackageCheck(),
     calibrationPackageCheck(),
     cameraDeviceCheck(),
   ]);
-  return [live3d, calibrationGui, yoloPackage, calibrationPackage, cameras];
+  return [live3d, yoloPackage, calibrationPackage, cameras];
 }
 
 async function urlCheck(id: string, label: string, url: string): Promise<CheckResult> {
@@ -215,7 +214,6 @@ function printUsage(): void {
 
 Checks local TennisBot operator readiness:
 - Live3D URL at http://127.0.0.1:5178/
-- Calibration GUI URL at http://127.0.0.1:5188/
 - YOLO runtime package verification
 - Stereo calibration package verification
 - USB camera devices /dev/video0 and /dev/video2

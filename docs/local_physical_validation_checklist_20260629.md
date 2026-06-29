@@ -5,12 +5,11 @@ Date: 2026-06-29
 ## Purpose
 
 This is the operator checklist for finishing the local-machine TennisBot loop.
-It starts after the software preflight has passed and both browser surfaces are
-available:
+It starts after the software preflight has passed and the Live3D browser
+surface is available:
 
 ```text
 Live3D:          http://127.0.0.1:5178/
-Calibration GUI: http://127.0.0.1:5188/
 ```
 
 The checklist is complete only when Live3D reaches `prediction-ready` with a
@@ -27,14 +26,20 @@ bun scripts/operator-preflight.ts --output docs/local_runtime_preflight_YYYYMMDD
 Pass condition:
 
 - Live3D surface returns 200.
-- Calibration GUI surface returns 200.
 - YOLO package verifies.
 - Stereo calibration package verifies.
 - `/dev/video0` and `/dev/video2` are present.
 
 ## 1. Target
 
-Open the Calibration GUI target tab and run `Generate target`.
+Generate the target from the calibration CLI:
+
+```bash
+cd tools/calibration
+uv run tennisbot-calibration target charuco \
+  --output ../../artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.png \
+  --output-report ../../docs/calibration_charuco_target_sheet_YYYYMMDD.md
+```
 
 Expected artifacts:
 
@@ -48,21 +53,25 @@ Print gate:
 - Print the SVG at 100% scale.
 - Measure one printed square.
 - Continue only if one square is 15.0 mm.
-- Record the measurement from the Calibration GUI Target tab with
-  `Record print check`.
+- Record the measurement with `uv run tennisbot-calibration target record-print-check --measured-square-mm <measured-mm>`.
 
 If the printed square is not 15.0 mm, fix printer scaling and reprint before
 capturing any camera frames.
 
 ## 2. Cam1 Mono
 
-In the Calibration GUI select `Cam1 Mono` and run these commands in order:
+Use the original OpenCV GUI to capture Cam1 mono frames, then run the CLI
+inspection, detection, solve, and package verification steps:
 
-1. `Capture frames`
-2. `Inspect frames`
-3. `Detect ChArUco`
-4. `Run solve`
-5. `Verify package`
+```bash
+cd CameraCalibLab
+uv run camera-calib-lab capture charuco-auto-gui \
+  --config configs/dfoptix_charuco_15mm_capture.yaml \
+  --output captures/local/dfoptix_charuco_cam1_session \
+  --calibration-output runs/calibrations/dfoptix_charuco_cam1 \
+  --views 30 \
+  --device /dev/video0
+```
 
 Pass condition:
 
@@ -82,13 +91,8 @@ at different image positions and tilts.
 
 ## 3. Cam2 Mono
 
-In the Calibration GUI select `Cam2 Mono` and repeat the same command sequence:
-
-1. `Capture frames`
-2. `Inspect frames`
-3. `Detect ChArUco`
-4. `Run solve`
-5. `Verify package`
+Use the same OpenCV mono capture flow for Cam2, changing the device and output
+paths for the second camera.
 
 Pass condition:
 
@@ -107,13 +111,18 @@ If this fails, recapture Cam2 before attempting stereo solve.
 
 ## 4. Stereo
 
-In the Calibration GUI select `Stereo` and run:
+Use the original OpenCV stereo capture GUI:
 
-1. `Capture frames`
-2. `Inspect frames`
-3. `Detect ChArUco`
-4. `Run solve`
-5. `Verify package`
+```bash
+cd CameraCalibLab
+uv run camera-calib-lab capture stereo-charuco-auto-gui \
+  --config configs/dfoptix_charuco_15mm_capture.yaml \
+  --output captures/local/dfoptix_stereo_charuco_auto_session \
+  --calibration-output runs/calibrations/dfoptix_stereo_charuco_auto \
+  --views 30 \
+  --left-device /dev/video0 \
+  --right-device /dev/video2
+```
 
 Pass condition:
 
@@ -165,7 +174,7 @@ loop complete.
 
 ## Current Status
 
-As of 2026-06-29, software preflight passes and the Calibration GUI target
-command bridge has been verified through the local API. The remaining acceptance
-work is physical: print and measure the target, capture real accepted
-mono/stereo calibration sessions, then run Live3D with a visible tennis ball.
+As of 2026-06-29, the calibration web service has been removed. The
+remaining acceptance work is physical: print and measure the target, capture
+real accepted mono/stereo calibration sessions with the OpenCV GUI, then run
+Live3D with a visible tennis ball.

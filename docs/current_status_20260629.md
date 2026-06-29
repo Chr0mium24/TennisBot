@@ -9,7 +9,7 @@ The project is at the local operator validation stage.
 The architecture simplification and main runtime split are in place:
 
 - `tools/yolo` is the standalone YOLO package tool.
-- `tools/calibration` is the standalone calibration package and review GUI.
+- `tools/calibration` is the standalone calibration package CLI.
 - `packages/core` owns artifact validation, stereo pairing, triangulation, and
   trajectory prediction.
 - `apps/live3d` owns the real-machine browser runtime for two USB cameras, YOLO
@@ -18,18 +18,16 @@ The architecture simplification and main runtime split are in place:
 
 ## Ready Now
 
-The local launcher reports both operator surfaces ready:
+The local launcher reports the remaining browser operator surface ready:
 
 ```text
 ready  Live3D           http://127.0.0.1:5178/
-ready  Calibration GUI  http://127.0.0.1:5188/
 ```
 
 The current preflight passes:
 
 ```text
 passed Live3D surface - http://127.0.0.1:5178/ returned 200.
-passed Calibration GUI surface - http://127.0.0.1:5188/ returned 200.
 passed YOLO package - artifacts/models/tennis_ball_yolo verified.
 passed Stereo calibration package - artifacts/calibration/stereo_cam1_cam2 verified as accepted stereo package.
 passed USB camera devices - /dev/video0 and /dev/video2 are present.
@@ -44,13 +42,9 @@ The latest committed runtime work added:
 - target print measurement recorder;
 - local runtime launcher next-action output;
 - calibration target generation;
-- calibration GUI target print-check recording with explicit measured-value gate;
-- calibration GUI physical validation status panel with per-gate details;
-- calibration GUI startup current artifact loader;
-- calibration GUI camera devices status panel;
-- calibration GUI separate cam1/cam2 mono gates;
-- calibration GUI capture command gated on accepted target print check;
-- calibration GUI target, mono, stereo, and package verification presets;
+- target print-check recording with explicit measured-value gate;
+- local physical validation status script with per-gate details;
+- CameraCalibLab OpenCV GUI retained for local mono/stereo calibration capture;
 - Live3D readiness gates and hardware reports.
 
 ## Remaining Physical Gates

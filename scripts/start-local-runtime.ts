@@ -34,15 +34,6 @@ const surfaces: Surface[] = [
     env: { PORT: "5178" },
     logPath: "/tmp/tennisbot_live3d.log",
   },
-  {
-    name: "Calibration GUI",
-    url: "http://127.0.0.1:5188/",
-    cwd: resolve(repoRoot, "tools/calibration/frontend/review"),
-    buildCommand: ["bun", "run", "build"],
-    serveCommand: ["bun", "./scripts/serve.ts"],
-    env: { PORT: "5188", HOST: "127.0.0.1" },
-    logPath: "/tmp/tennisbot_calibration_review_gui.log",
-  },
 ];
 
 const args = new Set(Bun.argv.slice(2));
@@ -87,7 +78,7 @@ if (physicalStatus === undefined) {
   console.log(`Physical validation next action: ${physicalStatus.next_action}`);
 }
 console.log("");
-console.log("Use Calibration GUI for Target -> Print Check -> Cam1 Mono -> Cam2 Mono -> Stereo.");
+console.log("Use CameraCalibLab OpenCV GUI for local stereo calibration capture.");
 console.log("Use Live3D after calibration and put a visible tennis ball in both camera views.");
 
 const childProcesses = started.flatMap((item) => (item.process === undefined ? [] : [item.process]));
@@ -227,12 +218,13 @@ function printUsage(): void {
 
 Starts or checks the local TennisBot operator surfaces:
 - Live3D at http://127.0.0.1:5178/
-- Calibration GUI at http://127.0.0.1:5188/
 
 Options:
-  --status    Only check whether both URLs are serving.
+  --status    Only check whether configured URLs are serving.
   --no-build  Start missing services without running frontend builds first.
 
-Normal startup also prints the current physical validation next action.
+Normal startup also prints the current physical validation next action. Run the
+original calibration GUI from CameraCalibLab with:
+  uv run camera-calib-lab capture stereo-charuco-auto-gui
 `);
 }

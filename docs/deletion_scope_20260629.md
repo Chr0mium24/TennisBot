@@ -19,7 +19,7 @@ original `CameraCalibLab` OpenCV GUI only.
 - `tools/calibration/`
 - references to `tennisbot-calibration`
 - references to `tools/calibration/frontend/review`
-- references to the new Calibration Web GUI at `http://127.0.0.1:5188/`
+- references to the deleted Calibration Web GUI service
 - docs created for the new calibration review GUI, command bridge, physical
   gate panels, target print-check workflow, and local runtime launcher if they
   only describe the deleted tool

@@ -45,7 +45,7 @@ Observed on 2026-06-29:
 ```text
 physical-validation-status: wrote docs/local_physical_validation_status_20260629.md and exited non-zero because physical gates remain incomplete.
 stereo gate: blocked while cam1/cam2 mono packages are still dry-run, even though the current stereo package is hardware validated.
-next_action: Print artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.svg at 100% scale, measure one square, then record it in Calibration GUI Target > Print Check. CLI fallback: cd tools/calibration && uv run tennisbot-calibration target record-print-check --measured-square-mm <measured-mm>
+next_action: Print artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.svg at 100% scale, measure one square, then record it with the CLI. Command: cd tools/calibration && uv run tennisbot-calibration target record-print-check --measured-square-mm <measured-mm>
 operator-preflight: passed.
 ```
 

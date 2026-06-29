@@ -19,7 +19,6 @@ TennisBot/
 
   tools/
     calibration/     standalone calibration package tool
-      frontend/review calibration artifact review GUI
     yolo/            standalone YOLO model package tool
 
   artifacts/         ignored local runtime artifacts
@@ -62,11 +61,8 @@ Owns mono/stereo calibration package production and verification. It does not
 own YOLO inference, trajectory prediction, or Live3D rendering. It can import
 existing CameraCalibLab calibration JSON into the runtime artifact contract
 without making the main runtime depend on CameraCalibLab source code.
-It also owns an isolated TypeScript/Bun review GUI under
-`tools/calibration/frontend/review` for artifact-shaped JSON review and command
-handoff. The GUI server includes a local-only whitelist command bridge for
-running reviewed calibration CLI commands and returning generated JSON artifacts
-to the browser workspace.
+The TypeScript/Bun calibration review GUI has been reverted. Local calibration
+capture should use the original `CameraCalibLab` OpenCV GUI.
 
 Default runtime output:
 
@@ -231,13 +227,17 @@ cd packages/contracts && bun test && bun run typecheck
 cd packages/core && bun test && bun run typecheck
 ```
 
-Run calibration review GUI:
+Run the original OpenCV stereo calibration GUI:
 
 ```bash
-cd tools/calibration/frontend/review
-bun test
-bun run build
-PORT=5188 bun run dev
+cd CameraCalibLab
+uv run camera-calib-lab capture stereo-charuco-auto-gui \
+  --config configs/dfoptix_charuco_15mm_capture.yaml \
+  --output captures/local/dfoptix_stereo_charuco_auto_session \
+  --calibration-output runs/calibrations/dfoptix_stereo_charuco_auto \
+  --views 30 \
+  --left-device /dev/video0 \
+  --right-device /dev/video2
 ```
 
 ## Current Verification Evidence
@@ -247,9 +247,6 @@ Most recent software verification:
 ```text
 cd tools/calibration && uv run pytest -q
 Result: 20 passing tests, 0 failures.
-
-cd tools/calibration/frontend/review && bun test && bun run build
-Result: 12 passing tests, build passed.
 
 cd apps/live3d && bun test
 Result: 44 passing tests, 0 failures.
