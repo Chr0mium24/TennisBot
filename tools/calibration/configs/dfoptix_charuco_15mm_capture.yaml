@@ -1,0 +1,17 @@
+target:
+  profile: dfoptix_charuco_14x9_square15mm_marker11_25mm
+  squares_x: 14
+  squares_y: 9
+  dictionary: DICT_5X5_100
+  square_size_m: 0.015
+  marker_size_m: 0.01125
+camera:
+  width_px: 1280
+  height_px: 720
+  fps: 30
+  fourcc: MJPG
+capture:
+  views: 30
+  min_corners: 24
+  min_sharpness: 30.0
+  min_capture_interval_s: 0.6

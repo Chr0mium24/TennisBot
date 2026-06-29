@@ -1,0 +1,23 @@
+[project]
+name = "tennisbot-calibration"
+version = "0.1.0"
+description = "TennisBot fixed ChArUco OpenCV calibration GUI."
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.0.0",
+    "opencv-python>=4.13.0.92",
+    "pyyaml>=6.0.0",
+]
+
+[project.scripts]
+camera-calib-lab = "camera_calib_lab.cli:main"
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
