@@ -86,6 +86,8 @@ point may change.
 The target artifact roots are:
 
 ```text
+artifacts/calibration_targets/
+artifacts/calibration_sessions/
 artifacts/calibration/cam1/
 artifacts/calibration/cam2/
 artifacts/calibration/stereo_cam1_cam2/
@@ -93,6 +95,22 @@ artifacts/calibration/stereo_cam1_cam2/
 
 Mono and stereo package contracts are defined in
 [`artifact_contracts.md`](artifact_contracts.md).
+
+## Target Sheet
+
+Generate the printable ChArUco sheet before physical mono/stereo capture:
+
+```bash
+cd tools/calibration
+uv run tennisbot-calibration target charuco \
+  --output ../../artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.png \
+  --output-report ../../docs/calibration_charuco_target_sheet_YYYYMMDD.md
+```
+
+The command writes a PNG, a millimeter-sized SVG, and metadata JSON under
+`artifacts/calibration_targets/`. Print the SVG at 100% scale with no
+fit-to-page scaling, then measure one printed square; it should be 15 mm. Use
+the same printed target for mono `cam1`, mono `cam2`, and stereo captures.
 
 ## Capture Sessions
 

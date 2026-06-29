@@ -22,6 +22,7 @@ Allowed command families:
 - `capture detect-charuco`
 - `calibrate mono`
 - `calibrate stereo`
+- `target charuco`
 - `package verify`
 
 ## GUI Behavior
@@ -56,13 +57,14 @@ Results:
 ```text
 bun test: 12 passed, 0 failed.
 bun run build: passed.
-uv run pytest -q: 19 passed.
+uv run pytest -q: 20 passed.
 ```
 
 The added tests cover command planning without shell execution, rejection of
 non-whitelisted commands, rejection of unsafe paths/devices, and API rejection
 responses, plus generated JSON artifact collection from command output paths and
-`package verify` stdout.
+`package verify` stdout, including target-sheet metadata returned by
+`target charuco`.
 
 Local API smoke:
 
@@ -70,18 +72,18 @@ Local API smoke:
 curl -X POST http://127.0.0.1:5188/api/calibration/run \
   -H 'content-type: application/json' \
   --data '{"command":"uv run tennisbot-calibration package verify --path ../../artifacts/calibration/stereo_cam1_cam2"}'
+curl -X POST http://127.0.0.1:5188/api/calibration/run \
+  -H 'content-type: application/json' \
+  --data '{"command":"uv run tennisbot-calibration target charuco --output ../../artifacts/calibration_targets/bridge_target.png"}'
 ```
 
 Result:
 
 ```text
-status: passed
-exitCode: 0
-package_kind: stereo
-accepted: true
-dry_run: false
-hardware_validated: true
-returned_artifacts: 1
+package verify: status=passed, exitCode=0, package_kind=stereo,
+accepted=true, dry_run=false, hardware_validated=true, returned_artifacts=1.
+target charuco: status=passed, exitCode=0,
+returned_artifact_schema=calibration.target_sheet.v1, accepted=true.
 ```
 
 ## Remaining Field Work

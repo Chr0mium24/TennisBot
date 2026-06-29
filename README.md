@@ -139,6 +139,7 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 - [Calibration capture quality hardware probe](docs/calibration_capture_quality_hardware_probe_20260629.md)
 - [Calibration ChArUco detection dry run](docs/calibration_charuco_detection_20260629.md)
 - [Calibration ChArUco detection hardware probe](docs/calibration_charuco_detection_hardware_probe_20260629.md)
+- [Calibration ChArUco target sheet](docs/calibration_charuco_target_sheet_20260629.md)
 - [Calibration mono solve](docs/calibration_mono_solve_20260629.md)
 - [Calibration mono solve capture quality](docs/calibration_mono_solve_capture_quality_20260629.md)
 - [Calibration mono solve ChArUco detection](docs/calibration_charuco_detection_mono_solve_20260629.md)

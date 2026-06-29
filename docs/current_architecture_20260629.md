@@ -146,6 +146,7 @@ Create dry-run calibration artifacts:
 
 ```bash
 cd tools/calibration
+uv run tennisbot-calibration target charuco --output ../../artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.png --output-report ../../docs/calibration_charuco_target_sheet_YYYYMMDD.md
 uv run tennisbot-calibration gui mono --camera-id cam1 --dry-run --output ../../artifacts/calibration/cam1
 uv run tennisbot-calibration gui mono --camera-id cam2 --dry-run --output ../../artifacts/calibration/cam2
 uv run tennisbot-calibration gui stereo --left-camera-id cam1 --right-camera-id cam2 --dry-run --output ../../artifacts/calibration/stereo_cam1_cam2
@@ -245,7 +246,7 @@ Most recent software verification:
 
 ```text
 cd tools/calibration && uv run pytest -q
-Result: 19 passing tests, 0 failures.
+Result: 20 passing tests, 0 failures.
 
 cd tools/calibration/frontend/review && bun test && bun run build
 Result: 12 passing tests, build passed.
@@ -281,6 +282,10 @@ Calibration: dry_run=false, hardware_validated=true, package verify accepted.
 Calibration scanned import: 17 CameraCalibLab calibration files scanned,
 selected cam1/cam2 by path pattern, ranked 3 stereo candidates, and imported
 best stereo candidate dfoptix_charuco_stereo_auto_fixed_intrinsics_rational_20260622.
+Calibration target sheet: docs/calibration_charuco_target_sheet_20260629.md
+records the generated DFOptix ChArUco 14x9 `DICT_5X5_100` sheet. The printable
+artifacts live under artifacts/calibration_targets/ and use 15 mm squares,
+11 mm markers, and a 210 mm x 135 mm board.
 Calibration quality warning: epipolar_rms=4.330 px exceeds the 2.000 px
 runtime-quality review threshold. stereo_rms=0.424 px,
 rectification_y_p95=0.830 px, baseline=0.052486 m.

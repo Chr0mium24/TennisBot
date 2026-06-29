@@ -20,6 +20,7 @@ from tennisbot_calibration.scan_camera_calib_lab import (
     write_scan_report,
 )
 from tennisbot_calibration.stereo_solve import solve_stereo_calibration
+from tennisbot_calibration.target_generation import generate_charuco_target
 from tennisbot_calibration.verify import verify_package
 
 
@@ -38,6 +39,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  calibrate stereo\n"
             "  gui mono\n"
             "  gui stereo\n"
+            "  target charuco\n"
             "  package verify\n"
             "  package scan-camera-calib-lab\n"
             "  package import-scanned-camera-calib-lab\n\n"
@@ -48,6 +50,7 @@ def build_parser() -> argparse.ArgumentParser:
     configure_capture(subparsers)
     configure_calibrate(subparsers)
     configure_gui(subparsers)
+    configure_target(subparsers)
     configure_package(subparsers)
     return parser
 
@@ -149,6 +152,20 @@ def configure_gui(subparsers: argparse._SubParsersAction[argparse.ArgumentParser
     stereo.add_argument("--output", required=True)
     stereo.add_argument("--dry-run", action="store_true", help="Write deterministic non-hardware review artifacts.")
     stereo.set_defaults(handler=gui_stereo)
+
+
+def configure_target(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    target = subparsers.add_parser("target", help="Generate printable calibration targets.")
+    target_subparsers = target.add_subparsers(dest="target_command", required=True)
+
+    charuco = target_subparsers.add_parser("charuco", help="Generate the DFOptix ChArUco target sheet.")
+    charuco.add_argument("--output", required=True, help="Output PNG path under artifacts/calibration_targets.")
+    charuco.add_argument("--output-svg", default=None, help="Optional SVG sheet path; defaults to <output>.svg.")
+    charuco.add_argument("--output-metadata", default=None, help="Optional metadata JSON path; defaults to <output>.json.")
+    charuco.add_argument("--output-report", default=None, help="Optional Markdown report path.")
+    charuco.add_argument("--dpi", type=int, default=300)
+    charuco.add_argument("--margin-mm", type=float, default=10.0)
+    charuco.set_defaults(handler=target_charuco)
 
 
 def configure_package(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -354,6 +371,19 @@ def gui_stereo(args: argparse.Namespace) -> int:
     require_dry_run(args.dry_run)
     package = write_stereo_dry_run(args.left_camera_id, args.right_camera_id, Path(args.output))
     print(json.dumps({"accepted": True, "dry_run": True, "output": args.output, "package": package}, indent=2))
+    return 0
+
+
+def target_charuco(args: argparse.Namespace) -> int:
+    metadata = generate_charuco_target(
+        output=Path(args.output),
+        output_svg=Path(args.output_svg) if args.output_svg else None,
+        output_metadata=Path(args.output_metadata) if args.output_metadata else None,
+        output_report=Path(args.output_report) if args.output_report else None,
+        dpi=args.dpi,
+        margin_mm=args.margin_mm,
+    )
+    print(json.dumps(metadata, indent=2, sort_keys=True))
     return 0
 
 

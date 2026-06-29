@@ -26,6 +26,7 @@ def test_cli_help_exposes_required_commands(capsys: pytest.CaptureFixture[str]) 
     capture_help = help_text(["capture"], capsys)
     calibrate_help = help_text(["calibrate"], capsys)
     gui_help = help_text(["gui"], capsys)
+    target_help = help_text(["target"], capsys)
     package_help = help_text(["package"], capsys)
 
     assert "capture" in top_help
@@ -40,15 +41,64 @@ def test_cli_help_exposes_required_commands(capsys: pytest.CaptureFixture[str]) 
     assert "stereo" in calibrate_help
     assert "gui mono" in top_help
     assert "gui stereo" in top_help
+    assert "target charuco" in top_help
     assert "package verify" in top_help
     assert "mono" in capture_help
     assert "stereo" in capture_help
     assert "mono" in gui_help
     assert "stereo" in gui_help
+    assert "charuco" in target_help
     assert "verify" in package_help
     assert "import-camera-calib-lab" in package_help
     assert "scan-camera-calib-lab" in package_help
     assert "import-scanned-camera-calib-lab" in package_help
+
+
+def test_target_charuco_generates_printable_sheet(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    output = tmp_path / "target.png"
+    report = tmp_path / "target.md"
+
+    assert (
+        main(
+            [
+                "target",
+                "charuco",
+                "--output",
+                str(output),
+                "--output-report",
+                str(report),
+                "--dpi",
+                "150",
+                "--margin-mm",
+                "5",
+            ]
+        )
+        == 0
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["schema_version"] == "calibration.target_sheet.v1"
+    assert payload["target"]["type"] == "charuco"
+    assert payload["target"]["profile"] == "dfoptix_charuco_15mm"
+    assert payload["target"]["dictionary"] == "DICT_5X5_100"
+    assert payload["board_size_mm"] == {"width": 210.0, "height": 135.0}
+    assert output.is_file()
+    assert output.with_suffix(".svg").is_file()
+    assert output.with_suffix(".json").is_file()
+    assert "# Calibration ChArUco Target Sheet" in report.read_text(encoding="utf-8")
+
+    image = cv2.imread(str(output), cv2.IMREAD_GRAYSCALE)
+    assert image is not None
+    dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_5X5_100)
+    board = cv2.aruco.CharucoBoard((14, 9), 0.015, 0.011, dictionary)
+    corners, ids, _marker_corners, marker_ids = cv2.aruco.CharucoDetector(board).detectBoard(image)
+    assert corners is not None
+    assert ids is not None
+    assert len(ids) >= 6
+    assert marker_ids is not None
 
 
 def test_capture_mono_dry_run_writes_session_frames_and_manifest(tmp_path: Path) -> None:

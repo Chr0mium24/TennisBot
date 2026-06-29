@@ -108,6 +108,29 @@ describe("calibration command runner", () => {
         path: "stdout:package-verification",
         payload: { schema_version: "calibration.package_verification.v1", accepted: true },
       });
+
+      const targetDir = join(roots.repoRoot, "artifacts", "calibration_targets");
+      mkdirSync(targetDir, { recursive: true });
+      writeFileSync(
+        join(targetDir, "target.json"),
+        JSON.stringify({
+          schema_version: "calibration.target_sheet.v1",
+          accepted: true,
+        }),
+      );
+      const targetPlan = createCalibrationCommandPlan(
+        [
+          "uv run tennisbot-calibration target charuco",
+          "--output ../../artifacts/calibration_targets/target.png",
+          "--output-report ../../docs/calibration_target.md",
+        ].join(" "),
+        roots,
+      );
+      expect(collectGeneratedCalibrationArtifacts(targetPlan)[0]).toMatchObject({
+        name: "target.json",
+        path: "artifacts/calibration_targets/target.json",
+        payload: { schema_version: "calibration.target_sheet.v1", accepted: true },
+      });
     } finally {
       rmSync(roots.repoRoot, { recursive: true, force: true });
     }

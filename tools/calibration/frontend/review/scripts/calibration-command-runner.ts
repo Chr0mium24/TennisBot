@@ -55,6 +55,8 @@ const valueFlags = new Set([
   "--fps",
   "--session",
   "--output-report",
+  "--output-svg",
+  "--output-metadata",
   "--observations",
   "--left-mono",
   "--right-mono",
@@ -66,6 +68,8 @@ const valueFlags = new Set([
 const pathFlags = new Set([
   "--output",
   "--output-report",
+  "--output-svg",
+  "--output-metadata",
   "--session",
   "--observations",
   "--left-mono",
@@ -80,6 +84,8 @@ const numericFlags = new Set([
   "--width",
   "--height",
   "--fps",
+  "--dpi",
+  "--margin-mm",
   "--min-views",
   "--min-pairs",
   "--max-rms-px",
@@ -130,6 +136,10 @@ const allowedCommandFlags = new Map<string, Set<string>>([
     "calibrate stereo",
     new Set(["--observations", "--left-mono", "--right-mono", "--output", "--min-pairs", "--max-rms-px"]),
   ],
+  [
+    "target charuco",
+    new Set(["--output", "--output-svg", "--output-metadata", "--output-report", "--dpi", "--margin-mm"]),
+  ],
   ["package verify", new Set(["--path"])],
 ]);
 
@@ -178,6 +188,8 @@ export function collectGeneratedCalibrationArtifacts(
     pushJsonArtifact(artifacts, plan, pathFromFlag(plan, "--output"));
   } else if (plan.commandKey === "calibrate mono" || plan.commandKey === "calibrate stereo") {
     pushJsonArtifact(artifacts, plan, pathFromFlag(plan, "--output", "package.json"));
+  } else if (plan.commandKey === "target charuco") {
+    pushJsonArtifact(artifacts, plan, targetMetadataPath(plan));
   } else if (plan.commandKey === "package verify") {
     const payload = parseJsonObject(stdout);
     if (payload !== undefined) {
@@ -261,6 +273,15 @@ function pathFromFlag(
   if (value === undefined) return undefined;
   const resolvedPath = resolve(plan.cwd, value);
   return childPath === undefined ? resolvedPath : join(resolvedPath, childPath);
+}
+
+function targetMetadataPath(plan: CalibrationCommandPlan): string | undefined {
+  const explicit = pathFromFlag(plan, "--output-metadata");
+  if (explicit !== undefined) return explicit;
+  const output = pathFromFlag(plan, "--output");
+  if (output === undefined) return undefined;
+  const withJsonSuffix = output.replace(/\.[^/\\]+$/u, ".json");
+  return withJsonSuffix === output ? `${output}.json` : withJsonSuffix;
 }
 
 function pushJsonArtifact(
