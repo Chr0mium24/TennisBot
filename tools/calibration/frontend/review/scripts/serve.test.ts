@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
-import { contentType, resolveStaticRequestPath } from "./serve";
+import { contentType, handleCalibrationRunRequest, resolveStaticRequestPath } from "./serve";
 
 describe("calibration review server", () => {
   test("serves static dist files and artifact files inside allowed roots", () => {
@@ -29,6 +29,21 @@ describe("calibration review server", () => {
     expect(contentType("/artifacts/package.json")).toContain("application/json");
     expect(contentType("/artifacts/calibration_sessions/session/frames/cam1_0001.png")).toBe("image/png");
     expect(contentType("/artifacts/calibration_sessions/session/frames/cam1_0001.jpg")).toBe("image/jpeg");
+  });
+
+  test("rejects non-whitelisted command execution requests", async () => {
+    const response = await handleCalibrationRunRequest(
+      new Request("http://localhost/api/calibration/run", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ command: "rm -rf ../../artifacts" }),
+      }),
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.status).toBe("rejected");
+    expect(payload.error).toContain("Only 'uv run tennisbot-calibration");
   });
 });
 

@@ -218,10 +218,11 @@ bun test
 bun run build
 ```
 
-Result: 8 tests passed and the browser bundle built. The review GUI imports
+Result: 11 tests passed and the browser bundle built. The review GUI imports
 artifact-shaped JSON, summarizes capture/inspect/detect/mono/stereo gates,
 renders local capture PNG frame previews, inspection and ChArUco tables,
-displays package metrics, and generates the next CLI commands. It does not
+displays package metrics, generates the next CLI commands, and can execute
+whitelisted calibration CLI commands through its local Bun server. It does not
 import Python calibration internals or legacy lab source modules.
 
 Imported calibration quality warning:

@@ -16,6 +16,14 @@ import {
 } from "./calibration-workspace";
 
 type Tab = "capture" | "review" | "solve" | "packages";
+type CommandId = "capture" | "inspect" | "detect" | "solve";
+
+type CommandRunView = {
+  status: "running" | "passed" | "failed" | "rejected" | "error";
+  detail: string;
+  stdout: string;
+  stderr: string;
+};
 
 type AppState = {
   artifacts: ImportedArtifact[];
@@ -26,6 +34,7 @@ type AppState = {
   observationsPath: string;
   inspectionReportPath: string;
   detectionReportPath: string;
+  commandRuns: Partial<Record<CommandId, CommandRunView>>;
 };
 
 const state: AppState = {
@@ -35,6 +44,7 @@ const state: AppState = {
   observationsPath: "../../artifacts/calibration_sessions/stereo_session/observations.json",
   inspectionReportPath: "../../docs/calibration_capture_quality_YYYYMMDD.md",
   detectionReportPath: "../../docs/calibration_charuco_detection_YYYYMMDD.md",
+  commandRuns: {},
   captureOptions: {
     topology: "stereo",
     cameraId: "cam1",
@@ -161,9 +171,9 @@ function renderCapturePanel(): string {
       </article>
       <article class="panel command-panel">
         <h2>Commands</h2>
-        ${commandBlock(buildCaptureCommand(state.captureOptions))}
-        ${commandBlock(buildInspectCommand(state.sessionPath, state.inspectionReportPath))}
-        ${commandBlock(buildDetectCommand(state.sessionPath, state.observationsPath, state.detectionReportPath))}
+        ${commandBlock("capture", "Capture frames", buildCommand("capture"))}
+        ${commandBlock("inspect", "Inspect frames", buildCommand("inspect"))}
+        ${commandBlock("detect", "Detect ChArUco", buildCommand("detect"))}
       </article>
     </section>
   `;
@@ -245,7 +255,7 @@ function renderSolvePanel(): string {
       </article>
       <article class="panel command-panel">
         <h2>Command</h2>
-        ${commandBlock(buildSolveCommand(state.solveOptions))}
+        ${commandBlock("solve", "Run solve", buildCommand("solve"))}
       </article>
     </section>
   `;
@@ -292,8 +302,39 @@ function renderTable(columns: string[], rows: Array<Record<string, string>>): st
   `;
 }
 
-function commandBlock(command: string): string {
-  return `<pre><code>${escapeHtml(command)}</code></pre>`;
+function commandBlock(id: CommandId, label: string, command: string): string {
+  const run = state.commandRuns[id];
+  const running = run?.status === "running";
+  return `
+    <div class="command-block">
+      <div class="command-header">
+        <strong>${escapeHtml(label)}</strong>
+        <button class="run-command" data-run-command-id="${id}" ${running ? "disabled" : ""}>
+          ${running ? "Running" : "Run"}
+        </button>
+      </div>
+      <pre><code>${escapeHtml(command)}</code></pre>
+      ${run === undefined ? "" : renderCommandRun(run)}
+    </div>
+  `;
+}
+
+function renderCommandRun(run: CommandRunView): string {
+  return `
+    <div class="command-result ${run.status}">
+      <strong>${escapeHtml(run.status)}</strong>
+      <span>${escapeHtml(run.detail)}</span>
+      ${run.stdout === "" ? "" : `<pre><code>${escapeHtml(run.stdout)}</code></pre>`}
+      ${run.stderr === "" ? "" : `<pre><code>${escapeHtml(run.stderr)}</code></pre>`}
+    </div>
+  `;
+}
+
+function buildCommand(id: CommandId): string {
+  if (id === "capture") return buildCaptureCommand(state.captureOptions);
+  if (id === "inspect") return buildInspectCommand(state.sessionPath, state.inspectionReportPath);
+  if (id === "detect") return buildDetectCommand(state.sessionPath, state.observationsPath, state.detectionReportPath);
+  return buildSolveCommand(state.solveOptions);
 }
 
 function field(key: keyof CaptureCommandOptions, label: string, value: string, visible: boolean): string {
@@ -363,6 +404,56 @@ function wireEvents(): void {
       render();
     });
   });
+  document.querySelectorAll<HTMLButtonElement>("[data-run-command-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const id = button.dataset.runCommandId as CommandId;
+      void runCalibrationCommand(id);
+    });
+  });
+}
+
+async function runCalibrationCommand(id: CommandId): Promise<void> {
+  const command = buildCommand(id);
+  state.commandRuns[id] = {
+    status: "running",
+    detail: "Command is running on the local calibration server.",
+    stdout: "",
+    stderr: "",
+  };
+  render();
+
+  try {
+    const response = await fetch("/api/calibration/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ command }),
+    });
+    const payload = (await response.json()) as {
+      status?: CommandRunView["status"];
+      exitCode?: number | null;
+      durationMs?: number;
+      stdout?: string;
+      stderr?: string;
+      error?: string;
+    };
+    const status = payload.status ?? (response.ok ? "passed" : "error");
+    state.commandRuns[id] = {
+      status,
+      detail:
+        payload.error ??
+        `Exit ${payload.exitCode ?? "unknown"} after ${payload.durationMs ?? "unknown"} ms.`,
+      stdout: payload.stdout ?? "",
+      stderr: payload.stderr ?? "",
+    };
+  } catch (error) {
+    state.commandRuns[id] = {
+      status: "error",
+      detail: error instanceof Error ? error.message : String(error),
+      stdout: "",
+      stderr: "",
+    };
+  }
+  render();
 }
 
 async function importFiles(files: FileList | null): Promise<void> {

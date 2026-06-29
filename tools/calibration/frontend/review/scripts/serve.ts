@@ -1,11 +1,14 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { resolve, sep } from "node:path";
 
+import { runCalibrationCommand } from "./calibration-command-runner";
+
 const appDir = resolve(import.meta.dirname, "..");
 const repoRoot = resolve(appDir, "..", "..", "..", "..");
 const distDir = resolve(appDir, "dist");
 const artifactsDir = resolve(repoRoot, "artifacts");
 const port = Number(process.env.PORT ?? 5188);
+const host = process.env.HOST ?? "127.0.0.1";
 
 export function contentType(pathname: string): string {
   if (pathname.endsWith(".html")) return "text/html; charset=utf-8";
@@ -35,16 +38,39 @@ export function resolveStaticRequestPath(
 export function startServer() {
   const server = Bun.serve({
     port,
+    hostname: host,
     async fetch(request) {
-      const resolvedPath = resolveStaticRequestPath(new URL(request.url).pathname);
+      const url = new URL(request.url);
+      if (url.pathname === "/api/calibration/run") {
+        return handleCalibrationRunRequest(request);
+      }
+      const resolvedPath = resolveStaticRequestPath(url.pathname);
       if (resolvedPath === null) return new Response("Not found", { status: 404 });
       return new Response(Bun.file(resolvedPath.filePath), {
         headers: { "content-type": contentType(resolvedPath.contentPath) },
       });
     },
   });
-  console.log(`Calibration review UI available at http://localhost:${port}`);
+  console.log(`Calibration review UI available at http://${host}:${port}`);
   return server;
+}
+
+export async function handleCalibrationRunRequest(request: Request): Promise<Response> {
+  if (request.method !== "POST") {
+    return jsonResponse({ error: "Use POST." }, 405);
+  }
+  let payload: unknown;
+  try {
+    payload = await request.json();
+  } catch {
+    return jsonResponse({ error: "Request body must be JSON." }, 400);
+  }
+  const command = typeof payload === "object" && payload !== null ? (payload as { command?: unknown }).command : undefined;
+  if (typeof command !== "string" || command.trim() === "") {
+    return jsonResponse({ error: "Request JSON must contain a non-empty command string." }, 400);
+  }
+  const result = await runCalibrationCommand(command);
+  return jsonResponse(result, result.status === "rejected" ? 400 : 200);
 }
 
 function decodePathname(pathname: string): string | null {
@@ -66,6 +92,13 @@ function isServableFileInRoot(filePath: string, root: string): boolean {
   const realRoot = realpathSync(root);
   const realFilePath = realpathSync(filePath);
   return statSync(realFilePath).isFile() && isInsideRoot(realFilePath, realRoot);
+}
+
+function jsonResponse(payload: unknown, status = 200): Response {
+  return new Response(JSON.stringify(payload, null, 2), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8" },
+  });
 }
 
 if (import.meta.main) {

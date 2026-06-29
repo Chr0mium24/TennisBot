@@ -27,7 +27,7 @@ PORT=5188 bun run dev
 ## Result
 
 ```text
-bun test: 8 passed.
+bun test: 11 passed.
 bun run build: main.js built under dist/assets; static index/styles copied.
 ```
 
@@ -40,6 +40,8 @@ The UI provides:
   `inspection.json` / `manifest.json` when the session path resolves under
   `/artifacts/...`;
 - capture command builder for mono/stereo sessions;
+- local whitelisted command execution for capture, inspect, detect, mono solve,
+  stereo solve, and package verify through the Bun review server;
 - inspection and ChArUco observation tables;
 - mono/stereo solve command builder;
 - mono/stereo package metric panels;
@@ -53,8 +55,6 @@ legacy lab code. It consumes artifact-shaped JSON only.
 
 ## Remaining Work
 
-- Add a backend bridge if the GUI should execute calibration commands instead of
-  generating reviewed CLI commands.
 - Add explicit accept/reject annotations for individual previewed frames.
 - Add real hardware review screenshots after a visible ChArUco session is
   captured.
