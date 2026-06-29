@@ -5,12 +5,12 @@ Date: 2026-06-29
 ## Goal
 
 Move both project-specific toolchains into top-level `tools/` so YOLO and
-calibration are handled consistently:
+calibration are handled consistently, using the smallest runnable slice first:
 
-- `tools/yolo`: tennis-ball annotation, dataset handling, training/eval/export,
-  and runtime model package creation.
-- `tools/calibration`: DFOptix ChArUco/OpenCV camera calibration GUI, solve, and
-  runtime calibration artifact export.
+- `tools/yolo`: tennis-ball annotation frontend/backend plus existing runtime
+  model package creation.
+- `tools/calibration`: DFOptix ChArUco/OpenCV mono and stereo capture GUI plus
+  the backend needed by those two GUI commands.
 
 The runtime boundary remains unchanged: apps and packages consume only
 `artifacts/models/...` and `artifacts/calibration/...`.
@@ -18,8 +18,8 @@ The runtime boundary remains unchanged: apps and packages consume only
 ## Migration Principle
 
 Migrate the smallest useful working slice first, then fix errors surfaced by
-tests and CLI smoke runs. Do not migrate generated data, local virtualenvs,
-large model files, datasets, runs, or historical build outputs.
+CLI smoke runs. Do not migrate generated data, local virtualenvs, tests,
+historical docs, large model files, datasets, runs, or historical build outputs.
 
 ## YOLO Minimal Migration
 
@@ -32,37 +32,33 @@ tools/yolo/
   src/tennisbot_yolo/
   web/yolo-annotator/
   yolo/scripts/
-  tests/
 ```
 
 Move first:
 
 - `web/yolo-annotator/`
-- `src/tennis_ball_detector_lab/camera_collect.py`
 - `src/tennis_ball_detector_lab/dataset.py`
-- `src/tennis_ball_detector_lab/deliverable.py`
-- `src/tennis_ball_detector_lab/evaluate.py`
 - `src/tennis_ball_detector_lab/paths.py`
-- Selected CLI behavior from `src/tennis_ball_detector_lab/cli.py`
 - `yolo/scripts/serve_annotator.py`
-- `yolo/scripts/build_current_backup_dataset.py`
-- `yolo/scripts/train_yolo26n_cam1_700.py`
-- `yolo/scripts/export_yolov8n_rknn_ptq.py`
-- `yolo/scripts/extract_tennis_ball_sprites.py`
-- Focused tests for dataset validation, camera collect, package/export, training
-  dry-run, and annotator backend.
+- Minimal selected CLI behavior from `src/tennis_ball_detector_lab/cli.py`:
+  `annotate` only.
 
 Keep or merge with existing `tools/yolo`:
 
 - Keep the current runtime package contract and verifier in
   `tools/yolo/src/tennisbot_yolo/package.py`.
-- Add migrated commands to the existing `tennisbot-yolo` CLI:
-  `annotate`, `collect-camera`, `validate-dataset`, `build-dataset`, `train`,
-  `eval`, `export-rknn`, `extract-sprites`, `package create`, and
-  `package verify`.
+- Add only `annotate` to the existing `tennisbot-yolo` CLI.
+- Keep existing `package create` and `package verify`.
 
 Do not move in the first pass:
 
+- tests and historical docs
+- camera collection
+- training
+- evaluation
+- RKNN export
+- sprite extraction
+- dataset manifest builders
 - `realtime_stereo_gui.py`
 - HSV/realtime diagnostic GUI behavior
 - local datasets, labels, training runs, model artifacts, `detector_package/`,
@@ -72,7 +68,9 @@ First acceptance checks:
 
 ```bash
 cd tools/yolo
-uv run pytest -q
+uv run tennisbot-yolo --help
+uv run tennisbot-yolo annotate --help
+uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_yolo
 cd web/yolo-annotator
 bun run check
 ```
@@ -87,7 +85,6 @@ Destination:
 tools/calibration/
   src/camera_calib_lab/
   configs/
-  tests/
 ```
 
 Recreate `tools/calibration` as the mainline OpenCV calibration tool. Keep the
@@ -101,31 +98,32 @@ Move first:
 
 - `pyproject.toml` dependency shape for `camera-calib-lab`.
 - `src/camera_calib_lab/cli.py`
-- `src/camera_calib_lab/app/`
+- `src/camera_calib_lab/app/charuco_auto_capture_app.py`
+- `src/camera_calib_lab/app/stereo_charuco_auto_capture_app.py`
+- `src/camera_calib_lab/app/display_windows.py`
+- `src/camera_calib_lab/app/keyboard.py`
+- `src/camera_calib_lab/app/overlay.py`
 - `src/camera_calib_lab/capture/`
 - `src/camera_calib_lab/commands/capture.py`
-- `src/camera_calib_lab/commands/target.py`
-- `src/camera_calib_lab/commands/detect.py`
-- `src/camera_calib_lab/commands/calibrate.py`
-- `src/camera_calib_lab/commands/package.py`
-- `src/camera_calib_lab/commands/inspect.py`
 - `src/camera_calib_lab/pipelines/capture_pipeline.py`
-- `src/camera_calib_lab/pipelines/detection_pipeline.py`
 - `src/camera_calib_lab/pipelines/calibration_pipeline.py`
-- `src/camera_calib_lab/pipelines/package_pipeline.py`
-- `src/camera_calib_lab/pipelines/target_pipeline.py`
-- `src/camera_calib_lab/targets/`
-- `src/camera_calib_lab/detection/`
+- `src/camera_calib_lab/targets/base.py`
+- `src/camera_calib_lab/targets/charuco.py`
+- `src/camera_calib_lab/detection/charuco.py`
+- `src/camera_calib_lab/detection/base.py`
+- `src/camera_calib_lab/detection/quality.py`
+- `src/camera_calib_lab/detection/subpixel.py`
 - `src/camera_calib_lab/solvers/`
-- `src/camera_calib_lab/packaging/`
 - Required `contracts/`, `io/`, `reports/`, `registries/`, `utils/`, and
-  `methods/` modules only as import errors require them.
+  `methods/` modules only as import errors require them for these two commands.
 - `configs/dfoptix_charuco_15mm_capture.yaml`
-- Focused tests for CLI surfaces, target generation, capture command contracts,
-  package export/verify, and GUI command construction.
 
 Do not move in the first pass:
 
+- tests and historical docs
+- passive GUI and phase GUI
+- standalone target CLI
+- inspect/detect/package command groups
 - simulation experiments
 - method comparison matrix
 - phase-screen experiments unless the OpenCV GUI import path requires a small
@@ -138,8 +136,8 @@ First acceptance checks:
 
 ```bash
 cd tools/calibration
-uv run pytest -q
 uv run camera-calib-lab --help
+uv run camera-calib-lab capture charuco-auto-gui --help
 uv run camera-calib-lab capture stereo-charuco-auto-gui --help
 ```
 
