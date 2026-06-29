@@ -19,6 +19,7 @@ TennisBot/
 
   tools/
     calibration/     standalone calibration package tool
+      frontend/review calibration artifact review GUI
     yolo/            standalone YOLO model package tool
 
   artifacts/         ignored local runtime artifacts
@@ -61,6 +62,9 @@ Owns mono/stereo calibration package production and verification. It does not
 own YOLO inference, trajectory prediction, or Live3D rendering. It can import
 existing CameraCalibLab calibration JSON into the runtime artifact contract
 without making the main runtime depend on CameraCalibLab source code.
+It also owns an isolated TypeScript/Bun review GUI under
+`tools/calibration/frontend/review` for artifact-shaped JSON review and command
+handoff.
 
 Default runtime output:
 
@@ -217,6 +221,15 @@ cd packages/contracts && bun test && bun run typecheck
 cd packages/core && bun test && bun run typecheck
 ```
 
+Run calibration review GUI:
+
+```bash
+cd tools/calibration/frontend/review
+bun test
+bun run build
+PORT=5188 bun run dev
+```
+
 ## Current Verification Evidence
 
 Most recent software verification:
@@ -224,6 +237,9 @@ Most recent software verification:
 ```text
 cd tools/calibration && uv run pytest -q
 Result: 19 passing tests, 0 failures.
+
+cd tools/calibration/frontend/review && bun test && bun run build
+Result: 6 passing tests, build passed.
 
 cd apps/live3d && bun test
 Result: 42 passing tests, 0 failures.

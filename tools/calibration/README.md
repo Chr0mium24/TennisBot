@@ -185,12 +185,29 @@ If stereo quality metrics exceed runtime warning thresholds, the package remains
 loadable for smoke testing but its summary records the warning before relying on
 3D prediction accuracy.
 
+## Review GUI
+
+The review GUI lives under `frontend/review` as an isolated TypeScript/Bun
+frontend:
+
+```bash
+cd tools/calibration/frontend/review
+bun test
+bun run build
+PORT=5188 bun run dev
+```
+
+It imports artifact-shaped JSON from the capture/check/detect/solve workflow,
+shows the current gate status, displays inspection and ChArUco tables, and
+generates the next CLI commands. It does not import Python calibration modules,
+YOLO tooling, or legacy lab source code.
+
 ## Migration Checklist
 
 - [ ] Freeze the current `CameraCalibLab` baseline and record its commit.
 - [ ] Confirm `uv run pytest -q` passes inside `CameraCalibLab`.
-- [ ] Confirm `cd frontend/review && bun test && bun run build` passes inside
-      `CameraCalibLab`.
+- [x] Confirm `cd frontend/review && bun test && bun run build` passes inside
+      `tools/calibration`.
 - [ ] Copy implementation files into `tools/calibration` without changing
       behavior.
 - [ ] Preserve `uv` for the Python project and `bun` for the TypeScript review

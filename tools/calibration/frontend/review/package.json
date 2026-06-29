@@ -1,0 +1,11 @@
+{
+  "name": "@tennisbot/calibration-review",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun ./scripts/build.ts",
+    "dev": "bun ./scripts/serve.ts",
+    "test": "bun test"
+  }
+}

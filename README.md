@@ -38,6 +38,15 @@ bun run typecheck
 bun run build
 ```
 
+Run calibration review GUI:
+
+```bash
+cd tools/calibration/frontend/review
+bun test
+bun run build
+PORT=5188 bun run dev
+```
+
 Create dry-run calibration artifacts:
 
 ```bash
@@ -136,6 +145,7 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 - [Calibration stereo solve](docs/calibration_stereo_solve_20260629.md)
 - [Calibration stereo solve capture quality](docs/calibration_stereo_solve_capture_quality_20260629.md)
 - [Calibration stereo solve ChArUco detection](docs/calibration_charuco_detection_stereo_solve_20260629.md)
+- [Calibration review GUI](docs/calibration_review_gui_20260629.md)
 - [Tool boundary audit](docs/tool_boundary_audit_20260629.md)
 - [Legacy board/runtime shell retirement](docs/legacy_board_retirement_20260629.md)
 - [Live3D hardware smoke](docs/live3d_hardware_smoke_20260629.md)

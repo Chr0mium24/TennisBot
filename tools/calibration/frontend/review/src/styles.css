@@ -1,0 +1,285 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f6f7f9;
+  color: #17202a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  background: #111827;
+  color: #eef2f7;
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.brand p,
+.stage p,
+.file-drop-detail {
+  margin: 4px 0 0;
+  color: #9ca3af;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.file-drop {
+  display: block;
+  border: 1px dashed #64748b;
+  border-radius: 8px;
+  padding: 16px;
+  cursor: pointer;
+  background: #1f2937;
+}
+
+.file-drop input {
+  display: none;
+}
+
+.file-drop-title {
+  display: block;
+  font-weight: 700;
+}
+
+.stage-list {
+  display: grid;
+  gap: 10px;
+}
+
+.stage {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: start;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 12px;
+  background: #172033;
+}
+
+.stage span {
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: #111827;
+  background: #cbd5e1;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.stage.ready span {
+  background: #7dd3fc;
+}
+
+.stage.blocked span {
+  background: #fca5a5;
+}
+
+.workspace {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #d7dde5;
+  background: #ffffff;
+}
+
+.tabs,
+.segmented {
+  display: inline-flex;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.tab,
+.segmented button,
+.secondary {
+  border: 0;
+  background: #ffffff;
+  color: #243244;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.tab.active,
+.segmented button.active {
+  background: #0f766e;
+  color: #ffffff;
+}
+
+.secondary {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+
+.panel-grid,
+.panel-stack {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.panel-grid {
+  grid-template-columns: minmax(320px, 0.95fr) minmax(340px, 1.05fr);
+}
+
+.panel {
+  min-width: 0;
+  border: 1px solid #d7dde5;
+  border-radius: 8px;
+  padding: 16px;
+  background: #ffffff;
+}
+
+.panel h2 {
+  margin: 0 0 14px;
+  font-size: 18px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: #17202a;
+}
+
+.toggle {
+  display: flex;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.toggle input {
+  width: auto;
+}
+
+pre {
+  margin: 0 0 12px;
+  overflow: auto;
+  border-radius: 8px;
+  background: #0b1220;
+  color: #e5eefc;
+  padding: 14px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.table-wrap {
+  overflow: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+th,
+td {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  color: #475569;
+  background: #f8fafc;
+  white-space: nowrap;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: minmax(140px, max-content) minmax(0, 1fr);
+  gap: 8px 14px;
+  margin: 0;
+  font-size: 14px;
+}
+
+.metrics dt {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.metrics dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.empty {
+  margin: 0;
+  color: #64748b;
+}
+
+@media (max-width: 880px) {
+  .shell,
+  .panel-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .tabs {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}

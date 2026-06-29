@@ -205,6 +205,20 @@ fixed-intrinsics stereo output into `artifacts/calibration/stereo_cam1_cam2`, an
 verified it with `accepted: true`, `dry_run: false`, and `hardware_validated:
 true`.
 
+### Calibration Review GUI
+
+```bash
+cd tools/calibration/frontend/review
+bun test
+bun run build
+```
+
+Result: 6 tests passed and the browser bundle built. The review GUI imports
+artifact-shaped JSON, summarizes capture/inspect/detect/mono/stereo gates,
+renders inspection and ChArUco tables, displays package metrics, and generates
+the next CLI commands. It does not import Python calibration internals or legacy
+lab source modules.
+
 Imported calibration quality warning:
 
 ```text
