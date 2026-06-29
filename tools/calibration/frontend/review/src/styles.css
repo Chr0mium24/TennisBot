@@ -92,6 +92,17 @@ input {
   white-space: nowrap;
 }
 
+.stage-action {
+  border: 1px solid #64748b;
+  border-radius: 6px;
+  padding: 4px 7px;
+  background: #1f2937;
+  color: #eef2f7;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 .stage.ready span {
   background: #7dd3fc;
 }

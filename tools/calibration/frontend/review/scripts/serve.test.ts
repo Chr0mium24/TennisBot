@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
-import { contentType, handleCalibrationRunRequest, resolveStaticRequestPath } from "./serve";
+import { contentType, handleCalibrationRunRequest, handlePhysicalStatusRequest, resolveStaticRequestPath } from "./serve";
 
 describe("calibration review server", () => {
   test("serves static dist files and artifact files inside allowed roots", () => {
@@ -44,6 +44,28 @@ describe("calibration review server", () => {
     expect(response.status).toBe(400);
     expect(payload.status).toBe("rejected");
     expect(payload.error).toContain("Only 'uv run tennisbot-calibration");
+  });
+
+  test("physical status endpoint is read-only", async () => {
+    const response = await handlePhysicalStatusRequest(
+      new Request("http://localhost/api/physical/status", {
+        method: "POST",
+      }),
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(405);
+    expect(payload.error).toBe("Use GET.");
+  });
+
+  test("physical status endpoint returns current status JSON", async () => {
+    const response = await handlePhysicalStatusRequest(new Request("http://localhost/api/physical/status"));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.schema_version).toBe("tennisbot.physical_validation_status.v1");
+    expect(["passed", "incomplete"]).toContain(payload.result);
+    expect(payload.gates.length).toBeGreaterThan(0);
   });
 });
 

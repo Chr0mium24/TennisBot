@@ -44,6 +44,9 @@ export function startServer() {
       if (url.pathname === "/api/calibration/run") {
         return handleCalibrationRunRequest(request);
       }
+      if (url.pathname === "/api/physical/status") {
+        return handlePhysicalStatusRequest(request);
+      }
       const resolvedPath = resolveStaticRequestPath(url.pathname);
       if (resolvedPath === null) return new Response("Not found", { status: 404 });
       return new Response(Bun.file(resolvedPath.filePath), {
@@ -73,6 +76,51 @@ export async function handleCalibrationRunRequest(request: Request): Promise<Res
   return jsonResponse(result, result.status === "rejected" ? 400 : 200);
 }
 
+export async function handlePhysicalStatusRequest(request: Request): Promise<Response> {
+  if (request.method !== "GET") {
+    return jsonResponse({ error: "Use GET." }, 405);
+  }
+  const timestamp = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const reportPath = `/tmp/tennisbot_physical_status_${timestamp}.md`;
+  const jsonPath = `/tmp/tennisbot_physical_status_${timestamp}.json`;
+  const childProcess = Bun.spawn(
+    [
+      "bun",
+      "scripts/physical-validation-status.ts",
+      "--output",
+      reportPath,
+      "--output-json",
+      jsonPath,
+    ],
+    {
+      cwd: repoRoot,
+      env: processEnv(),
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
+    },
+  );
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(childProcess.stdout).text(),
+    new Response(childProcess.stderr).text(),
+    childProcess.exited,
+  ]);
+  try {
+    const payload = await Bun.file(jsonPath).json();
+    return jsonResponse({ ...payload, report_path: reportPath, exit_code: exitCode });
+  } catch (error) {
+    return jsonResponse(
+      {
+        error: error instanceof Error ? error.message : String(error),
+        exit_code: exitCode,
+        stdout,
+        stderr,
+      },
+      500,
+    );
+  }
+}
+
 function decodePathname(pathname: string): string | null {
   try {
     const decoded = decodeURIComponent(pathname);
@@ -99,6 +147,10 @@ function jsonResponse(payload: unknown, status = 200): Response {
     status,
     headers: { "content-type": "application/json; charset=utf-8" },
   });
+}
+
+function processEnv(): Record<string, string> {
+  return Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined));
 }
 
 if (import.meta.main) {

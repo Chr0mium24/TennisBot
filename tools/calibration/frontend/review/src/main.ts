@@ -32,10 +32,18 @@ type CommandRunView = {
   stderr: string;
 };
 
+type PhysicalStatusView = {
+  status: "loading" | "ready" | "error";
+  result: string;
+  nextAction: string;
+  detail: string;
+};
+
 type AppState = {
   artifacts: ImportedArtifact[];
   activeTab: Tab;
   activePreset: FlowPreset;
+  physicalStatus: PhysicalStatusView;
   targetOptions: TargetCommandOptions;
   targetPrintCheckOptions: TargetPrintCheckCommandOptions;
   captureOptions: CaptureCommandOptions;
@@ -52,6 +60,12 @@ const state: AppState = {
   artifacts: [],
   activeTab: "target",
   activePreset: "stereo",
+  physicalStatus: {
+    status: "loading",
+    result: "loading",
+    nextAction: "Loading physical validation status.",
+    detail: "",
+  },
   sessionPath: "../../artifacts/calibration_sessions/stereo_session",
   observationsPath: "../../artifacts/calibration_sessions/stereo_session/observations.json",
   inspectionReportPath: "../../docs/calibration_capture_quality_YYYYMMDD.md",
@@ -105,6 +119,7 @@ if (app === null) {
 }
 
 render();
+void refreshPhysicalStatus();
 
 function render(): void {
   const targetSheet = latest(state.artifacts, "targetSheet")?.payload;
@@ -130,6 +145,7 @@ function render(): void {
           <input id="file-input" type="file" accept="application/json,.json" multiple>
         </label>
         <div class="stage-list">
+          ${renderPhysicalStatus()}
           ${summarizeWorkflow(state.artifacts).map(renderStage).join("")}
         </div>
       </aside>
@@ -158,6 +174,23 @@ function render(): void {
     </section>
   `;
   wireEvents();
+}
+
+function renderPhysicalStatus(): string {
+  const isReady = state.physicalStatus.status === "ready" && state.physicalStatus.result === "passed";
+  const isBlocked =
+    state.physicalStatus.status === "error" ||
+    (state.physicalStatus.status === "ready" && state.physicalStatus.result !== "passed");
+  return `
+    <article class="stage physical-status ${isReady ? "ready" : isBlocked ? "blocked" : ""}">
+      <div>
+        <strong>Physical Status</strong>
+        <p>${escapeHtml(state.physicalStatus.nextAction)}</p>
+        ${state.physicalStatus.detail === "" ? "" : `<p>${escapeHtml(state.physicalStatus.detail)}</p>`}
+      </div>
+      <button class="stage-action" id="refresh-physical-status" type="button">${state.physicalStatus.status === "loading" ? "..." : "Refresh"}</button>
+    </article>
+  `;
 }
 
 function renderStage(stage: ReturnType<typeof summarizeWorkflow>[number]): string {
@@ -554,6 +587,9 @@ function wireEvents(): void {
     state.artifacts = sampleArtifacts();
     render();
   });
+  document.querySelector("#refresh-physical-status")?.addEventListener("click", () => {
+    void refreshPhysicalStatus();
+  });
   document.querySelectorAll<HTMLButtonElement>("[data-flow-preset]").forEach((button) => {
     button.addEventListener("click", () => {
       applyFlowPreset(button.dataset.flowPreset as FlowPreset);
@@ -751,6 +787,7 @@ async function runCalibrationCommand(id: CommandId): Promise<void> {
     };
   }
   render();
+  void refreshPhysicalStatus();
 }
 
 function importGeneratedArtifacts(artifacts: unknown[] | undefined): number {
@@ -853,6 +890,42 @@ function display(value: unknown): string {
 
 function isJsonObject(value: unknown): value is JsonObject {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+async function refreshPhysicalStatus(): Promise<void> {
+  state.physicalStatus = {
+    ...state.physicalStatus,
+    status: "loading",
+    detail: "",
+  };
+  render();
+  try {
+    const response = await fetch("/api/physical/status");
+    const payload = (await response.json()) as { result?: unknown; next_action?: unknown; gates?: unknown[]; error?: unknown };
+    if (!response.ok) {
+      throw new Error(typeof payload.error === "string" ? payload.error : `Status request failed with ${response.status}.`);
+    }
+    const incompleteGateCount = Array.isArray(payload.gates)
+      ? payload.gates.filter((gate) => isJsonObject(gate) && gate.status !== "passed").length
+      : 0;
+    state.physicalStatus = {
+      status: "ready",
+      result: typeof payload.result === "string" ? payload.result : "unknown",
+      nextAction:
+        typeof payload.next_action === "string" && payload.next_action !== ""
+          ? payload.next_action
+          : "All physical validation gates have passed.",
+      detail: incompleteGateCount > 0 ? `${incompleteGateCount} gate(s) incomplete.` : "",
+    };
+  } catch (error) {
+    state.physicalStatus = {
+      status: "error",
+      result: "error",
+      nextAction: "Physical validation status is unavailable.",
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
+  render();
 }
 
 function escapeHtml(value: string): string {
