@@ -11,6 +11,7 @@ import {
   latest,
   observationRows,
   summarizeWorkflow,
+  targetSheetFileLinks,
   type CaptureCommandOptions,
   type ImportedArtifact,
   type JsonObject,
@@ -188,6 +189,7 @@ function renderTargetPanel(targetSheet: JsonObject | undefined): string {
       <article class="panel">
         <h2>Target Sheet</h2>
         ${targetSheetMetrics(targetSheet)}
+        ${targetSheetFiles(targetSheet)}
       </article>
     </section>
   `;
@@ -368,6 +370,25 @@ function targetSheetMetrics(payload: JsonObject | undefined): string {
     ["dpi", display(payload.dpi)],
   ];
   return `<dl class="metrics">${rows.map(([key, value]) => `<dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd>`).join("")}</dl>`;
+}
+
+function targetSheetFiles(payload: JsonObject | undefined): string {
+  const links = targetSheetFileLinks(payload);
+  if (links.length === 0) return "";
+  return `
+    <div class="file-links">
+      ${links
+        .map(
+          (link) => `
+            <a ${link.url === undefined ? "" : `href="${escapeHtml(link.url)}" target="_blank" rel="noreferrer"`}>
+              <strong>${escapeHtml(link.label)}</strong>
+              <span>${escapeHtml(link.path)}</span>
+            </a>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
 }
 
 function verificationMetrics(payload: JsonObject | undefined): string {

@@ -40,6 +40,12 @@ export type CaptureFramePreview = {
   imageUrl?: string;
 };
 
+export type ArtifactFileLink = {
+  label: string;
+  path: string;
+  url?: string;
+};
+
 export type CaptureCommandOptions = {
   topology: "mono" | "stereo";
   cameraId: string;
@@ -279,6 +285,16 @@ export function observationRows(payload: JsonObject | undefined): Array<Record<s
   });
 }
 
+export function targetSheetFileLinks(payload: JsonObject | undefined): ArtifactFileLink[] {
+  const files = objectField(payload, "files");
+  return ["svg", "png", "metadata"]
+    .map((label) => {
+      const path = stringField(files, label);
+      return path === undefined ? undefined : { label, path, url: artifactFileUrl(path) };
+    })
+    .filter((item): item is ArtifactFileLink => item !== undefined);
+}
+
 export function latest(artifacts: ImportedArtifact[], kind: ArtifactKind): ImportedArtifact | undefined {
   return [...artifacts].reverse().find((artifact) => artifact.kind === kind);
 }
@@ -364,7 +380,10 @@ function artifactImageUrl(sessionPath: string | undefined, framePath: string): s
         ? undefined
         : `${sessionPath}/${framePath}`;
   if (candidate === undefined) return undefined;
+  return artifactFileUrl(candidate, [".png", ".jpg", ".jpeg"]);
+}
 
+function artifactFileUrl(candidate: string, allowedExtensions = [".png", ".jpg", ".jpeg", ".svg", ".json"]): string | undefined {
   const segments = candidate.replaceAll("\\", "/").split("/");
   const artifactsIndex = segments.lastIndexOf("artifacts");
   if (artifactsIndex < 0) return undefined;
@@ -376,7 +395,7 @@ function artifactImageUrl(sessionPath: string | undefined, framePath: string): s
     return undefined;
   }
   const last = artifactSegments.at(-1)?.toLowerCase() ?? "";
-  if (![".png", ".jpg", ".jpeg"].some((extension) => last.endsWith(extension))) {
+  if (!allowedExtensions.some((extension) => last.endsWith(extension))) {
     return undefined;
   }
   return `/artifacts/${artifactSegments.map((segment) => encodeURIComponent(segment)).join("/")}`;

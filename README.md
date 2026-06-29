@@ -171,6 +171,7 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 - [Calibration review GUI](docs/calibration_review_gui_20260629.md)
 - [Calibration review GUI command bridge](docs/calibration_review_gui_command_bridge_20260629.md)
 - [Calibration GUI target command bridge fix](docs/calibration_gui_target_command_bridge_fix_20260629.md)
+- [Calibration GUI target file links](docs/calibration_gui_target_file_links_20260629.md)
 - [Tool boundary audit](docs/tool_boundary_audit_20260629.md)
 - [Legacy board/runtime shell retirement](docs/legacy_board_retirement_20260629.md)
 - [Live3D hardware smoke](docs/live3d_hardware_smoke_20260629.md)

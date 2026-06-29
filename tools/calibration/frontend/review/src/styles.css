@@ -365,6 +365,33 @@ th {
   overflow-wrap: anywhere;
 }
 
+.file-links {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.file-links a {
+  display: grid;
+  gap: 3px;
+  border: 1px solid #d7dde5;
+  border-radius: 8px;
+  padding: 10px;
+  color: #0f766e;
+  text-decoration: none;
+}
+
+.file-links a:hover {
+  border-color: #0f766e;
+  background: #f0fdfa;
+}
+
+.file-links span {
+  color: #475569;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
 .empty {
   margin: 0;
   color: #64748b;

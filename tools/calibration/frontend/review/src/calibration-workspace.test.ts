@@ -12,6 +12,7 @@ import {
   frameRows,
   observationRows,
   summarizeWorkflow,
+  targetSheetFileLinks,
   type ImportedArtifact,
 } from "./calibration-workspace";
 
@@ -186,6 +187,50 @@ describe("calibration review workspace", () => {
 
     expect(previews[0].imageUrl).toBeUndefined();
     expect(previews[1].imageUrl).toBe("/artifacts/calibration_sessions/session/frames/cam1_0001.png");
+  });
+
+  test("builds printable target sheet file links from artifact metadata", () => {
+    expect(
+      targetSheetFileLinks({
+        schema_version: "calibration.target_sheet.v1",
+        files: {
+          svg: "../../artifacts/calibration_targets/target.svg",
+          png: "../../artifacts/calibration_targets/target.png",
+          metadata: "../../artifacts/calibration_targets/target.json",
+        },
+      }),
+    ).toEqual([
+      {
+        label: "svg",
+        path: "../../artifacts/calibration_targets/target.svg",
+        url: "/artifacts/calibration_targets/target.svg",
+      },
+      {
+        label: "png",
+        path: "../../artifacts/calibration_targets/target.png",
+        url: "/artifacts/calibration_targets/target.png",
+      },
+      {
+        label: "metadata",
+        path: "../../artifacts/calibration_targets/target.json",
+        url: "/artifacts/calibration_targets/target.json",
+      },
+    ]);
+  });
+
+  test("does not link target files outside served artifact paths", () => {
+    expect(
+      targetSheetFileLinks({
+        schema_version: "calibration.target_sheet.v1",
+        files: {
+          svg: "../../docs/target.svg",
+          png: "../../artifacts/../secret.png",
+        },
+      }),
+    ).toEqual([
+      { label: "svg", path: "../../docs/target.svg", url: undefined },
+      { label: "png", path: "../../artifacts/../secret.png", url: undefined },
+    ]);
   });
 });
 
