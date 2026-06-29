@@ -219,11 +219,13 @@ It imports artifact-shaped JSON from the capture/check/detect/solve workflow,
 shows the current gate status, previews local capture PNG frames served from
 `/artifacts/...`, displays inspection and ChArUco tables, and generates the next
 CLI commands. The visible workflow begins with the printable Target step, then
-continues through capture, inspect, detect, and solve. The local Bun server can
-also execute a whitelisted subset of `uv run tennisbot-calibration ...` commands
-without invoking a shell, then return generated JSON artifacts for automatic
-import into the workspace. It does not import Python calibration modules, YOLO
-tooling, or legacy lab source code.
+continues through capture, inspect, detect, solve, and package verification.
+`Cam1 Mono`, `Cam2 Mono`, and `Stereo` presets keep capture, observations,
+solve, report, and verify paths aligned. The local Bun server can also execute a
+whitelisted subset of `uv run tennisbot-calibration ...` commands without
+invoking a shell, then return generated JSON artifacts for automatic import into
+the workspace. It does not import Python calibration modules, YOLO tooling, or
+legacy lab source code.
 
 ## Migration Checklist
 

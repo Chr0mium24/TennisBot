@@ -221,6 +221,10 @@ export function buildSolveCommand(options: SolveCommandOptions): string {
   ]);
 }
 
+export function buildVerifyCommand(path: string): string {
+  return joinCommand(["uv run tennisbot-calibration package verify", `--path ${quote(path)}`]);
+}
+
 export function frameRows(payload: JsonObject | undefined): Array<Record<string, string>> {
   const frames = arrayField(payload, "frames");
   return frames.map((frame) => {

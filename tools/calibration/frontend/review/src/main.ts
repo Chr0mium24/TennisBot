@@ -4,6 +4,7 @@ import {
   buildInspectCommand,
   buildSolveCommand,
   buildTargetCommand,
+  buildVerifyCommand,
   captureFramePreviews,
   classifyArtifact,
   frameRows,
@@ -18,7 +19,8 @@ import {
 } from "./calibration-workspace";
 
 type Tab = "target" | "capture" | "review" | "solve" | "packages";
-type CommandId = "target" | "capture" | "inspect" | "detect" | "solve";
+type CommandId = "target" | "capture" | "inspect" | "detect" | "solve" | "verify";
+type FlowPreset = "cam1Mono" | "cam2Mono" | "stereo";
 
 type CommandRunView = {
   status: "running" | "passed" | "failed" | "rejected" | "error";
@@ -30,6 +32,7 @@ type CommandRunView = {
 type AppState = {
   artifacts: ImportedArtifact[];
   activeTab: Tab;
+  activePreset: FlowPreset;
   targetOptions: TargetCommandOptions;
   captureOptions: CaptureCommandOptions;
   solveOptions: SolveCommandOptions;
@@ -37,16 +40,19 @@ type AppState = {
   observationsPath: string;
   inspectionReportPath: string;
   detectionReportPath: string;
+  verifyPath: string;
   commandRuns: Partial<Record<CommandId, CommandRunView>>;
 };
 
 const state: AppState = {
   artifacts: [],
   activeTab: "target",
+  activePreset: "stereo",
   sessionPath: "../../artifacts/calibration_sessions/stereo_session",
   observationsPath: "../../artifacts/calibration_sessions/stereo_session/observations.json",
   inspectionReportPath: "../../docs/calibration_capture_quality_YYYYMMDD.md",
   detectionReportPath: "../../docs/calibration_charuco_detection_YYYYMMDD.md",
+  verifyPath: "../../artifacts/calibration/stereo_cam1_cam2",
   commandRuns: {},
   targetOptions: {
     output: "../../artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.png",
@@ -97,6 +103,7 @@ function render(): void {
   const observations = latest(state.artifacts, "charucoObservations")?.payload;
   const monoPackage = latest(state.artifacts, "monoPackage")?.payload;
   const stereoPackage = latest(state.artifacts, "stereoPackage")?.payload;
+  const packageVerification = latest(state.artifacts, "packageVerification")?.payload;
   app.innerHTML = `
     <section class="shell">
       <aside class="sidebar">
@@ -124,13 +131,18 @@ function render(): void {
             ${renderTab("solve", "Solve")}
             ${renderTab("packages", "Packages")}
           </div>
+          <div class="preset-switch">
+            ${renderPresetButton("cam1Mono", "Cam1 Mono")}
+            ${renderPresetButton("cam2Mono", "Cam2 Mono")}
+            ${renderPresetButton("stereo", "Stereo")}
+          </div>
           <button class="secondary" id="load-sample">Load Sample</button>
         </header>
         ${state.activeTab === "target" ? renderTargetPanel(targetSheet) : ""}
         ${state.activeTab === "capture" ? renderCapturePanel() : ""}
         ${state.activeTab === "review" ? renderReviewPanel(manifest, inspection, observations) : ""}
         ${state.activeTab === "solve" ? renderSolvePanel() : ""}
-        ${state.activeTab === "packages" ? renderPackagesPanel(monoPackage, stereoPackage) : ""}
+        ${state.activeTab === "packages" ? renderPackagesPanel(monoPackage, stereoPackage, packageVerification) : ""}
       </section>
     </section>
   `;
@@ -151,6 +163,10 @@ function renderStage(stage: ReturnType<typeof summarizeWorkflow>[number]): strin
 
 function renderTab(tab: Tab, label: string): string {
   return `<button class="tab ${state.activeTab === tab ? "active" : ""}" data-tab="${tab}">${label}</button>`;
+}
+
+function renderPresetButton(preset: FlowPreset, label: string): string {
+  return `<button class="${state.activePreset === preset ? "active" : ""}" data-flow-preset="${preset}">${label}</button>`;
 }
 
 function renderTargetPanel(targetSheet: JsonObject | undefined): string {
@@ -297,7 +313,11 @@ function renderSolvePanel(): string {
   `;
 }
 
-function renderPackagesPanel(monoPackage: JsonObject | undefined, stereoPackage: JsonObject | undefined): string {
+function renderPackagesPanel(
+  monoPackage: JsonObject | undefined,
+  stereoPackage: JsonObject | undefined,
+  packageVerification: JsonObject | undefined,
+): string {
   return `
     <section class="panel-grid">
       <article class="panel">
@@ -307,6 +327,15 @@ function renderPackagesPanel(monoPackage: JsonObject | undefined, stereoPackage:
       <article class="panel">
         <h2>Stereo Package</h2>
         ${packageMetrics(stereoPackage, ["camera_ids", "accepted", "dry_run", "hardware_validated"])}
+      </article>
+      <article class="panel command-panel">
+        <h2>Verify</h2>
+        ${verifyField("verifyPath", "Package", state.verifyPath)}
+        ${commandBlock("verify", "Verify package", buildCommand("verify"))}
+      </article>
+      <article class="panel">
+        <h2>Verification</h2>
+        ${verificationMetrics(packageVerification)}
       </article>
     </section>
   `;
@@ -337,6 +366,19 @@ function targetSheetMetrics(payload: JsonObject | undefined): string {
     ["square_mm", display(typeof target.square_size_m === "number" ? target.square_size_m * 1000 : undefined)],
     ["board_mm", `${display(board.width)} x ${display(board.height)}`],
     ["dpi", display(payload.dpi)],
+  ];
+  return `<dl class="metrics">${rows.map(([key, value]) => `<dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd>`).join("")}</dl>`;
+}
+
+function verificationMetrics(payload: JsonObject | undefined): string {
+  if (payload === undefined) return `<p class="empty">No verification loaded.</p>`;
+  const rows = [
+    ["accepted", display(payload.accepted)],
+    ["package_kind", display(payload.package_kind)],
+    ["package_dir", display(payload.package_dir)],
+    ["dry_run", display(payload.dry_run)],
+    ["hardware_validated", display(payload.hardware_validated)],
+    ["details", Array.isArray(payload.details) ? payload.details.join(", ") : display(payload.details)],
   ];
   return `<dl class="metrics">${rows.map(([key, value]) => `<dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd>`).join("")}</dl>`;
 }
@@ -390,6 +432,7 @@ function buildCommand(id: CommandId): string {
   if (id === "capture") return buildCaptureCommand(state.captureOptions);
   if (id === "inspect") return buildInspectCommand(state.sessionPath, state.inspectionReportPath);
   if (id === "detect") return buildDetectCommand(state.sessionPath, state.observationsPath, state.detectionReportPath);
+  if (id === "verify") return buildVerifyCommand(state.verifyPath);
   return buildSolveCommand(state.solveOptions);
 }
 
@@ -417,6 +460,10 @@ function solveNumberField(key: keyof SolveCommandOptions, label: string, value: 
   return visible ? `<label>${label}<input data-solve-field="${key}" type="number" step="0.1" value="${value}"></label>` : "";
 }
 
+function verifyField(key: "verifyPath", label: string, value: string): string {
+  return `<label>${label}<input data-verify-field="${key}" value="${escapeHtml(value)}"></label>`;
+}
+
 function wireEvents(): void {
   document.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -437,6 +484,12 @@ function wireEvents(): void {
     state.artifacts = sampleArtifacts();
     render();
   });
+  document.querySelectorAll<HTMLButtonElement>("[data-flow-preset]").forEach((button) => {
+    button.addEventListener("click", () => {
+      applyFlowPreset(button.dataset.flowPreset as FlowPreset);
+      render();
+    });
+  });
   document.querySelectorAll<HTMLInputElement>("[data-target-field]").forEach((input) => {
     input.addEventListener("input", () => {
       const key = input.dataset.targetField as keyof TargetCommandOptions;
@@ -454,7 +507,7 @@ function wireEvents(): void {
     input.addEventListener("input", () => {
       const key = input.dataset.captureField as keyof CaptureCommandOptions;
       (state.captureOptions[key] as string | number) = input.type === "number" ? Number(input.value) : input.value;
-      if (key === "output") state.sessionPath = input.value;
+      if (key === "output") updateSessionPaths(input.value);
       render();
     });
   });
@@ -472,6 +525,14 @@ function wireEvents(): void {
     input.addEventListener("input", () => {
       const key = input.dataset.solveField as keyof SolveCommandOptions;
       (state.solveOptions[key] as string | number) = input.type === "number" ? Number(input.value) : input.value;
+      if (key === "output") state.verifyPath = input.value;
+      if (key === "observations") state.observationsPath = input.value;
+      render();
+    });
+  });
+  document.querySelectorAll<HTMLInputElement>("[data-verify-field]").forEach((input) => {
+    input.addEventListener("input", () => {
+      state.verifyPath = input.value;
       render();
     });
   });
@@ -481,6 +542,90 @@ function wireEvents(): void {
       void runCalibrationCommand(id);
     });
   });
+}
+
+function applyFlowPreset(preset: FlowPreset): void {
+  state.activePreset = preset;
+  if (preset === "cam1Mono") {
+    applyMonoPreset({
+      cameraId: "cam1",
+      device: "/dev/video0",
+      session: "../../artifacts/calibration_sessions/cam1_session",
+      packagePath: "../../artifacts/calibration/cam1",
+      inspectReport: "../../docs/calibration_capture_quality_cam1_YYYYMMDD.md",
+      detectReport: "../../docs/calibration_charuco_detection_cam1_YYYYMMDD.md",
+    });
+    return;
+  }
+  if (preset === "cam2Mono") {
+    applyMonoPreset({
+      cameraId: "cam2",
+      device: "/dev/video2",
+      session: "../../artifacts/calibration_sessions/cam2_session",
+      packagePath: "../../artifacts/calibration/cam2",
+      inspectReport: "../../docs/calibration_capture_quality_cam2_YYYYMMDD.md",
+      detectReport: "../../docs/calibration_charuco_detection_cam2_YYYYMMDD.md",
+    });
+    return;
+  }
+
+  const session = "../../artifacts/calibration_sessions/stereo_session";
+  const packagePath = "../../artifacts/calibration/stereo_cam1_cam2";
+  state.captureOptions = {
+    ...state.captureOptions,
+    topology: "stereo",
+    leftCameraId: "cam1",
+    rightCameraId: "cam2",
+    leftDevice: "/dev/video0",
+    rightDevice: "/dev/video2",
+    output: session,
+  };
+  state.solveOptions = {
+    ...state.solveOptions,
+    topology: "stereo",
+    observations: `${session}/observations.json`,
+    output: packagePath,
+    leftMono: "../../artifacts/calibration/cam1",
+    rightMono: "../../artifacts/calibration/cam2",
+  };
+  state.inspectionReportPath = "../../docs/calibration_capture_quality_stereo_YYYYMMDD.md";
+  state.detectionReportPath = "../../docs/calibration_charuco_detection_stereo_YYYYMMDD.md";
+  updateSessionPaths(session);
+  state.verifyPath = packagePath;
+}
+
+function applyMonoPreset(options: {
+  cameraId: string;
+  device: string;
+  session: string;
+  packagePath: string;
+  inspectReport: string;
+  detectReport: string;
+}): void {
+  state.captureOptions = {
+    ...state.captureOptions,
+    topology: "mono",
+    cameraId: options.cameraId,
+    device: options.device,
+    output: options.session,
+  };
+  state.solveOptions = {
+    ...state.solveOptions,
+    topology: "mono",
+    observations: `${options.session}/observations.json`,
+    output: options.packagePath,
+    cameraId: options.cameraId,
+  };
+  state.inspectionReportPath = options.inspectReport;
+  state.detectionReportPath = options.detectReport;
+  updateSessionPaths(options.session);
+  state.verifyPath = options.packagePath;
+}
+
+function updateSessionPaths(session: string): void {
+  state.sessionPath = session;
+  state.observationsPath = `${session}/observations.json`;
+  state.solveOptions.observations = state.observationsPath;
 }
 
 async function runCalibrationCommand(id: CommandId): Promise<void> {

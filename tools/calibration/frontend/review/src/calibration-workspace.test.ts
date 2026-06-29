@@ -6,6 +6,7 @@ import {
   buildInspectCommand,
   buildSolveCommand,
   buildTargetCommand,
+  buildVerifyCommand,
   captureFramePreviews,
   classifyArtifact,
   frameRows,
@@ -20,6 +21,7 @@ describe("calibration review workspace", () => {
     expect(classifyArtifact({ schema_version: "calibration.capture_session.v1" })).toBe("captureManifest");
     expect(classifyArtifact({ schema_version: "calibration.capture_inspection.v1" })).toBe("captureInspection");
     expect(classifyArtifact({ schema_version: "calibration.charuco_observations.v1" })).toBe("charucoObservations");
+    expect(classifyArtifact({ schema_version: "calibration.package_verification.v1" })).toBe("packageVerification");
     expect(classifyArtifact({ schema_version: "calibration.mono.v1" })).toBe("monoPackage");
     expect(classifyArtifact({ package_type: "stereo_camera_calibration" })).toBe("stereoPackage");
     expect(classifyArtifact({ schema_version: "unknown" })).toBe("unknown");
@@ -103,6 +105,7 @@ describe("calibration review workspace", () => {
         maxRmsPx: 2,
       }),
     ).toContain("calibrate stereo");
+    expect(buildVerifyCommand("../../artifacts/calibration/stereo_cam1_cam2")).toContain("package verify");
   });
 
   test("extracts inspection and observation table rows", () => {

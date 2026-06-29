@@ -116,7 +116,8 @@ input {
 }
 
 .tabs,
-.segmented {
+.segmented,
+.preset-switch {
   display: inline-flex;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
@@ -125,6 +126,7 @@ input {
 
 .tab,
 .segmented button,
+.preset-switch button,
 .secondary {
   border: 0;
   background: #ffffff;
@@ -134,7 +136,8 @@ input {
 }
 
 .tab.active,
-.segmented button.active {
+.segmented button.active,
+.preset-switch button.active {
   background: #0f766e;
   color: #ffffff;
 }
@@ -381,6 +384,11 @@ th {
   .tabs {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
+  }
+
+  .preset-switch {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
   }
 
   .form-grid {
