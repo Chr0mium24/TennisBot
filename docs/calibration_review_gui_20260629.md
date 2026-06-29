@@ -27,7 +27,7 @@ PORT=5188 bun run dev
 ## Result
 
 ```text
-bun test: 11 passed.
+bun test: 12 passed.
 bun run build: main.js built under dist/assets; static index/styles copied.
 ```
 
@@ -42,6 +42,9 @@ The UI provides:
 - capture command builder for mono/stereo sessions;
 - local whitelisted command execution for capture, inspect, detect, mono solve,
   stereo solve, and package verify through the Bun review server;
+- automatic import of generated JSON artifacts returned by successful command
+  runs, including `manifest.json`, `inspection.json`, `observations.json`,
+  package `package.json`, and package verification JSON;
 - inspection and ChArUco observation tables;
 - mono/stereo solve command builder;
 - mono/stereo package metric panels;

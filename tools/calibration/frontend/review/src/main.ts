@@ -435,13 +435,16 @@ async function runCalibrationCommand(id: CommandId): Promise<void> {
       stdout?: string;
       stderr?: string;
       error?: string;
+      artifacts?: unknown[];
     };
     const status = payload.status ?? (response.ok ? "passed" : "error");
+    const importedArtifactCount = importGeneratedArtifacts(payload.artifacts);
     state.commandRuns[id] = {
       status,
       detail:
-        payload.error ??
-        `Exit ${payload.exitCode ?? "unknown"} after ${payload.durationMs ?? "unknown"} ms.`,
+        (payload.error ??
+          `Exit ${payload.exitCode ?? "unknown"} after ${payload.durationMs ?? "unknown"} ms.`) +
+        (importedArtifactCount > 0 ? ` Imported ${importedArtifactCount} artifact(s).` : ""),
       stdout: payload.stdout ?? "",
       stderr: payload.stderr ?? "",
     };
@@ -454,6 +457,25 @@ async function runCalibrationCommand(id: CommandId): Promise<void> {
     };
   }
   render();
+}
+
+function importGeneratedArtifacts(artifacts: unknown[] | undefined): number {
+  if (!Array.isArray(artifacts)) return 0;
+  let importedCount = 0;
+  for (const artifact of artifacts) {
+    if (!isJsonObject(artifact) || !isJsonObject(artifact.payload)) continue;
+    const name = typeof artifact.name === "string" ? artifact.name : "generated.json";
+    const path = typeof artifact.path === "string" ? artifact.path : name;
+    const payload = artifact.payload;
+    state.artifacts.push({
+      id: `${path}:${Date.now()}:${importedCount}`,
+      name: path,
+      kind: classifyArtifact(payload),
+      payload,
+    });
+    importedCount += 1;
+  }
+  return importedCount;
 }
 
 async function importFiles(files: FileList | null): Promise<void> {
@@ -514,6 +536,10 @@ function display(value: unknown): string {
   if (typeof value === "number") return String(Number(value.toFixed(6)));
   if (typeof value === "boolean") return String(value);
   return typeof value === "string" ? value : "-";
+}
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function escapeHtml(value: string): string {

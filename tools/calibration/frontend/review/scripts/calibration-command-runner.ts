@@ -1,9 +1,18 @@
-import { resolve, sep } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { basename, join, resolve, sep } from "node:path";
 
 export type CalibrationCommandPlan = {
   command: string;
+  commandKey: string;
   argv: string[];
   cwd: string;
+  repoRoot: string;
+};
+
+export type GeneratedCalibrationArtifact = {
+  name: string;
+  path: string;
+  payload: Record<string, unknown>;
 };
 
 export type CalibrationCommandRunResult = {
@@ -13,6 +22,7 @@ export type CalibrationCommandRunResult = {
   durationMs: number;
   stdout: string;
   stderr: string;
+  artifacts: GeneratedCalibrationArtifact[];
   error?: string;
 };
 
@@ -148,9 +158,37 @@ export function createCalibrationCommandPlan(
   validateFlags(tokens.slice(5), allowedFlags, roots);
   return {
     command: tokens.join(" "),
+    commandKey,
     argv: tokens,
     cwd: roots.calibrationRoot,
+    repoRoot: roots.repoRoot,
   };
+}
+
+export function collectGeneratedCalibrationArtifacts(
+  plan: CalibrationCommandPlan,
+  stdout = "",
+): GeneratedCalibrationArtifact[] {
+  const artifacts: GeneratedCalibrationArtifact[] = [];
+  if (plan.commandKey === "capture mono" || plan.commandKey === "capture stereo") {
+    pushJsonArtifact(artifacts, plan, pathFromFlag(plan, "--output", "manifest.json"));
+  } else if (plan.commandKey === "capture inspect") {
+    pushJsonArtifact(artifacts, plan, pathFromFlag(plan, "--session", "inspection.json"));
+  } else if (plan.commandKey === "capture detect-charuco") {
+    pushJsonArtifact(artifacts, plan, pathFromFlag(plan, "--output"));
+  } else if (plan.commandKey === "calibrate mono" || plan.commandKey === "calibrate stereo") {
+    pushJsonArtifact(artifacts, plan, pathFromFlag(plan, "--output", "package.json"));
+  } else if (plan.commandKey === "package verify") {
+    const payload = parseJsonObject(stdout);
+    if (payload !== undefined) {
+      artifacts.push({
+        name: "package-verification.json",
+        path: "stdout:package-verification",
+        payload,
+      });
+    }
+  }
+  return artifacts;
 }
 
 export async function runCalibrationCommand(
@@ -169,6 +207,7 @@ export async function runCalibrationCommand(
       durationMs: Date.now() - started,
       stdout: "",
       stderr: "",
+      artifacts: [],
       error: formatUnknownError(error),
     };
   }
@@ -198,6 +237,7 @@ export async function runCalibrationCommand(
     new Response(process.stderr).text(),
   ]);
   const durationMs = Date.now() - started;
+  const artifacts = collectGeneratedCalibrationArtifacts(plan, stdout);
 
   return {
     status: exitCode === 0 && !timedOut ? "passed" : "failed",
@@ -206,7 +246,55 @@ export async function runCalibrationCommand(
     durationMs,
     stdout: truncateOutput(stdout),
     stderr: truncateOutput(timedOut ? `${stderr}\nTimed out after ${timeoutMs} ms.` : stderr),
+    artifacts,
   };
+}
+
+function pathFromFlag(
+  plan: CalibrationCommandPlan,
+  flag: string,
+  childPath?: string,
+): string | undefined {
+  const index = plan.argv.indexOf(flag);
+  if (index < 0) return undefined;
+  const value = plan.argv[index + 1];
+  if (value === undefined) return undefined;
+  const resolvedPath = resolve(plan.cwd, value);
+  return childPath === undefined ? resolvedPath : join(resolvedPath, childPath);
+}
+
+function pushJsonArtifact(
+  artifacts: GeneratedCalibrationArtifact[],
+  plan: CalibrationCommandPlan,
+  path: string | undefined,
+): void {
+  if (path === undefined || !existsSync(path)) return;
+  if (!isInside(path, resolve(plan.repoRoot, "artifacts"))) return;
+  const payload = parseJsonObject(readFileSync(path, "utf-8"));
+  if (payload === undefined) return;
+  artifacts.push({
+    name: basename(path),
+    path: displayPath(plan, path),
+    payload,
+  });
+}
+
+function displayPath(plan: CalibrationCommandPlan, path: string): string {
+  const resolvedRoot = resolve(plan.repoRoot);
+  return path === resolvedRoot || !path.startsWith(`${resolvedRoot}${sep}`)
+    ? path
+    : path.slice(resolvedRoot.length + 1);
+}
+
+function parseJsonObject(text: string): Record<string, unknown> | undefined {
+  try {
+    const value = JSON.parse(text);
+    return value !== null && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function validateFlags(tokens: string[], allowedFlags: Set<string>, roots: RunnerRoots): void {
@@ -299,10 +387,14 @@ function tokenizeCommand(command: string): string[] {
 }
 
 function assertInside(path: string, root: string, message: string): void {
-  const resolvedRoot = resolve(root);
-  if (path !== resolvedRoot && !path.startsWith(`${resolvedRoot}${sep}`)) {
+  if (!isInside(path, root)) {
     throw new Error(message);
   }
+}
+
+function isInside(path: string, root: string): boolean {
+  const resolvedRoot = resolve(root);
+  return path === resolvedRoot || path.startsWith(`${resolvedRoot}${sep}`);
 }
 
 function truncateOutput(output: string): string {

@@ -31,6 +31,11 @@ command. Results are rendered inline with status, exit code/duration detail,
 stdout, and stderr. Rejected commands return a structured `rejected` result
 instead of being executed.
 
+When a command writes a JSON artifact, the server returns it with the command
+result. The browser automatically imports returned JSON artifacts into the
+review workspace, so a capture/inspect/detect/solve sequence can update the gate
+state without manual file picker steps.
+
 The review server now binds to `127.0.0.1` by default because it can execute
 local commands. Set `HOST=0.0.0.0` only for deliberate LAN exposure.
 
@@ -49,14 +54,15 @@ uv run pytest -q
 Results:
 
 ```text
-bun test: 11 passed, 0 failed.
+bun test: 12 passed, 0 failed.
 bun run build: passed.
 uv run pytest -q: 19 passed.
 ```
 
 The added tests cover command planning without shell execution, rejection of
 non-whitelisted commands, rejection of unsafe paths/devices, and API rejection
-responses.
+responses, plus generated JSON artifact collection from command output paths and
+`package verify` stdout.
 
 Local API smoke:
 
@@ -75,6 +81,7 @@ package_kind: stereo
 accepted: true
 dry_run: false
 hardware_validated: true
+returned_artifacts: 1
 ```
 
 ## Remaining Field Work

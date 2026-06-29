@@ -1,10 +1,13 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
-import { createCalibrationCommandPlan } from "./calibration-command-runner";
+import {
+  collectGeneratedCalibrationArtifacts,
+  createCalibrationCommandPlan,
+} from "./calibration-command-runner";
 
 describe("calibration command runner", () => {
   test("plans whitelisted calibration commands without invoking a shell", () => {
@@ -54,6 +57,57 @@ describe("calibration command runner", () => {
           roots,
         ),
       ).toThrow("--device must be a /dev/videoN device path.");
+    } finally {
+      rmSync(roots.repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("collects generated JSON artifacts from command output paths", () => {
+    const roots = tempRoots();
+    try {
+      const sessionDir = join(roots.repoRoot, "artifacts", "calibration_sessions", "stereo_session");
+      mkdirSync(sessionDir, { recursive: true });
+      writeFileSync(
+        join(sessionDir, "inspection.json"),
+        JSON.stringify({
+          schema_version: "calibration.capture_inspection.v1",
+          accepted: true,
+        }),
+      );
+      const plan = createCalibrationCommandPlan(
+        [
+          "uv run tennisbot-calibration capture inspect",
+          "--session ../../artifacts/calibration_sessions/stereo_session",
+          "--output-report ../../docs/calibration_capture_quality.md",
+        ].join(" "),
+        roots,
+      );
+
+      expect(collectGeneratedCalibrationArtifacts(plan)).toEqual([
+        {
+          name: "inspection.json",
+          path: "artifacts/calibration_sessions/stereo_session/inspection.json",
+          payload: {
+            schema_version: "calibration.capture_inspection.v1",
+            accepted: true,
+          },
+        },
+      ]);
+
+      const verifyPlan = createCalibrationCommandPlan(
+        "uv run tennisbot-calibration package verify --path ../../artifacts/calibration/stereo_cam1_cam2",
+        roots,
+      );
+      expect(
+        collectGeneratedCalibrationArtifacts(
+          verifyPlan,
+          JSON.stringify({ schema_version: "calibration.package_verification.v1", accepted: true }),
+        )[0],
+      ).toMatchObject({
+        name: "package-verification.json",
+        path: "stdout:package-verification",
+        payload: { schema_version: "calibration.package_verification.v1", accepted: true },
+      });
     } finally {
       rmSync(roots.repoRoot, { recursive: true, force: true });
     }

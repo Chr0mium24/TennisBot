@@ -65,7 +65,8 @@ without making the main runtime depend on CameraCalibLab source code.
 It also owns an isolated TypeScript/Bun review GUI under
 `tools/calibration/frontend/review` for artifact-shaped JSON review and command
 handoff. The GUI server includes a local-only whitelist command bridge for
-running reviewed calibration CLI commands.
+running reviewed calibration CLI commands and returning generated JSON artifacts
+to the browser workspace.
 
 Default runtime output:
 
@@ -247,7 +248,7 @@ cd tools/calibration && uv run pytest -q
 Result: 19 passing tests, 0 failures.
 
 cd tools/calibration/frontend/review && bun test && bun run build
-Result: 11 passing tests, build passed.
+Result: 12 passing tests, build passed.
 
 cd apps/live3d && bun test
 Result: 44 passing tests, 0 failures.

@@ -201,7 +201,8 @@ It imports artifact-shaped JSON from the capture/check/detect/solve workflow,
 shows the current gate status, previews local capture PNG frames served from
 `/artifacts/...`, displays inspection and ChArUco tables, and generates the next
 CLI commands. The local Bun server can also execute a whitelisted subset of
-`uv run tennisbot-calibration ...` commands without invoking a shell. It does not
+`uv run tennisbot-calibration ...` commands without invoking a shell, then return
+generated JSON artifacts for automatic import into the workspace. It does not
 import Python calibration modules, YOLO tooling, or legacy lab source code.
 
 ## Migration Checklist
