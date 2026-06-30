@@ -90,7 +90,7 @@ bun scripts/calib.ts brightness --devices /dev/video0,/dev/video2
 
 ## 相机视频调试
 
-双目预览并调快门/增益：
+双目预览并调快门/增益/亮度：
 
 ```bash
 bun scripts/calib.ts preview
@@ -106,7 +106,7 @@ bun scripts/calib.ts preview cam2
 指定初始参数：
 
 ```bash
-bun scripts/calib.ts preview cam2 --shutter 400 --gain 64
+bun scripts/calib.ts preview cam2 --shutter 400 --gain 64 --brightness 32
 ```
 
 默认值：
@@ -117,12 +117,13 @@ bun scripts/calib.ts preview cam2 --shutter 400 --gain 64
 - 分辨率：`1280x720`
 - 帧率：`30`
 - 输入格式：`MJPG`
-- 默认切到手动曝光，方便滑条调整快门
+- 默认切到手动曝光，并将 `shutter`、`gain`、`brightness` 初始化到高可见值，方便先看到画面再下调
 
 窗口操作：
 
 - 滑条：`shutter` 调 `exposure_time_absolute`
 - 滑条：`gain` 调 UVC `gain`
+- 滑条：`brightness` 调 UVC `brightness`
 - 退出：`q` 或 `esc`
 
 ## 底层标定工具

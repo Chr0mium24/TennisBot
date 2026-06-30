@@ -101,6 +101,7 @@ def camera_preview(args: argparse.Namespace) -> int:
             fourcc=str(args.fourcc),
             exposure=None if args.exposure is None else int(args.exposure),
             gain=None if args.gain is None else int(args.gain),
+            brightness=None if args.brightness is None else int(args.brightness),
             auto_exposure=bool(args.auto_exposure),
             dry_run=bool(args.dry_run),
             max_width=int(args.max_width),
@@ -207,6 +208,7 @@ def build_parser() -> argparse.ArgumentParser:
     preview.add_argument("--fourcc", default="MJPG", help="OpenCV FourCC")
     preview.add_argument("--shutter", "--exposure", dest="exposure", type=int, default=None, help="初始 exposure_time_absolute")
     preview.add_argument("--gain", type=int, default=None, help="初始 gain")
+    preview.add_argument("--brightness", type=int, default=None, help="初始 brightness")
     preview.add_argument("--auto-exposure", action="store_true", help="保留自动曝光；默认切到手动曝光以允许调快门")
     preview.add_argument("--max-width", type=int, default=760, help="单路画面的最大预览宽度")
     preview.add_argument("--dry-run", action="store_true", help="只打印设备和控制项，不打开视频窗口")

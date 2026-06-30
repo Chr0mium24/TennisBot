@@ -38,6 +38,8 @@ type CommandStep = {
   args: string[];
 };
 
+type ForwardedSignal = "SIGINT" | "SIGTERM";
+
 const repoRoot = resolve(import.meta.dirname, "..");
 const calibrationCwd = resolve(repoRoot, "tools/calibration");
 const calibrationCommand = ["uv", "run", "camera-calib-lab"];
@@ -202,7 +204,32 @@ async function runStep(step: CommandStep, dryRun: boolean): Promise<number> {
     stdout: "inherit",
     stderr: "inherit",
   });
-  return await proc.exited;
+  return await waitForChild(proc);
+}
+
+async function waitForChild(proc: ReturnType<typeof Bun.spawn>): Promise<number> {
+  const signals: ForwardedSignal[] = ["SIGINT", "SIGTERM"];
+  const removers: Array<() => void> = [];
+  let forceKillTimer: ReturnType<typeof setTimeout> | undefined;
+  let terminating = false;
+
+  for (const signal of signals) {
+    const handler = () => {
+      proc.kill(signal);
+      if (terminating) return;
+      terminating = true;
+      forceKillTimer = setTimeout(() => proc.kill("SIGKILL"), 2000);
+    };
+    process.on(signal, handler);
+    removers.push(() => process.off(signal, handler));
+  }
+
+  try {
+    return await proc.exited;
+  } finally {
+    if (forceKillTimer !== undefined) clearTimeout(forceKillTimer);
+    for (const remove of removers) remove();
+  }
 }
 
 function parseMonoOptions(args: string[]): MonoOptions {
@@ -500,6 +527,7 @@ function printPreviewUsage(): void {
   --shutter <n>
   --exposure <n>
   --gain <n>
+  --brightness <n>
   --auto-exposure
   --width <px>
   --height <px>
@@ -507,7 +535,7 @@ function printPreviewUsage(): void {
   --dry-run
 
 窗口:
-  滑条调 shutter/exposure_time_absolute 和 gain。
+  滑条调 shutter/exposure_time_absolute、gain 和 brightness。
   q 或 esc 退出。
 `);
 }

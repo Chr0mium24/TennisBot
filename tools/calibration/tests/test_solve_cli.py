@@ -6,11 +6,14 @@ import unittest
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
+from unittest.mock import patch
 
 import cv2
 import numpy as np
 
+from camera_calib_lab.camera_preview import V4L2Control
 from camera_calib_lab.cli import main
+from camera_calib_lab.capture_gui import parse_device
 from camera_calib_lab.solve import target_payload
 
 
@@ -35,6 +38,27 @@ class SolveCliTest(unittest.TestCase):
         report = json.loads(output.getvalue())
         self.assertEqual(report["status"], "dry-run")
         self.assertEqual([camera["device"] for camera in report["cameras"]], ["/dev/video0", "/dev/video2"])
+
+    def test_camera_preview_dry_run_uses_visible_manual_defaults(self) -> None:
+        controls = {
+            "exposure_time_absolute": V4L2Control("exposure_time_absolute", 3, 2047, 1, 166, 166),
+            "gain": V4L2Control("gain", 0, 255, 1, 32, 32),
+            "brightness": V4L2Control("brightness", -64, 64, 1, -5, -5),
+        }
+        output = StringIO()
+        with patch("camera_calib_lab.camera_preview.read_v4l2_controls", return_value=controls):
+            with redirect_stdout(output):
+                code = main(["camera", "preview", "--dry-run", "--device", "/dev/video0"])
+        self.assertEqual(code, 0)
+        camera = json.loads(output.getvalue())["cameras"][0]
+        self.assertEqual(camera["exposure_time_absolute"]["selected"], 2047)
+        self.assertEqual(camera["gain"]["selected"], 255)
+        self.assertEqual(camera["brightness"]["selected"], 64)
+
+    def test_parse_dev_video_path_as_v4l2_index(self) -> None:
+        self.assertEqual(parse_device("/dev/video2"), 2)
+        self.assertEqual(parse_device("1"), 1)
+        self.assertEqual(parse_device("/tmp/video"), "/tmp/video")
 
     def test_mono_solve_writes_runtime_package(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

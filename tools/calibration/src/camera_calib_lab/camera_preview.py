@@ -13,6 +13,7 @@ from camera_calib_lab.capture_gui import CameraConfig, OpenCVCamera, preview_siz
 
 EXPOSURE_CONTROL = "exposure_time_absolute"
 GAIN_CONTROL = "gain"
+BRIGHTNESS_CONTROL = "brightness"
 AUTO_EXPOSURE_CONTROL = "auto_exposure"
 MANUAL_AUTO_EXPOSURE_VALUE = 1
 AUTO_EXPOSURE_VALUE = 3
@@ -44,6 +45,7 @@ class PreviewOptions:
     fourcc: str
     exposure: int | None
     gain: int | None
+    brightness: int | None
     auto_exposure: bool
     dry_run: bool
     max_width: int
@@ -58,7 +60,16 @@ class PreviewCamera:
 
 
 class CameraControls:
-    def __init__(self, *, device: str, label: str, exposure: int | None, gain: int | None, auto_exposure: bool) -> None:
+    def __init__(
+        self,
+        *,
+        device: str,
+        label: str,
+        exposure: int | None,
+        gain: int | None,
+        brightness: int | None,
+        auto_exposure: bool,
+    ) -> None:
         self.device = device
         self.label = label
         self.auto_exposure = auto_exposure
@@ -66,10 +77,14 @@ class CameraControls:
         controls = read_v4l2_controls(device)
         self.exposure = controls.get(EXPOSURE_CONTROL, fallback_control(EXPOSURE_CONTROL, 1, 2047, 1, 250))
         self.gain = controls.get(GAIN_CONTROL, fallback_control(GAIN_CONTROL, 0, 255, 1, 64))
-        self.exposure_value = self.exposure.clamp(exposure if exposure is not None else self.exposure.value)
-        self.gain_value = self.gain.clamp(gain if gain is not None else self.gain.value)
+        self.brightness = controls.get(BRIGHTNESS_CONTROL, fallback_control(BRIGHTNESS_CONTROL, -64, 64, 1, 0))
+        default_exposure = self.exposure.value if self.auto_exposure else self.exposure.maximum
+        self.exposure_value = self.exposure.clamp(exposure if exposure is not None else default_exposure)
+        self.gain_value = self.gain.clamp(gain if gain is not None else self.gain.maximum)
+        self.brightness_value = self.brightness.clamp(brightness if brightness is not None else self.brightness.maximum)
         self.applied_exposure: int | None = None
         self.applied_gain: int | None = None
+        self.applied_brightness: int | None = None
 
     def configure_initial(self) -> None:
         if self.auto_exposure:
@@ -78,6 +93,7 @@ class CameraControls:
             self.set_control(AUTO_EXPOSURE_CONTROL, MANUAL_AUTO_EXPOSURE_VALUE)
             self.set_exposure(self.exposure_value)
         self.set_gain(self.gain_value)
+        self.set_brightness(self.brightness_value)
 
     def create_trackbars(self, window_name: str) -> None:
         cv2.createTrackbar(
@@ -94,15 +110,25 @@ class CameraControls:
             self.trackbar_max(self.gain),
             noop,
         )
+        cv2.createTrackbar(
+            self.brightness_trackbar,
+            window_name,
+            self.to_trackbar(self.brightness, self.brightness_value),
+            self.trackbar_max(self.brightness),
+            noop,
+        )
 
     def update_from_trackbars(self, window_name: str) -> None:
         exposure_pos = cv2.getTrackbarPos(self.exposure_trackbar, window_name)
         gain_pos = cv2.getTrackbarPos(self.gain_trackbar, window_name)
+        brightness_pos = cv2.getTrackbarPos(self.brightness_trackbar, window_name)
         self.exposure_value = self.from_trackbar(self.exposure, exposure_pos)
         self.gain_value = self.from_trackbar(self.gain, gain_pos)
+        self.brightness_value = self.from_trackbar(self.brightness, brightness_pos)
         if not self.auto_exposure:
             self.set_exposure(self.exposure_value)
         self.set_gain(self.gain_value)
+        self.set_brightness(self.brightness_value)
 
     @property
     def exposure_trackbar(self) -> str:
@@ -111,6 +137,10 @@ class CameraControls:
     @property
     def gain_trackbar(self) -> str:
         return f"{self.label} gain"
+
+    @property
+    def brightness_trackbar(self) -> str:
+        return f"{self.label} brightness"
 
     def to_trackbar(self, control: V4L2Control, value: int) -> int:
         return max(0, min(self.trackbar_max(control), value - control.minimum))
@@ -134,6 +164,12 @@ class CameraControls:
         self.applied_gain = value
         self.set_control(GAIN_CONTROL, value)
 
+    def set_brightness(self, value: int) -> None:
+        if self.applied_brightness == value:
+            return
+        self.applied_brightness = value
+        self.set_control(BRIGHTNESS_CONTROL, value)
+
     def set_control(self, name: str, value: int) -> None:
         if not self.device.startswith("/dev/"):
             return
@@ -154,6 +190,7 @@ class CameraControls:
             "auto_exposure": self.auto_exposure,
             "exposure_time_absolute": control_payload(self.exposure, self.exposure_value),
             "gain": control_payload(self.gain, self.gain_value),
+            "brightness": control_payload(self.brightness, self.brightness_value),
         }
 
 
@@ -178,6 +215,7 @@ def run_camera_preview(options: PreviewOptions) -> dict[str, Any]:
                 label=label,
                 exposure=options.exposure,
                 gain=options.gain,
+                brightness=options.brightness,
                 auto_exposure=options.auto_exposure,
             )
             controls.configure_initial()
@@ -211,6 +249,7 @@ def dry_run_payload(options: PreviewOptions) -> dict[str, Any]:
             label=camera_label(index, len(options.devices)),
             exposure=options.exposure,
             gain=options.gain,
+            brightness=options.brightness,
             auto_exposure=options.auto_exposure,
         )
         cameras.append(controls.payload())
@@ -231,8 +270,11 @@ def draw_preview_frame(frame: np.ndarray, camera: PreviewCamera, *, max_width: i
     preview = frame.copy()
     lines = [
         f"{camera.label} {camera.device}",
-        f"shutter={camera.controls.exposure_value} gain={camera.controls.gain_value} mean={mean_gray:.1f}",
-        "trackbars: shutter/gain  q/esc: quit",
+        (
+            f"shutter={camera.controls.exposure_value} gain={camera.controls.gain_value} "
+            f"brightness={camera.controls.brightness_value} mean={mean_gray:.1f}"
+        ),
+        "trackbars: shutter/gain/brightness  q/esc: quit",
     ]
     for index, line in enumerate(lines):
         y = 28 + index * 26

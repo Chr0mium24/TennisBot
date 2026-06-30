@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -66,14 +67,19 @@ class CharucoDetection:
 class OpenCVCamera:
     def __init__(self, device: str | int, config: CameraConfig) -> None:
         self.device = parse_device(device)
-        self.capture = cv2.VideoCapture(self.device)
+        self.capture = (
+            cv2.VideoCapture(self.device, cv2.CAP_V4L2)
+            if isinstance(self.device, int)
+            else cv2.VideoCapture(self.device)
+        )
         if not self.capture.isOpened():
             raise RuntimeError(f"failed to open camera device: {device}")
+        if config.fourcc:
+            self.capture.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*config.fourcc[:4]))
+        self.capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, float(config.width_px))
         self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, float(config.height_px))
         self.capture.set(cv2.CAP_PROP_FPS, float(config.fps))
-        if config.fourcc:
-            self.capture.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*config.fourcc[:4]))
 
     def read(self) -> np.ndarray:
         ok, frame = self.capture.read()
@@ -92,7 +98,10 @@ def utc_now_iso() -> str:
 def parse_device(value: str | int) -> str | int:
     if isinstance(value, int):
         return value
-    return int(value) if value.isdigit() else value
+    if value.isdigit():
+        return int(value)
+    match = re.fullmatch(r"/dev/video(\d+)", value)
+    return int(match.group(1)) if match else value
 
 
 def load_config(path: Path) -> ToolConfig:

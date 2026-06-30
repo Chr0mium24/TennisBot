@@ -40,9 +40,11 @@ bun scripts/calib.ts preview cam1
 bun scripts/calib.ts preview cam2
 ```
 
-The preview window provides trackbars for `shutter` (`exposure_time_absolute`)
-and `gain`. It uses `v4l2-ctl` to write the controls and exits with `q` or
-`esc`.
+The preview window provides trackbars for `shutter`
+(`exposure_time_absolute`), `gain`, and `brightness`. By default it switches to
+manual exposure and starts from high visibility values so a camera with a low
+numeric brightness sample does not appear as a black preview. It uses
+`v4l2-ctl` to write the controls and exits with `q` or `esc`.
 
 ## Where Device Parameters Are Used
 
