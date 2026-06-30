@@ -172,6 +172,9 @@ uv run camera-calib-lab solve stereo \
 - `--epipolar-warning-px 2.0`
 - `--rectification-warning-px 2.0`
 
+双目求解会校验 stereo session 的 `left` / `right` 设备与左右单目标定包的
+`source_device` 一致，避免把 `cam1` / `cam2` 单目标定包对调后继续求解。
+
 输出包含：
 
 - `package.json`

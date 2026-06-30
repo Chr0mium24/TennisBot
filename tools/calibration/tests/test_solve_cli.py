@@ -14,7 +14,14 @@ import numpy as np
 from camera_calib_lab.camera_preview import V4L2Control
 from camera_calib_lab.cli import main
 from camera_calib_lab.capture_types import parse_device
-from camera_calib_lab.solve import ViewObservation, detect_session_observations, target_payload
+from camera_calib_lab.solve import (
+    MonoCameraPackage,
+    SourceObservations,
+    ViewObservation,
+    detect_session_observations,
+    target_payload,
+    validate_stereo_source_devices,
+)
 
 
 class SolveCliTest(unittest.TestCase):
@@ -71,6 +78,7 @@ class SolveCliTest(unittest.TestCase):
                 {
                     "topology": "mono",
                     "target": target_payload({}),
+                    "camera": {"camera_id": "cam1", "width_px": 960, "height_px": 640, "device": "/dev/video0"},
                     "dry_run": False,
                     "hardware_validated": True,
                     "frames": [
@@ -100,6 +108,10 @@ class SolveCliTest(unittest.TestCase):
                 {
                     "topology": "stereo",
                     "target": target_payload({}),
+                    "stereo_rig": {
+                        "left": {"camera_id": "left", "width_px": 960, "height_px": 640, "device": "/dev/video0"},
+                        "right": {"camera_id": "right", "width_px": 960, "height_px": 640, "device": "/dev/video2"},
+                    },
                     "dry_run": False,
                     "hardware_validated": True,
                     "frames": [
@@ -124,7 +136,45 @@ class SolveCliTest(unittest.TestCase):
 
             self.assertEqual(source.topology, "stereo")
             self.assertEqual(source.pair_indices, [1])
+            self.assertEqual(source.devices, {"left": "/dev/video0", "right": "/dev/video2"})
             self.assertEqual([view.side for view in source.views], ["left", "right"])
+
+    def test_stereo_source_device_validation_accepts_equivalent_video_ids(self) -> None:
+        source = SourceObservations(
+            topology="stereo",
+            source_path=Path("/session"),
+            target={},
+            dry_run=False,
+            hardware_validated=True,
+            views=[],
+            pair_indices=[],
+            devices={"left": "/dev/video0", "right": "/dev/video2"},
+        )
+
+        validate_stereo_source_devices(
+            source,
+            left_mono=mono_package("cam1", "0"),
+            right_mono=mono_package("cam2", "/dev/video2"),
+        )
+
+    def test_stereo_source_device_validation_rejects_swapped_mono_packages(self) -> None:
+        source = SourceObservations(
+            topology="stereo",
+            source_path=Path("/session"),
+            target={},
+            dry_run=False,
+            hardware_validated=True,
+            views=[],
+            pair_indices=[],
+            devices={"left": "/dev/video0", "right": "/dev/video2"},
+        )
+
+        with self.assertRaisesRegex(ValueError, "left mono package"):
+            validate_stereo_source_devices(
+                source,
+                left_mono=mono_package("cam1", "/dev/video2"),
+                right_mono=mono_package("cam2", "/dev/video0"),
+            )
 
     def test_mono_solve_writes_runtime_package(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -236,6 +286,21 @@ def patched_session_detection():
         create_charuco_board=lambda _target: object(),
         create_detector=lambda _board: object(),
         detect_image_observation=fake_detect,
+    )
+
+
+def mono_package(camera_id: str, source_device: str) -> MonoCameraPackage:
+    return MonoCameraPackage(
+        package_dir=Path(f"/artifacts/calibration/{camera_id}"),
+        package_json={"accepted": True, "source_device": source_device},
+        camera_json={
+            "camera_id": camera_id,
+            "camera_matrix": np.eye(3).tolist(),
+            "distortion_coefficients": [0.0, 0.0, 0.0, 0.0, 0.0],
+        },
+        camera_matrix=np.eye(3),
+        dist_coeffs=np.zeros((5, 1), dtype=np.float64),
+        source_device=source_device,
     )
 
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -41,6 +42,7 @@ class SourceObservations:
     hardware_validated: bool
     views: list[ViewObservation]
     pair_indices: list[int]
+    devices: dict[str, str]
 
 
 @dataclass(frozen=True)
@@ -50,6 +52,7 @@ class MonoCameraPackage:
     camera_json: dict[str, Any]
     camera_matrix: np.ndarray
     dist_coeffs: np.ndarray
+    source_device: str | None = None
 
 
 def solve_mono_package(
@@ -86,6 +89,7 @@ def solve_mono_package(
     accepted_view_count = len(views)
     accepted = accepted_view_count >= min_views and float(rms_px) <= max_rms_px
     resolved_camera_id = camera_id or views[0].camera_id
+    source_device = source_device_for_views(source, views)
     target = target_payload(source.target)
     created_at = utc_now_iso()
     camera_json = camera_intrinsics_json(
@@ -127,6 +131,7 @@ def solve_mono_package(
         "camera_id": resolved_camera_id,
         "created_at": created_at,
         "source_session": display_source_path(source.source_path),
+        "source_device": source_device,
         "target": target,
         "files": {
             "camera": "camera.json",
@@ -182,6 +187,7 @@ def solve_stereo_package(
     right_mono = load_mono_package(right_mono_path)
     validate_mono_package(left_mono, expected_camera_id=left_camera_id)
     validate_mono_package(right_mono, expected_camera_id=right_camera_id)
+    validate_stereo_source_devices(source, left_mono=left_mono, right_mono=right_mono)
     pairs = stereo_pairs(source)
     if not pairs:
         raise ValueError("no accepted stereo ChArUco pairs were found")
@@ -439,6 +445,7 @@ def load_observations_json(path: Path) -> SourceObservations:
         hardware_validated=bool(payload.get("hardware_validated", not bool(payload.get("dry_run", False)))),
         views=views,
         pair_indices=pair_indices,
+        devices={},
     )
 
 
@@ -448,10 +455,10 @@ def detect_session_observations(session_path: Path, _config_path: Path) -> Sourc
     if not isinstance(payload.get("frames"), list):
         raise ValueError("capture session.json is missing frames")
     target = dict(payload.get("target", {}))
+    topology = session_topology(payload)
     target_config = target_config_from_payload(target)
     board = create_charuco_board(target_config)
     detector = create_detector(board)
-    topology = session_topology(payload)
     views: list[ViewObservation] = []
     pair_indices: list[int] = []
     if topology == "mono":
@@ -499,6 +506,7 @@ def detect_session_observations(session_path: Path, _config_path: Path) -> Sourc
         hardware_validated=hardware_validated,
         views=[view for view in views if view.image_points.shape[0] > 0],
         pair_indices=pair_indices,
+        devices=session_devices(payload, topology),
     )
 
 
@@ -532,6 +540,30 @@ def session_topology(payload: dict[str, Any]) -> str:
     if "topology" in payload:
         return str(payload["topology"])
     raise ValueError("capture session.json does not declare topology")
+
+
+def session_devices(payload: dict[str, Any], topology: str) -> dict[str, str]:
+    if topology == "mono":
+        camera = payload.get("camera")
+        if not isinstance(camera, dict):
+            raise ValueError("mono session.json is missing camera")
+        device = camera.get("device")
+        return {} if device in {None, ""} else {str(camera["camera_id"]): str(device)}
+    if topology == "stereo":
+        rig = payload.get("stereo_rig")
+        if not isinstance(rig, dict):
+            raise ValueError("stereo session.json is missing stereo_rig")
+        left = rig.get("left")
+        right = rig.get("right")
+        if not isinstance(left, dict) or not isinstance(right, dict):
+            raise ValueError("stereo session.json stereo_rig is missing left or right camera")
+        devices = {}
+        if left.get("device") not in {None, ""}:
+            devices["left"] = str(left["device"])
+        if right.get("device") not in {None, ""}:
+            devices["right"] = str(right["device"])
+        return devices
+    return {}
 
 
 def mono_session_frames(payload: dict[str, Any]) -> list[dict[str, str]]:
@@ -671,6 +703,49 @@ def first_view(views: list[ViewObservation], *, side: str) -> ViewObservation | 
     return None
 
 
+def source_device_for_views(source: SourceObservations, views: list[ViewObservation]) -> str | None:
+    camera_ids = {view.camera_id for view in views}
+    if len(camera_ids) != 1:
+        return None
+    return source.devices.get(next(iter(camera_ids)))
+
+
+def validate_stereo_source_devices(
+    source: SourceObservations,
+    *,
+    left_mono: MonoCameraPackage,
+    right_mono: MonoCameraPackage,
+) -> None:
+    left_device = source.devices.get("left")
+    right_device = source.devices.get("right")
+    if left_device is None and right_device is None:
+        return
+    validate_mono_source_device("left", left_mono, left_device)
+    validate_mono_source_device("right", right_mono, right_device)
+
+
+def validate_mono_source_device(side: str, package: MonoCameraPackage, expected_device: str | None) -> None:
+    if expected_device is None:
+        return
+    actual_device = package.source_device
+    if actual_device in {None, ""}:
+        raise ValueError(f"{side} mono package {package.package_dir} is missing source_device")
+    if normalize_device(actual_device) != normalize_device(expected_device):
+        raise ValueError(
+            f"{side} mono package {package.package_dir} source_device={actual_device!r} "
+            f"does not match stereo {side} device {expected_device!r}"
+        )
+
+
+def normalize_device(value: str) -> str:
+    if value.isdigit():
+        return f"video:{int(value)}"
+    match = re.fullmatch(r"/dev/video(\d+)", value)
+    if match:
+        return f"video:{int(match.group(1))}"
+    return value
+
+
 def align_stereo_pair(left: ViewObservation, right: ViewObservation) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     if left.ids is not None and right.ids is not None:
         left_ids = left.ids.reshape(-1)
@@ -699,6 +774,7 @@ def load_mono_package(package_dir: Path) -> MonoCameraPackage:
         camera_json=camera_json,
         camera_matrix=np.asarray(camera_json["camera_matrix"], dtype=np.float64),
         dist_coeffs=np.asarray(camera_json["distortion_coefficients"], dtype=np.float64).reshape(-1, 1),
+        source_device=str(package_json["source_device"]) if package_json.get("source_device") not in {None, ""} else None,
     )
 
 

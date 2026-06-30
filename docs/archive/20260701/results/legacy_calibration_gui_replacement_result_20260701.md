@@ -38,3 +38,26 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 uv run --with pytest python -m pytest -q
 Result:
 
 - `9 passed in 0.45s`
+
+## Follow-up Device Mapping Check
+
+Added stereo solve validation for the `left` / `right` to `cam1` / `cam2`
+mapping:
+
+- mono packages now record `source_device` from their mono `session.json`;
+- stereo session loading records `left` and `right` devices from `stereo_rig`;
+- stereo solve fails if the left mono package source device does not match the
+  stereo left device, or the right mono package source device does not match the
+  stereo right device;
+- `/dev/videoN` and `N` are treated as the same V4L2 device.
+
+Verification rerun:
+
+```bash
+cd tools/calibration
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 uv run --with pytest python -m pytest -q
+```
+
+Result:
+
+- `11 passed in 0.45s`
