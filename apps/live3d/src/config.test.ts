@@ -53,8 +53,9 @@ test("fixture construction runs the core stereo and prediction flow", () => {
 
   expect(fixture.scene.trail).toHaveLength(3);
   expect(fixture.scene.prediction.sourcePointIds).toEqual(
-    fixture.scene.trail.map((point) => point.pointId),
+    fixture.scene.trail.slice(-2).map((point) => point.pointId),
   );
+  expect(fixture.scene.prediction.model).toBe("projectile-3d-two-frame-constant-gravity");
   expect(fixture.scene.prediction.samples).toHaveLength(9);
   expect(fixture.scene.prediction.samples[0]?.positionMeters).toEqual(
     fixture.scene.ball.positionMeters,
