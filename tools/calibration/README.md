@@ -44,7 +44,7 @@ uv run camera-calib-lab camera preview --device /dev/video0
 uv run camera-calib-lab camera preview --devices /dev/video0,/dev/video2
 ```
 
-默认预览使用 `1280x720`、`30 FPS`、`MJPG`，并切到手动曝光。启动时会将
+默认预览使用 `3840x2160`、`30 FPS`、`MJPG`，并切到手动曝光。启动时会将
 `shutter`、`gain`、`brightness` 设到高可见值，窗口滑条可继续下调；`q`
 或 `esc` 退出。
 

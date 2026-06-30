@@ -114,7 +114,7 @@ bun scripts/calib.ts preview cam2 --shutter 400 --gain 64 --brightness 32
 - 双目设备：`/dev/video0,/dev/video2`
 - `cam1` 设备：`/dev/video0`
 - `cam2` 设备：`/dev/video2`
-- 分辨率：`1280x720`
+- 分辨率：`3840x2160`
 - 帧率：`30`
 - 输入格式：`MJPG`
 - 默认切到手动曝光，并将 `shutter`、`gain`、`brightness` 初始化到高可见值，方便先看到画面再下调

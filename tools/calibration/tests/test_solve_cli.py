@@ -37,6 +37,9 @@ class SolveCliTest(unittest.TestCase):
         self.assertEqual(code, 0)
         report = json.loads(output.getvalue())
         self.assertEqual(report["status"], "dry-run")
+        self.assertEqual(report["width"], 3840)
+        self.assertEqual(report["height"], 2160)
+        self.assertEqual(report["fps"], 30.0)
         self.assertEqual([camera["device"] for camera in report["cameras"]], ["/dev/video0", "/dev/video2"])
 
     def test_camera_preview_dry_run_uses_visible_manual_defaults(self) -> None:

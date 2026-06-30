@@ -520,6 +520,7 @@ function printPreviewUsage(): void {
   preview: /dev/video0,/dev/video2
   cam1: /dev/video0
   cam2: /dev/video2
+  resolution: 3840x2160 @ 30 FPS
 
 选项:
   --device <path>
