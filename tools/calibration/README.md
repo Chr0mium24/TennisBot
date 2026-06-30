@@ -8,8 +8,7 @@ DFOptix ChArUco 标定板：
 - 15 mm square
 - 11.25 mm marker
 
-当前能力重点是单目/双目 OpenCV 采集 GUI 和采集 manifest。新采集数据的完整
-mono/stereo solve 与运行时包导出还需要继续主线化。
+当前能力包括单目/双目 OpenCV 采集 GUI、ChArUco 求解和运行时标定包导出。
 
 ## 安装
 
@@ -76,3 +75,70 @@ uv run camera-calib-lab capture stereo-charuco-auto-gui \
 - 每帧 ChArUco 角点数、平均亮度、清晰度
 
 默认采集目录如果已存在，会自动追加时间戳，避免覆盖旧采集。
+
+## 单目求解
+
+对每个相机分别求内参。`--session` 指向上一步单目采集目录，输出目录为单目标定
+包：
+
+```bash
+uv run camera-calib-lab solve mono \
+  --session captures/local/20260630_cam1_charuco \
+  --output ../../artifacts/calibration/cam1 \
+  --camera-id cam1
+
+uv run camera-calib-lab solve mono \
+  --session captures/local/20260630_cam2_charuco \
+  --output ../../artifacts/calibration/cam2 \
+  --camera-id cam2
+```
+
+默认验收门槛：
+
+- `--min-views 8`
+- `--max-rms-px 1.0`
+
+输出包含：
+
+- `package.json`
+- `camera.json`
+- `verification.json`
+- `calibration_opencv.yaml`
+- `summary.md`
+- `review.html`
+
+## 双目求解
+
+双目求解需要双目采集目录和左右单目标定包：
+
+```bash
+uv run camera-calib-lab solve stereo \
+  --session captures/local/20260630_stereo_charuco \
+  --left-mono ../../artifacts/calibration/cam1 \
+  --right-mono ../../artifacts/calibration/cam2 \
+  --output ../../artifacts/calibration/stereo_cam1_cam2 \
+  --left-camera-id cam1 \
+  --right-camera-id cam2
+```
+
+默认验收门槛：
+
+- `--min-pairs 12`
+- `--max-rms-px 2.0`
+- `--epipolar-warning-px 2.0`
+- `--rectification-warning-px 2.0`
+
+输出包含：
+
+- `package.json`
+- `cam1.json`
+- `cam2.json`
+- `stereo.json`
+- `rectification.json`
+- `verification.json`
+- `calibration_opencv.yaml`
+- `summary.md`
+- `review.html`
+
+`epipolar` 和校正后 `y` 误差超过阈值时会写入质量警告；`stereo RMS`、有效组数
+和 baseline 会决定包是否 accepted。

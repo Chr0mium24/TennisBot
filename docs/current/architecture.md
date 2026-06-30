@@ -42,6 +42,8 @@ Owns the mainline OpenCV calibration capture GUI for this project target:
 - `DICT_5X5_100`, 14 x 9 squares, 15 mm squares, 11.25 mm markers;
 - mono capture GUI command;
 - stereo capture GUI command;
+- mono ChArUco solve and runtime package export;
+- stereo ChArUco solve and runtime package export;
 - capture quality checks for corner count, sharpness, and brightness;
 - session manifests with saved frames.
 
@@ -51,12 +53,9 @@ Current commands:
 cd tools/calibration
 uv run camera-calib-lab capture charuco-auto-gui --device /dev/video0
 uv run camera-calib-lab capture stereo-charuco-auto-gui --left-device /dev/video0 --right-device /dev/video2
+uv run camera-calib-lab solve mono --session captures/local/cam1_charuco --output ../../artifacts/calibration/cam1 --camera-id cam1
+uv run camera-calib-lab solve stereo --session captures/local/stereo_charuco --left-mono ../../artifacts/calibration/cam1 --right-mono ../../artifacts/calibration/cam2 --output ../../artifacts/calibration/stereo_cam1_cam2
 ```
-
-Current limitation: this minimal mainline migration captures usable ChArUco
-sessions, but the fresh mono/stereo solve and runtime package export path is not
-yet fully mainlined in `tools/calibration`. Existing runtime calibration
-packages are still consumed from `artifacts/calibration/...`.
 
 ### `tools/yolo`
 
@@ -111,7 +110,7 @@ measured and applied.
 
 ```text
 1. tools/calibration captures mono/stereo ChArUco sessions
-2. a runtime calibration package is produced under artifacts/calibration/...
+2. tools/calibration solves mono/stereo calibration packages under artifacts/calibration/...
 3. tools/yolo creates or verifies artifacts/models/tennis_ball_yolo
 4. apps/live3d loads the YOLO and calibration artifacts
 5. the operator starts two USB cameras in the browser
@@ -175,8 +174,6 @@ bun run verify:hardware -- --prepare-uvc-controls --timeout-ms 30000 --output ..
 
 ## Remaining Engineering Work
 
-- Mainline the calibration solve/export path after the capture GUI if fresh
-  runtime calibration packages must be generated without legacy lab code.
 - Recalibrate after the cameras are mounted in their real physical positions.
 - Apply or document the browser-frame scaling, rectification, and camera/world
   transform rules before claiming court-coordinate 3D correctness.

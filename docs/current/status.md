@@ -46,9 +46,9 @@ The latest imported calibration package is not final physical acceptance. It has
 `epipolar_rms_px=4.330`, above the `2.000` runtime review threshold. Fresh
 calibration is still needed after the cameras are fixed in their real positions.
 
-`tools/calibration` currently mainlines the capture GUI and target-specific
-backend. Fresh mono/stereo solve and runtime package export are still the next
-calibration migration gap.
+`tools/calibration` now mainlines the capture GUI, ChArUco mono solve, ChArUco
+stereo solve, and runtime calibration package export. Fresh real calibration
+still requires visible physical target captures after the cameras are fixed.
 
 Live3D loads stereo calibration artifacts, but it does not know the camera rig's
 pose relative to the tennis court. Current 3D output is camera-frame geometry,

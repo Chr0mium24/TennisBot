@@ -88,6 +88,32 @@ uv run camera-calib-lab capture stereo-charuco-auto-gui
 uv run camera-calib-lab capture stereo-charuco-auto-gui --left-device /dev/video0 --right-device /dev/video2
 ```
 
+单目求解并导出运行时包：
+
+```bash
+uv run camera-calib-lab solve mono \
+  --session captures/local/20260630_cam1_charuco \
+  --output ../../artifacts/calibration/cam1 \
+  --camera-id cam1
+
+uv run camera-calib-lab solve mono \
+  --session captures/local/20260630_cam2_charuco \
+  --output ../../artifacts/calibration/cam2 \
+  --camera-id cam2
+```
+
+双目求解并导出运行时包：
+
+```bash
+uv run camera-calib-lab solve stereo \
+  --session captures/local/20260630_stereo_charuco \
+  --left-mono ../../artifacts/calibration/cam1 \
+  --right-mono ../../artifacts/calibration/cam2 \
+  --output ../../artifacts/calibration/stereo_cam1_cam2 \
+  --left-camera-id cam1 \
+  --right-camera-id cam2
+```
+
 ## YOLO 工具
 
 进入目录：

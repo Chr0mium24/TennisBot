@@ -68,12 +68,10 @@ Use the mainline OpenCV GUI in order:
    for each mono camera capture.
 3. `cd tools/calibration && uv run camera-calib-lab capture stereo-charuco-auto-gui ...`
    for stereo capture.
-4. Produce or import the runtime calibration package under
-   `artifacts/calibration/stereo_cam1_cam2`.
-
-Current limitation: the tracked `tools/calibration` migration captures sessions
-and writes manifests, but the fresh solve/export path is not fully mainlined
-yet.
+4. `cd tools/calibration && uv run camera-calib-lab solve mono ...` for each
+   mono capture.
+5. `cd tools/calibration && uv run camera-calib-lab solve stereo ...` to export
+   the runtime calibration package under `artifacts/calibration/stereo_cam1_cam2`.
 
 ## Live3D Order
 
