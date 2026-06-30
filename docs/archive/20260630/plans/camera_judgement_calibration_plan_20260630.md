@@ -24,6 +24,8 @@ chain.
 - The capture GUI writes ChArUco frame sessions and `manifest.json`.
 - Fresh mono/stereo solve and runtime package export are not fully mainlined in
   `tools/calibration` yet.
+- Final physical calibration should use the fixed physical DFOptix ChArUco
+  board, not an ordinary paper print.
 - The existing runtime package at `artifacts/calibration/stereo_cam1_cam2` is
   accepted but has a runtime quality warning: `epipolar_rms_px=4.330`, above the
   `2.000` review threshold.
@@ -85,27 +87,29 @@ cd apps/live3d
 bun run verify:hardware -- --prepare-uvc-controls --uvc-devices /dev/video0,/dev/video2
 ```
 
-## Phase 3: Target Print Check
+## Phase 3: Physical Target Board Check
 
-Use the tracked DFOptix ChArUco target:
+Use the fixed physical DFOptix ChArUco target that matches the tool
+configuration:
 
-- `artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.svg`
 - `DICT_5X5_100`
 - `14 x 9` squares
 - `15 mm` square
 - `11.25 mm` marker
 
-Print at `100%` scale, then measure one square with calipers. Record the real
-measurement, replacing `15.0` with the actual measured value:
+Before capture:
 
-```bash
-bun scripts/record-target-print-check.ts \
-  --measured-square-mm 15.0 \
-  --report docs/archive/20260630/calibration/calibration_target_print_check_20260630.md
-```
+- Confirm the board is the physical DFOptix target for this project.
+- Confirm the board is flat, clean, and not warped.
+- Confirm the configured dimensions still match the physical board:
+  `square_size_m=0.015` and `marker_size_m=0.01125`.
+- Record the board source or measurement note in the experiment report.
 
-Do not continue if the print check is outside tolerance. Reprint with corrected
-printer scaling.
+The tracked generated target files under `artifacts/calibration_targets/` are
+reference artifacts. A normal paper print is only acceptable for software
+pipeline smoke tests. It should not be used for final camera calibration because
+printer scaling, paper stretch, and surface warping directly corrupt the 3D
+scale and stereo baseline.
 
 ## Phase 4: Capture Mono Sessions
 
@@ -219,7 +223,7 @@ Save experiment results under `docs/archive/20260630/calibration/` with:
 
 - final left/right device mapping;
 - brightness check output;
-- print measurement;
+- physical target board source and dimension note;
 - mono capture paths and accepted view counts;
 - stereo capture path and accepted pair count;
 - solve/import package path;
@@ -233,7 +237,7 @@ Proceed in this order:
 
 1. Preflight.
 2. Brightness/device mapping.
-3. Print measurement.
+3. Physical target board check.
 4. Mono captures.
 5. Stereo capture.
 6. Solve/import package.
