@@ -1,6 +1,6 @@
 # Local Runtime Operator Runbook
 
-Date: 2026-06-29
+Date: 2026-06-30
 
 ## Scope
 
@@ -45,22 +45,17 @@ ready  Live3D           http://127.0.0.1:5178/
 Before taking calibration frames, check camera brightness/order:
 
 ```bash
-cd tools/calibration
-uv run camera-calib-lab camera brightness
+bun scripts/calib.ts brightness
 ```
 
 Use the mainline OpenCV GUI in order:
 
 1. Confirm the fixed physical DFOptix ChArUco board is clean, flat, and matches
    the configured `15 mm` square / `11.25 mm` marker dimensions.
-2. `cd tools/calibration && uv run camera-calib-lab capture charuco-auto-gui ...`
-   for each mono camera capture.
-3. `cd tools/calibration && uv run camera-calib-lab capture stereo-charuco-auto-gui ...`
-   for stereo capture.
-4. `cd tools/calibration && uv run camera-calib-lab solve mono ...` for each
-   mono capture.
-5. `cd tools/calibration && uv run camera-calib-lab solve stereo ...` to export
-   the runtime calibration package under `artifacts/calibration/stereo_cam1_cam2`.
+2. `bun scripts/calib.ts mono cam1` for the left mono capture and solve.
+3. `bun scripts/calib.ts mono cam2` for the right mono capture and solve.
+4. `bun scripts/calib.ts stereo` for stereo capture, solve, and runtime package
+   export under `artifacts/calibration/stereo_cam1_cam2`.
 
 ## Live3D Order
 

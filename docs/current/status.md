@@ -1,6 +1,6 @@
 # TennisBot Current Status
 
-Date: 2026-06-29
+Date: 2026-06-30
 
 ## Current Step
 
@@ -24,9 +24,8 @@ ready  Live3D           http://127.0.0.1:5178/
 The current quick camera-device tool is:
 
 ```bash
-cd tools/calibration
-uv run camera-calib-lab camera brightness
-uv run camera-calib-lab camera brightness --devices /dev/video0,/dev/video2
+bun scripts/calib.ts brightness
+bun scripts/calib.ts brightness --devices /dev/video0,/dev/video2
 ```
 
 It prints average brightness for two USB cameras so a covered or dark camera can
@@ -70,9 +69,9 @@ uv run --extra detect tennisbot-yolo detect-gui \
 Capture calibration frames:
 
 ```bash
-cd tools/calibration
-uv run camera-calib-lab capture charuco-auto-gui --device /dev/video0
-uv run camera-calib-lab capture stereo-charuco-auto-gui --left-device /dev/video0 --right-device /dev/video2
+bun scripts/calib.ts mono cam1
+bun scripts/calib.ts mono cam2
+bun scripts/calib.ts stereo
 ```
 
 Start or check Live3D:

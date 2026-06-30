@@ -1,6 +1,6 @@
 # 命令入口使用说明
 
-日期：2026-06-29
+日期：2026-06-30
 
 ## 约定
 
@@ -27,16 +27,50 @@ bun scripts/live3d.ts
 bun scripts/live3d.ts --status
 ```
 
-## 相机亮度检查
+## 标定快捷入口
+
+从仓库根目录运行：
 
 ```bash
-cd tools/calibration
-uv run camera-calib-lab camera brightness
+bun scripts/calib.ts brightness
+bun scripts/calib.ts mono cam1
+bun scripts/calib.ts mono cam2
+bun scripts/calib.ts stereo
 ```
 
 默认值：
 
-- 设备：自动选择前两个 USB V4L2 采集设备
+- 亮度检查设备：`/dev/video0,/dev/video2`
+- `cam1` 设备：`/dev/video0`，输出：`artifacts/calibration/cam1`
+- `cam2` 设备：`/dev/video2`，输出：`artifacts/calibration/cam2`
+- 双目标定设备：左 `/dev/video0`，右 `/dev/video2`
+- 双目输出：`artifacts/calibration/stereo_cam1_cam2`
+- 配置：`tools/calibration/configs/dfoptix_charuco_15mm_capture.yaml`
+- 采集张数：`30`
+
+常用选项：
+
+```bash
+bun scripts/calib.ts mono cam1 --capture-only
+bun scripts/calib.ts mono cam1 --solve-only --session tools/calibration/captures/local/<session>
+bun scripts/calib.ts stereo --dry-run
+bun scripts/calib.ts stereo --devices /dev/video0,/dev/video2
+```
+
+正常标定顺序是先检查亮度和相机顺序，再分别完成 `cam1`、`cam2` 单目，
+最后完成双目。`mono` 和 `stereo` 默认都是“采集 GUI 结束后继续求解并导出
+运行时包”。`mono/stereo --dry-run` 只打印底层命令；`brightness --dry-run`
+只枚举设备，不调用 `ffmpeg` 采集图像帧。
+
+## 相机亮度检查
+
+```bash
+bun scripts/calib.ts brightness
+```
+
+默认值：
+
+- 设备：`/dev/video0,/dev/video2`
 - 分辨率：`1280x720`
 - 帧率：`30`
 - 输入格式：`mjpeg`
@@ -45,13 +79,13 @@ uv run camera-calib-lab camera brightness
 指定设备：
 
 ```bash
-cd tools/calibration
-uv run camera-calib-lab camera brightness --devices /dev/video0,/dev/video2
+bun scripts/calib.ts brightness --devices /dev/video0,/dev/video2
 ```
 
-## 标定工具
+## 底层标定工具
 
-进入目录：
+通常直接使用上面的 `bun scripts/calib.ts ...` 快捷入口。需要排查底层 CLI
+时再进入目录：
 
 ```bash
 cd tools/calibration

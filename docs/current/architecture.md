@@ -49,12 +49,10 @@ Owns the mainline OpenCV calibration capture GUI for this project target:
 Current commands:
 
 ```bash
-cd tools/calibration
-uv run camera-calib-lab camera brightness
-uv run camera-calib-lab capture charuco-auto-gui --device /dev/video0
-uv run camera-calib-lab capture stereo-charuco-auto-gui --left-device /dev/video0 --right-device /dev/video2
-uv run camera-calib-lab solve mono --session captures/local/cam1_charuco --output ../../artifacts/calibration/cam1 --camera-id cam1
-uv run camera-calib-lab solve stereo --session captures/local/stereo_charuco --left-mono ../../artifacts/calibration/cam1 --right-mono ../../artifacts/calibration/cam2 --output ../../artifacts/calibration/stereo_cam1_cam2
+bun scripts/calib.ts brightness
+bun scripts/calib.ts mono cam1
+bun scripts/calib.ts mono cam2
+bun scripts/calib.ts stereo
 ```
 
 ### `tools/yolo`
@@ -144,9 +142,8 @@ but the full run still requires a visible tennis ball in both camera views and a
 Camera brightness sanity check:
 
 ```bash
-cd tools/calibration
-uv run camera-calib-lab camera brightness
-uv run camera-calib-lab camera brightness --devices /dev/video0,/dev/video2
+bun scripts/calib.ts brightness
+bun scripts/calib.ts brightness --devices /dev/video0,/dev/video2
 ```
 
 Start the local browser runtime:

@@ -64,7 +64,7 @@ for (const item of started) {
   console.log(`- ${item.surface.name}: ${item.surface.url} (${item.reused ? "reused" : `pid ${item.process?.pid}`})`);
 }
 console.log("");
-console.log("Use tools/calibration for camera brightness checks and mono/stereo calibration.");
+console.log("Use bun scripts/calib.ts for camera brightness checks and mono/stereo calibration.");
 console.log("Use Live3D after calibration and put a visible tennis ball in both camera views.");
 
 const childProcesses = started.flatMap((item) => (item.process === undefined ? [] : [item.process]));
@@ -178,8 +178,9 @@ function printUsage(): void {
   --no-build  启动缺失服务时跳过前端构建。
 
 标定和相机亮度检查使用:
-  cd tools/calibration
-  uv run camera-calib-lab camera brightness
-  uv run camera-calib-lab capture stereo-charuco-auto-gui
+  bun scripts/calib.ts brightness
+  bun scripts/calib.ts mono cam1
+  bun scripts/calib.ts mono cam2
+  bun scripts/calib.ts stereo
 `);
 }

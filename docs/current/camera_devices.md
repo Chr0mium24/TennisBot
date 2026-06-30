@@ -1,6 +1,6 @@
 # Camera Brightness Check
 
-Date: 2026-06-29
+Date: 2026-06-30
 
 ## Purpose
 
@@ -8,21 +8,19 @@ Use a quick brightness check to identify which USB camera is dark, for example
 when one lens cap is still on or one camera is blocked.
 
 ```bash
-cd tools/calibration
-uv run camera-calib-lab camera brightness
+bun scripts/calib.ts brightness
 ```
 
-The calibration tool captures one grayscale frame from the first two USB V4L2 capture
-devices and prints average brightness on a 0-255 scale. The darker device is
-printed as the likely covered camera.
+The calibration wrapper captures one grayscale frame from `/dev/video0` and
+`/dev/video2` by default and prints average brightness on a 0-255 scale. The
+darker device is printed as the likely covered camera.
 
 ## Manual Devices
 
 If auto order is wrong or you want to test specific devices:
 
 ```bash
-cd tools/calibration
-uv run camera-calib-lab camera brightness --devices /dev/video0,/dev/video2
+bun scripts/calib.ts brightness --devices /dev/video0,/dev/video2
 ```
 
 Requires `ffmpeg` and `v4l2-ctl` on the machine running the cameras.
@@ -32,9 +30,9 @@ Requires `ffmpeg` and `v4l2-ctl` on the machine running the cameras.
 Calibration:
 
 ```bash
-cd tools/calibration
-uv run camera-calib-lab capture charuco-auto-gui --device <device>
-uv run camera-calib-lab capture stereo-charuco-auto-gui --left-device <left> --right-device <right>
+bun scripts/calib.ts mono cam1 --device <device>
+bun scripts/calib.ts mono cam2 --device <device>
+bun scripts/calib.ts stereo --left-device <left> --right-device <right>
 ```
 
 Live3D hardware verifier UVC preparation:

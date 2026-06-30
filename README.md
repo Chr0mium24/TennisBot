@@ -50,16 +50,13 @@ bun run typecheck
 bun run build
 ```
 
-Run the OpenCV stereo calibration GUI:
+Run camera checks and calibration:
 
 ```bash
-cd tools/calibration
-uv run camera-calib-lab camera brightness
-uv run camera-calib-lab capture stereo-charuco-auto-gui \
-  --config configs/dfoptix_charuco_15mm_capture.yaml \
-  --left-device /dev/video0 \
-  --right-device /dev/video2 \
-  --views 30
+bun scripts/calib.ts brightness
+bun scripts/calib.ts mono cam1
+bun scripts/calib.ts mono cam2
+bun scripts/calib.ts stereo
 ```
 
 Create dry-run YOLO artifacts:
