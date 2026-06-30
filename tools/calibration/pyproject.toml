@@ -11,6 +11,7 @@ dependencies = [
 
 [project.scripts]
 camera-calib-lab = "camera_calib_lab.cli:main"
+pytest = "camera_calib_lab.pytest_main:main"
 
 [build-system]
 requires = ["setuptools>=69"]
@@ -21,3 +22,12 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
