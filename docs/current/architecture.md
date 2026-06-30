@@ -43,8 +43,10 @@ Owns the mainline OpenCV calibration capture GUI for this project target:
 - mono ChArUco solve and runtime package export;
 - stereo ChArUco solve and runtime package export;
 - USB camera brightness checks;
-- capture quality checks for corner count, sharpness, and brightness;
-- session manifests with saved frames.
+- capture quality checks for full-corner coverage, brightness, sharpness,
+  stability, position buckets, and dwell capture;
+- `session.json` capture sessions with saved frame paths plus per-frame
+  metadata and summary artifacts.
 
 Current commands:
 

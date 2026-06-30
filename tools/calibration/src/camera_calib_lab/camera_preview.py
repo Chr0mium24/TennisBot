@@ -8,7 +8,7 @@ from typing import Any
 import cv2
 import numpy as np
 
-from camera_calib_lab.capture_gui import CameraConfig, OpenCVCamera, preview_size
+from camera_calib_lab.capture_types import CameraConfig, OpenCVCamera, preview_size
 
 
 EXPOSURE_CONTROL = "exposure_time_absolute"

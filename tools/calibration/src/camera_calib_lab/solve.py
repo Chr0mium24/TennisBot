@@ -9,7 +9,8 @@ from typing import Any
 import cv2
 import numpy as np
 
-from camera_calib_lab.capture_gui import TargetConfig, create_charuco_board, create_detector, detect_charuco, load_config, utc_now_iso
+from camera_calib_lab.capture_types import TargetConfig, utc_now_iso
+from camera_calib_lab.charuco_detection import create_charuco_board, create_detector, detect_charuco
 
 
 MONO_SCHEMA = "calibration.mono.v1"
@@ -64,7 +65,9 @@ def solve_mono_package(
     source = load_source_observations(session_path=session_path, observations_path=observations_path, config_path=config_path)
     if source.topology != "mono":
         raise ValueError(f"mono solve requires a mono source, got topology={source.topology!r}")
-    views = [view for view in source.views if camera_id in {None, "", view.camera_id}]
+    views = source.views if camera_id in {None, ""} else [view for view in source.views if view.camera_id == camera_id]
+    if not views and camera_id not in {None, ""} and source.views:
+        views = source.views
     if not views:
         raise ValueError("no accepted mono ChArUco views were found")
     image_size = common_image_size(views)
@@ -179,7 +182,7 @@ def solve_stereo_package(
     right_mono = load_mono_package(right_mono_path)
     validate_mono_package(left_mono, expected_camera_id=left_camera_id)
     validate_mono_package(right_mono, expected_camera_id=right_camera_id)
-    pairs = stereo_pairs(source, left_camera_id=left_camera_id, right_camera_id=right_camera_id)
+    pairs = stereo_pairs(source)
     if not pairs:
         raise ValueError("no accepted stereo ChArUco pairs were found")
     image_size = common_image_size([view for pair in pairs for view in pair[:2]])
@@ -439,24 +442,48 @@ def load_observations_json(path: Path) -> SourceObservations:
     )
 
 
-def detect_session_observations(session_path: Path, config_path: Path) -> SourceObservations:
-    manifest_path = session_path / "manifest.json"
-    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+def detect_session_observations(session_path: Path, _config_path: Path) -> SourceObservations:
+    session_file = session_path / "session.json"
+    payload = json.loads(session_file.read_text(encoding="utf-8"))
+    if not isinstance(payload.get("frames"), list):
+        raise ValueError("capture session.json is missing frames")
     target = dict(payload.get("target", {}))
-    config = load_config(config_path)
-    target_config = target_config_from_payload(target, config.target)
+    target_config = target_config_from_payload(target)
     board = create_charuco_board(target_config)
     detector = create_detector(board)
     topology = session_topology(payload)
     views: list[ViewObservation] = []
     pair_indices: list[int] = []
     if topology == "mono":
-        for index, item in enumerate(mono_session_images(payload), start=1):
-            views.append(detect_image_observation(session_path / item["image"], board, detector, item["camera_id"], None, index))
+        for index, item in enumerate(mono_session_frames(payload), start=1):
+            views.append(
+                detect_image_observation(
+                    session_frame_path(session_path, item["image"]),
+                    board,
+                    detector,
+                    item["camera_id"],
+                    None,
+                    index,
+                )
+            )
     elif topology == "stereo":
-        for index, pair in enumerate(stereo_session_images(payload), start=1):
-            left = detect_image_observation(session_path / pair["left_image"], board, detector, pair["left_camera_id"], "left", index)
-            right = detect_image_observation(session_path / pair["right_image"], board, detector, pair["right_camera_id"], "right", index)
+        for index, pair in enumerate(stereo_session_pairs(payload), start=1):
+            left = detect_image_observation(
+                session_frame_path(session_path, pair["left_image"]),
+                board,
+                detector,
+                pair["left_camera_id"],
+                "left",
+                index,
+            )
+            right = detect_image_observation(
+                session_frame_path(session_path, pair["right_image"]),
+                board,
+                detector,
+                pair["right_camera_id"],
+                "right",
+                index,
+            )
             if left.image_points.shape[0] > 0 and right.image_points.shape[0] > 0:
                 pair_indices.append(index)
             views.extend([left, right])
@@ -504,71 +531,64 @@ def detect_image_observation(
 def session_topology(payload: dict[str, Any]) -> str:
     if "topology" in payload:
         return str(payload["topology"])
-    kind = str(payload.get("kind", ""))
-    if kind.startswith("mono"):
-        return "mono"
-    if kind.startswith("stereo"):
-        return "stereo"
-    raise ValueError("session manifest does not declare topology or kind")
+    raise ValueError("capture session.json does not declare topology")
 
 
-def mono_session_images(payload: dict[str, Any]) -> list[dict[str, str]]:
-    if isinstance(payload.get("frames"), list):
-        return [
+def mono_session_frames(payload: dict[str, Any]) -> list[dict[str, str]]:
+    frames = []
+    for item in payload["frames"]:
+        frame_paths = item.get("frame_paths")
+        if not isinstance(frame_paths, list) or not frame_paths:
+            raise ValueError(f"mono frame {item.get('view_id')} is missing frame_paths")
+        frames.append(
             {
-                "camera_id": str(item.get("camera_id", "cam1")),
-                "image": str(item["image"]),
+                "camera_id": str(item["camera_id"]),
+                "image": str(frame_paths[0]),
             }
-            for item in payload["frames"]
-            if "image" in item
-        ]
-    return [
-        {
-            "camera_id": str(payload.get("camera_id", "cam1")),
-            "image": str(path),
-        }
-        for path in payload.get("files", [])
-    ]
+        )
+    return frames
 
 
-def stereo_session_images(payload: dict[str, Any]) -> list[dict[str, str]]:
-    if isinstance(payload.get("frames"), list):
-        pairs = []
-        for item in payload["frames"]:
-            if "left" not in item or "right" not in item:
-                continue
-            pairs.append(
-                {
-                    "left_camera_id": "left",
-                    "right_camera_id": "right",
-                    "left_image": str(item["left"]["image"]),
-                    "right_image": str(item["right"]["image"]),
-                }
-            )
-        return pairs
-    camera_ids = payload.get("camera_ids") if isinstance(payload.get("camera_ids"), list) else ["cam1", "cam2"]
-    left_id = str(camera_ids[0])
-    right_id = str(camera_ids[1])
-    return [
-        {
-            "left_camera_id": left_id,
-            "right_camera_id": right_id,
-            "left_image": str(item["left"]),
-            "right_image": str(item["right"]),
-        }
-        for item in payload.get("pairs", [])
-        if "left" in item and "right" in item
-    ]
+def stereo_session_pairs(payload: dict[str, Any]) -> list[dict[str, str]]:
+    grouped: dict[str, dict[str, str]] = {}
+    for item in payload["frames"]:
+        view_id = str(item.get("view_id", ""))
+        camera_id = str(item.get("camera_id", ""))
+        frame_paths = item.get("frame_paths")
+        if not view_id or not isinstance(frame_paths, list) or not frame_paths:
+            raise ValueError("stereo frame is missing view_id or frame_paths")
+        if camera_id not in {"left", "right"}:
+            raise ValueError(f"stereo frame camera_id must be left or right, got {camera_id!r}")
+        grouped.setdefault(view_id, {})[camera_id] = str(frame_paths[0])
+    pairs = []
+    for view_id in sorted(grouped):
+        pair = grouped[view_id]
+        if "left" not in pair or "right" not in pair:
+            raise ValueError(f"stereo view {view_id} is missing left or right frame")
+        pairs.append(
+            {
+                "left_camera_id": "left",
+                "right_camera_id": "right",
+                "left_image": pair["left"],
+                "right_image": pair["right"],
+            }
+        )
+    return pairs
 
 
-def target_config_from_payload(payload: dict[str, Any], fallback: TargetConfig) -> TargetConfig:
+def session_frame_path(session_path: Path, value: str) -> Path:
+    path = Path(value)
+    return path if path.is_absolute() else session_path / path
+
+
+def target_config_from_payload(payload: dict[str, Any]) -> TargetConfig:
     return TargetConfig(
-        profile=str(payload.get("profile", fallback.profile)),
-        squares_x=int(payload.get("squares_x", fallback.squares_x)),
-        squares_y=int(payload.get("squares_y", fallback.squares_y)),
-        dictionary=str(payload.get("dictionary", fallback.dictionary)),
-        square_size_m=float(payload.get("square_size_m", fallback.square_size_m)),
-        marker_size_m=float(payload.get("marker_size_m", fallback.marker_size_m)),
+        profile=str(payload["profile"]),
+        squares_x=int(payload["squares_x"]),
+        squares_y=int(payload["squares_y"]),
+        dictionary=str(payload["dictionary"]),
+        square_size_m=float(payload["square_size_m"]),
+        marker_size_m=float(payload["marker_size_m"]),
     )
 
 
@@ -628,12 +648,7 @@ def common_image_size(views: list[ViewObservation]) -> tuple[int, int]:
     return next(iter(sizes))
 
 
-def stereo_pairs(
-    source: SourceObservations,
-    *,
-    left_camera_id: str,
-    right_camera_id: str,
-) -> list[tuple[ViewObservation, ViewObservation]]:
+def stereo_pairs(source: SourceObservations) -> list[tuple[ViewObservation, ViewObservation]]:
     views_by_index: dict[int, list[ViewObservation]] = {}
     for view in source.views:
         views_by_index.setdefault(view.index, []).append(view)
@@ -642,19 +657,16 @@ def stereo_pairs(
     for index, views in sorted(views_by_index.items()):
         if allowed_indices and index not in allowed_indices:
             continue
-        left = first_view(views, side="left", camera_id=left_camera_id)
-        right = first_view(views, side="right", camera_id=right_camera_id)
+        left = first_view(views, side="left")
+        right = first_view(views, side="right")
         if left is not None and right is not None:
             pairs.append((left, right))
     return pairs
 
 
-def first_view(views: list[ViewObservation], *, side: str, camera_id: str) -> ViewObservation | None:
+def first_view(views: list[ViewObservation], *, side: str) -> ViewObservation | None:
     for view in views:
         if view.side == side:
-            return view
-    for view in views:
-        if view.camera_id == camera_id:
             return view
     return None
 

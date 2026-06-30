@@ -1,283 +1,52 @@
 from __future__ import annotations
 
-import json
-import re
-from dataclasses import dataclass
-from datetime import datetime, timezone
+from collections import defaultdict, deque
 from pathlib import Path
 from time import monotonic
 from typing import Any
 
 import cv2
-import numpy as np
-import yaml
+
+from camera_calib_lab.capture_artifacts import (
+    mono_manifest,
+    mono_session_json,
+    save_mono_frame,
+    save_stereo_pair,
+    stereo_manifest,
+    stereo_session_json,
+    write_mono_summary,
+    write_stereo_summary,
+)
+from camera_calib_lab.capture_overlay import (
+    charuco_auto_preview_frame,
+    preview_status_lines,
+    status_line_for_quality,
+    status_line_for_stereo_quality,
+    stereo_charuco_preview_frame,
+    stereo_preview_status_lines,
+)
+from camera_calib_lab.capture_quality import (
+    AutoCaptureQuality,
+    evaluate_frame_quality,
+    quality_with_stability,
+    required_charuco_corners,
+    should_auto_capture,
+    stereo_pair_quality,
+)
+from camera_calib_lab.capture_types import (
+    CaptureConfig,
+    OpenCVCamera,
+    ToolConfig,
+    fresh_output_dir,
+    load_config,
+    write_json,
+)
+from camera_calib_lab.charuco_detection import create_charuco_board, create_detector, detect_charuco
 
 
-LEFT_CAMERA_ID = "left"
-RIGHT_CAMERA_ID = "right"
-IMAGE_NAME = "image.png"
-
-
-@dataclass(frozen=True)
-class TargetConfig:
-    profile: str = "dfoptix_charuco_14x9_square15mm_marker11_25mm"
-    squares_x: int = 14
-    squares_y: int = 9
-    dictionary: str = "DICT_5X5_100"
-    square_size_m: float = 0.015
-    marker_size_m: float = 0.01125
-
-
-@dataclass(frozen=True)
-class CameraConfig:
-    width_px: int = 1280
-    height_px: int = 720
-    fps: float = 30.0
-    fourcc: str = "MJPG"
-
-
-@dataclass(frozen=True)
-class CaptureConfig:
-    views: int = 30
-    min_corners: int = 24
-    min_sharpness: float = 30.0
-    min_capture_interval_s: float = 0.6
-
-
-@dataclass(frozen=True)
-class ToolConfig:
-    target: TargetConfig
-    camera: CameraConfig
-    capture: CaptureConfig
-
-
-@dataclass(frozen=True)
-class CharucoDetection:
-    corners: np.ndarray | None
-    ids: np.ndarray | None
-    count: int
-    mean_gray: float
-    sharpness: float
-
-    @property
-    def accepted(self) -> bool:
-        return self.count > 0
-
-
-class OpenCVCamera:
-    def __init__(self, device: str | int, config: CameraConfig) -> None:
-        self.device = parse_device(device)
-        self.capture = (
-            cv2.VideoCapture(self.device, cv2.CAP_V4L2)
-            if isinstance(self.device, int)
-            else cv2.VideoCapture(self.device)
-        )
-        if not self.capture.isOpened():
-            raise RuntimeError(f"failed to open camera device: {device}")
-        if config.fourcc:
-            self.capture.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*config.fourcc[:4]))
-        self.capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, float(config.width_px))
-        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, float(config.height_px))
-        self.capture.set(cv2.CAP_PROP_FPS, float(config.fps))
-
-    def read(self) -> np.ndarray:
-        ok, frame = self.capture.read()
-        if not ok or frame is None:
-            raise RuntimeError(f"failed to read frame from camera device: {self.device}")
-        return frame
-
-    def release(self) -> None:
-        self.capture.release()
-
-
-def utc_now_iso() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
-def parse_device(value: str | int) -> str | int:
-    if isinstance(value, int):
-        return value
-    if value.isdigit():
-        return int(value)
-    match = re.fullmatch(r"/dev/video(\d+)", value)
-    return int(match.group(1)) if match else value
-
-
-def load_config(path: Path) -> ToolConfig:
-    payload: dict[str, Any] = {}
-    if path.exists():
-        loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
-        if isinstance(loaded, dict):
-            payload = loaded
-    target = payload.get("target") if isinstance(payload.get("target"), dict) else {}
-    camera = payload.get("camera") if isinstance(payload.get("camera"), dict) else {}
-    capture = payload.get("capture") if isinstance(payload.get("capture"), dict) else {}
-    return ToolConfig(
-        target=TargetConfig(
-            profile=str(target.get("profile", TargetConfig.profile)),
-            squares_x=int(target.get("squares_x", TargetConfig.squares_x)),
-            squares_y=int(target.get("squares_y", TargetConfig.squares_y)),
-            dictionary=str(target.get("dictionary", TargetConfig.dictionary)),
-            square_size_m=float(target.get("square_size_m", TargetConfig.square_size_m)),
-            marker_size_m=float(target.get("marker_size_m", TargetConfig.marker_size_m)),
-        ),
-        camera=CameraConfig(
-            width_px=int(camera.get("width_px", CameraConfig.width_px)),
-            height_px=int(camera.get("height_px", CameraConfig.height_px)),
-            fps=float(camera.get("fps", CameraConfig.fps)),
-            fourcc=str(camera.get("fourcc", CameraConfig.fourcc)),
-        ),
-        capture=CaptureConfig(
-            views=int(capture.get("views", CaptureConfig.views)),
-            min_corners=int(capture.get("min_corners", CaptureConfig.min_corners)),
-            min_sharpness=float(capture.get("min_sharpness", CaptureConfig.min_sharpness)),
-            min_capture_interval_s=float(capture.get("min_capture_interval_s", CaptureConfig.min_capture_interval_s)),
-        ),
-    )
-
-
-def create_charuco_board(target: TargetConfig) -> cv2.aruco.CharucoBoard:
-    dictionary_id = getattr(cv2.aruco, target.dictionary)
-    dictionary = cv2.aruco.getPredefinedDictionary(dictionary_id)
-    try:
-        return cv2.aruco.CharucoBoard(
-            (target.squares_x, target.squares_y),
-            target.square_size_m,
-            target.marker_size_m,
-            dictionary,
-        )
-    except TypeError:
-        return cv2.aruco.CharucoBoard_create(
-            target.squares_x,
-            target.squares_y,
-            target.square_size_m,
-            target.marker_size_m,
-            dictionary,
-        )
-
-
-def create_detector(board: cv2.aruco.CharucoBoard) -> Any:
-    if hasattr(cv2.aruco, "CharucoDetector"):
-        return cv2.aruco.CharucoDetector(board)
-    return None
-
-
-def detect_charuco(frame: np.ndarray, board: cv2.aruco.CharucoBoard, detector: Any) -> CharucoDetection:
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    mean_gray = float(np.mean(gray))
-    sharpness = float(cv2.Laplacian(gray, cv2.CV_64F).var())
-    corners = None
-    ids = None
-    if detector is not None:
-        result = detector.detectBoard(gray)
-        corners = result[0] if len(result) > 0 else None
-        ids = result[1] if len(result) > 1 else None
-    else:
-        marker_corners, marker_ids, _rejected = cv2.aruco.detectMarkers(gray, board.getDictionary())
-        if marker_ids is not None and len(marker_ids) > 0:
-            _count, corners, ids = cv2.aruco.interpolateCornersCharuco(marker_corners, marker_ids, gray, board)
-    count = 0 if ids is None else int(len(ids))
-    return CharucoDetection(corners=corners, ids=ids, count=count, mean_gray=mean_gray, sharpness=sharpness)
-
-
-def detection_is_accepted(detection: CharucoDetection, capture: CaptureConfig) -> bool:
-    return detection.count >= capture.min_corners and detection.sharpness >= capture.min_sharpness
-
-
-def fresh_output_dir(path: Path) -> Path:
-    if not path.exists():
-        return path
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    for index in range(1, 1000):
-        suffix = stamp if index == 1 else f"{stamp}_{index:02d}"
-        candidate = path.with_name(f"{path.name}_{suffix}")
-        if not candidate.exists():
-            return candidate
-    raise RuntimeError(f"could not allocate fresh output directory for {path}")
-
-
-def write_json(path: Path, payload: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-
-
-def preview_size(frame: np.ndarray, max_width: int = 960) -> tuple[int, int]:
-    height, width = frame.shape[:2]
-    if width <= max_width:
-        return width, height
-    scale = max_width / float(width)
-    return max_width, max(1, int(height * scale))
-
-
-def draw_preview(
-    frame: np.ndarray,
-    detection: CharucoDetection,
-    *,
-    saved: int,
-    target: int,
-    accepted: bool,
-    label: str,
-) -> np.ndarray:
-    preview = frame.copy()
-    if detection.corners is not None and detection.ids is not None and len(detection.ids) > 0:
-        cv2.aruco.drawDetectedCornersCharuco(preview, detection.corners, detection.ids)
-    color = (20, 180, 20) if accepted else (20, 20, 220)
-    lines = [
-        f"{label} saved {saved}/{target}",
-        f"corners={detection.count} sharpness={detection.sharpness:.1f} mean={detection.mean_gray:.1f}",
-        "space: manual save  c: finish/calibrate request  q/esc: quit",
-    ]
-    for index, line in enumerate(lines):
-        y = 28 + index * 26
-        cv2.putText(preview, line, (18, y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2, cv2.LINE_AA)
-    size = preview_size(preview)
-    return cv2.resize(preview, size, interpolation=cv2.INTER_AREA)
-
-
-def save_mono_frame(output: Path, frame: np.ndarray, detection: CharucoDetection, index: int) -> dict[str, Any]:
-    view_id = f"view{index + 1:03d}"
-    view_dir = output / "cam1" / view_id
-    view_dir.mkdir(parents=True, exist_ok=True)
-    image_path = view_dir / IMAGE_NAME
-    if not cv2.imwrite(str(image_path), frame):
-        raise RuntimeError(f"failed to write {image_path}")
-    return {
-        "view_id": view_id,
-        "camera_id": "cam1",
-        "image": image_path.relative_to(output).as_posix(),
-        "charuco_corner_count": detection.count,
-        "mean_gray": detection.mean_gray,
-        "sharpness": detection.sharpness,
-    }
-
-
-def save_stereo_pair(
-    output: Path,
-    left_frame: np.ndarray,
-    right_frame: np.ndarray,
-    left_detection: CharucoDetection,
-    right_detection: CharucoDetection,
-    index: int,
-) -> dict[str, Any]:
-    view_id = f"view{index + 1:03d}"
-    records = {}
-    for camera_id, frame, detection in (
-        (LEFT_CAMERA_ID, left_frame, left_detection),
-        (RIGHT_CAMERA_ID, right_frame, right_detection),
-    ):
-        view_dir = output / camera_id / view_id
-        view_dir.mkdir(parents=True, exist_ok=True)
-        image_path = view_dir / IMAGE_NAME
-        if not cv2.imwrite(str(image_path), frame):
-            raise RuntimeError(f"failed to write {image_path}")
-        records[camera_id] = {
-            "image": image_path.relative_to(output).as_posix(),
-            "charuco_corner_count": detection.count,
-            "mean_gray": detection.mean_gray,
-            "sharpness": detection.sharpness,
-        }
-    return {"view_id": view_id, **records}
+QUIT_KEYS = {27, ord("q"), ord("Q")}
+CAPTURE_KEY = ord(" ")
+CALIBRATE_KEYS = {ord("c"), ord("C")}
 
 
 def run_mono_charuco_gui(
@@ -288,59 +57,141 @@ def run_mono_charuco_gui(
     views: int,
     device: str | int,
 ) -> dict[str, Any]:
-    config = load_config(config_path)
-    capture_config = CaptureConfig(
-        views=views or config.capture.views,
-        min_corners=config.capture.min_corners,
-        min_sharpness=config.capture.min_sharpness,
-        min_capture_interval_s=config.capture.min_capture_interval_s,
-    )
+    config = capture_config_with_views(load_config(config_path), views)
     output = fresh_output_dir(output_path)
     output.mkdir(parents=True, exist_ok=True)
     board = create_charuco_board(config.target)
     detector = create_detector(board)
     source = OpenCVCamera(device or 0, config.camera)
     records: list[dict[str, Any]] = []
-    calibrate_requested = False
-    last_capture = -1.0e9
-    window_name = "TennisBot ChArUco Mono Capture"
+    bucket_counts: dict[str, int] = defaultdict(int)
+    recent_qualities: deque[AutoCaptureQuality] = deque(maxlen=max(1, int(config.capture.stability_frames) - 1))
+    last_capture_at = -1.0e9
+    last_capture_bucket: str | None = None
+    active_bucket: str | None = None
+    active_bucket_since = 0.0
+    total_frame_count = 0
+    qualified_frame_count = 0
+    required_corners = required_charuco_corners(config.target, config.capture)
+    window_name = "CameraCalibLab ChArUco Auto Capture"
+    mouse_state = mouse_state_dict()
+    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+    install_mouse_callback(window_name, mouse_state)
     try:
         while True:
             frame = source.read()
             detection = detect_charuco(frame, board, detector)
-            accepted = detection_is_accepted(detection, capture_config)
-            now = monotonic()
-            if accepted and len(records) < capture_config.views and now - last_capture >= capture_config.min_capture_interval_s:
-                records.append(save_mono_frame(output, frame, detection, len(records)))
-                last_capture = now
-            cv2.imshow(
-                window_name,
-                draw_preview(frame, detection, saved=len(records), target=capture_config.views, accepted=accepted, label="mono"),
+            base_quality = evaluate_frame_quality(
+                frame=frame,
+                detection=detection,
+                required_corners=required_corners,
+                min_sharpness=config.capture.min_sharpness,
+                position_bins=(config.capture.position_bins_x, config.capture.position_bins_y),
             )
+            frame_quality = quality_with_stability(
+                base_quality,
+                tuple(recent_qualities),
+                config.capture.stability_frames,
+                config.capture.stable_center_delta,
+                config.capture.stable_area_delta,
+            )
+            now = monotonic()
+            total_frame_count += 1
+            dwell_seconds = 0.0
+            if frame_quality.accepted and frame_quality.position_bucket is not None:
+                if active_bucket != frame_quality.position_bucket:
+                    active_bucket = frame_quality.position_bucket
+                    active_bucket_since = now
+                dwell_seconds = max(0.0, now - active_bucket_since)
+                qualified_frame_count += 1
+            else:
+                active_bucket = None
+                active_bucket_since = now
+            ready = len(records) >= config.capture.views
+            auto_saved = False
+            if should_auto_capture(
+                frame_quality,
+                bucket_counts,
+                now,
+                last_capture_at,
+                config.capture.min_capture_interval_s,
+                config.capture.max_views_per_bucket,
+                last_capture_bucket=last_capture_bucket,
+                dwell_seconds=dwell_seconds,
+                dwell_capture_s=config.capture.dwell_capture_s,
+            ):
+                records.append(save_mono_frame(output, frame, detection, frame_quality, config.camera.camera_id, len(records)))
+                bucket_counts[str(frame_quality.position_bucket)] += 1
+                last_capture_at = now
+                last_capture_bucket = str(frame_quality.position_bucket)
+                active_bucket_since = now
+                dwell_seconds = 0.0
+                auto_saved = True
+                ready = len(records) >= config.capture.views
+            status = status_line_for_quality(
+                frame_quality,
+                auto_saved=auto_saved,
+                bucket_count=bucket_counts.get(str(frame_quality.position_bucket), 0) if frame_quality.position_bucket else 0,
+                max_views_per_bucket=config.capture.max_views_per_bucket,
+                same_bucket_as_last_capture=frame_quality.position_bucket == last_capture_bucket,
+                dwell_seconds=dwell_seconds,
+                dwell_capture_s=config.capture.dwell_capture_s,
+            )
+            preview, button_bounds = charuco_auto_preview_frame(
+                frame,
+                detection.points,
+                preview_status_lines(
+                    target_id=config.target.profile,
+                    saved_count=len(records),
+                    target_count=config.capture.views,
+                    total_frame_count=total_frame_count,
+                    qualified_frame_count=qualified_frame_count,
+                    quality=frame_quality,
+                    status=status,
+                    ready=ready,
+                    dwell_seconds=dwell_seconds,
+                    dwell_capture_s=config.capture.dwell_capture_s,
+                ),
+                ready,
+                bucket_counts,
+                (config.capture.position_bins_x, config.capture.position_bins_y),
+                frame_quality.position_bucket,
+            )
+            mouse_state["bounds"] = button_bounds
+            mouse_state["enabled"] = ready
+            cv2.imshow(window_name, preview)
             key = cv2.waitKey(30) & 0xFF
-            if key in {27, ord("q"), ord("Q")}:
+            recent_qualities.append(base_quality)
+            if key in QUIT_KEYS:
                 break
-            if key == ord(" ") and accepted and len(records) < capture_config.views:
-                records.append(save_mono_frame(output, frame, detection, len(records)))
-                last_capture = now
-            if key in {ord("c"), ord("C")}:
-                calibrate_requested = True
+            if ready and (key in CALIBRATE_KEYS or bool(mouse_state["clicked"])):
+                mouse_state["clicked"] = True
                 break
-            if len(records) >= capture_config.views:
-                calibrate_requested = True
-                break
+            if key == CAPTURE_KEY and frame_quality.accepted and not auto_saved:
+                records.append(save_mono_frame(output, frame, detection, frame_quality, config.camera.camera_id, len(records), manual=True))
+                if frame_quality.position_bucket is not None:
+                    bucket_counts[str(frame_quality.position_bucket)] += 1
+                    last_capture_bucket = str(frame_quality.position_bucket)
+                last_capture_at = now
+                active_bucket_since = now
     finally:
         source.release()
-        cv2.destroyWindow(window_name)
-    manifest = session_manifest(
-        kind="mono_charuco",
+        destroy_window(window_name)
+    manifest = mono_manifest(
         output=output,
         config=config,
+        device=device,
         records=records,
-        calibrate_requested=calibrate_requested,
+        bucket_counts=dict(bucket_counts),
+        total_frame_count=total_frame_count,
+        qualified_frame_count=qualified_frame_count,
+        calibrate_requested=bool(len(records) >= config.capture.views and mouse_state["clicked"]),
         calibration_output=calibration_output,
     )
+    write_json(output / "session.json", mono_session_json(output, config, device, records))
     write_json(output / "manifest.json", manifest)
+    write_mono_summary(output / "summary.md", manifest)
+    write_json(output / "auto_gui_result.json", manifest)
     return manifest
 
 
@@ -353,113 +204,222 @@ def run_stereo_charuco_gui(
     left_device: str | int,
     right_device: str | int,
 ) -> dict[str, Any]:
-    config = load_config(config_path)
-    capture_config = CaptureConfig(
-        views=views or config.capture.views,
-        min_corners=config.capture.min_corners,
-        min_sharpness=config.capture.min_sharpness,
-        min_capture_interval_s=config.capture.min_capture_interval_s,
-    )
+    config = capture_config_with_views(load_config(config_path), views)
     output = fresh_output_dir(output_path)
     output.mkdir(parents=True, exist_ok=True)
     board = create_charuco_board(config.target)
     detector = create_detector(board)
     left_source = OpenCVCamera(left_device or 0, config.camera)
     right_source = OpenCVCamera(right_device or 1, config.camera)
-    records: list[dict[str, Any]] = []
-    calibrate_requested = False
-    last_capture = -1.0e9
-    window_name = "TennisBot ChArUco Stereo Capture"
+    pair_records: list[dict[str, Any]] = []
+    bucket_counts: dict[str, int] = defaultdict(int)
+    recent_left: deque[AutoCaptureQuality] = deque(maxlen=max(1, int(config.capture.stability_frames) - 1))
+    recent_right: deque[AutoCaptureQuality] = deque(maxlen=max(1, int(config.capture.stability_frames) - 1))
+    last_capture_at = -1.0e9
+    last_capture_bucket: str | None = None
+    active_bucket: str | None = None
+    active_bucket_since = 0.0
+    total_pair_frame_count = 0
+    qualified_pair_count = 0
+    required_corners = required_charuco_corners(config.target, config.capture)
+    window_name = "CameraCalibLab Stereo ChArUco Auto Capture"
+    mouse_state = mouse_state_dict()
+    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+    install_mouse_callback(window_name, mouse_state)
     try:
         while True:
             left_frame = left_source.read()
             right_frame = right_source.read()
             left_detection = detect_charuco(left_frame, board, detector)
             right_detection = detect_charuco(right_frame, board, detector)
-            accepted = detection_is_accepted(left_detection, capture_config) and detection_is_accepted(right_detection, capture_config)
+            left_base = evaluate_frame_quality(
+                frame=left_frame,
+                detection=left_detection,
+                required_corners=required_corners,
+                min_sharpness=config.capture.min_sharpness,
+                position_bins=(config.capture.position_bins_x, config.capture.position_bins_y),
+            )
+            right_base = evaluate_frame_quality(
+                frame=right_frame,
+                detection=right_detection,
+                required_corners=required_corners,
+                min_sharpness=config.capture.min_sharpness,
+                position_bins=(config.capture.position_bins_x, config.capture.position_bins_y),
+            )
+            left_quality = quality_with_stability(
+                left_base,
+                tuple(recent_left),
+                config.capture.stability_frames,
+                config.capture.stable_center_delta,
+                config.capture.stable_area_delta,
+            )
+            right_quality = quality_with_stability(
+                right_base,
+                tuple(recent_right),
+                config.capture.stability_frames,
+                config.capture.stable_center_delta,
+                config.capture.stable_area_delta,
+            )
+            pair_quality = stereo_pair_quality(left_quality, right_quality)
             now = monotonic()
-            if accepted and len(records) < capture_config.views and now - last_capture >= capture_config.min_capture_interval_s:
-                records.append(save_stereo_pair(output, left_frame, right_frame, left_detection, right_detection, len(records)))
-                last_capture = now
-            left_preview = draw_preview(
-                left_frame,
-                left_detection,
-                saved=len(records),
-                target=capture_config.views,
-                accepted=accepted,
-                label="left",
+            total_pair_frame_count += 1
+            dwell_seconds = 0.0
+            if pair_quality.accepted and pair_quality.position_bucket is not None:
+                if active_bucket != pair_quality.position_bucket:
+                    active_bucket = pair_quality.position_bucket
+                    active_bucket_since = now
+                dwell_seconds = max(0.0, now - active_bucket_since)
+                qualified_pair_count += 1
+            else:
+                active_bucket = None
+                active_bucket_since = now
+            ready = len(pair_records) >= config.capture.views
+            auto_saved = False
+            if should_auto_capture(
+                pair_quality,
+                bucket_counts,
+                now,
+                last_capture_at,
+                config.capture.min_capture_interval_s,
+                config.capture.max_views_per_bucket,
+                last_capture_bucket=last_capture_bucket,
+                dwell_seconds=dwell_seconds,
+                dwell_capture_s=config.capture.dwell_capture_s,
+            ):
+                pair_records.append(save_stereo_pair(output, left_frame, right_frame, left_detection, right_detection, left_quality, right_quality, len(pair_records)))
+                bucket_counts[str(pair_quality.position_bucket)] += 1
+                last_capture_at = now
+                last_capture_bucket = str(pair_quality.position_bucket)
+                active_bucket_since = now
+                dwell_seconds = 0.0
+                auto_saved = True
+                ready = len(pair_records) >= config.capture.views
+            status = status_line_for_stereo_quality(
+                pair_quality,
+                auto_saved=auto_saved,
+                bucket_count=bucket_counts.get(str(pair_quality.position_bucket), 0) if pair_quality.position_bucket else 0,
+                max_views_per_bucket=config.capture.max_views_per_bucket,
+                same_bucket_as_last_capture=pair_quality.position_bucket == last_capture_bucket,
+                dwell_seconds=dwell_seconds,
+                dwell_capture_s=config.capture.dwell_capture_s,
             )
-            right_preview = draw_preview(
-                right_frame,
-                right_detection,
-                saved=len(records),
-                target=capture_config.views,
-                accepted=accepted,
-                label="right",
+            preview, button_bounds = stereo_charuco_preview_frame(
+                left_frame=left_frame,
+                right_frame=right_frame,
+                left_points=left_detection.points,
+                right_points=right_detection.points,
+                lines=stereo_preview_status_lines(
+                    target_id=config.target.profile,
+                    saved_count=len(pair_records),
+                    target_count=config.capture.views,
+                    total_pair_frame_count=total_pair_frame_count,
+                    qualified_pair_count=qualified_pair_count,
+                    left_quality=left_quality,
+                    right_quality=right_quality,
+                    status=status,
+                    ready=ready,
+                    dwell_seconds=dwell_seconds,
+                    dwell_capture_s=config.capture.dwell_capture_s,
+                ),
+                calibrate_enabled=ready,
+                bucket_counts=dict(bucket_counts),
+                position_bins=(config.capture.position_bins_x, config.capture.position_bins_y),
+                current_bucket=pair_quality.position_bucket,
             )
-            if left_preview.shape[0] != right_preview.shape[0]:
-                right_preview = cv2.resize(right_preview, (right_preview.shape[1], left_preview.shape[0]))
-            cv2.imshow(window_name, np.hstack([left_preview, right_preview]))
+            mouse_state["bounds"] = button_bounds
+            mouse_state["enabled"] = ready
+            cv2.imshow(window_name, preview)
             key = cv2.waitKey(30) & 0xFF
-            if key in {27, ord("q"), ord("Q")}:
+            recent_left.append(left_base)
+            recent_right.append(right_base)
+            if key in QUIT_KEYS:
                 break
-            if key == ord(" ") and accepted and len(records) < capture_config.views:
-                records.append(save_stereo_pair(output, left_frame, right_frame, left_detection, right_detection, len(records)))
-                last_capture = now
-            if key in {ord("c"), ord("C")}:
-                calibrate_requested = True
+            if ready and (key in CALIBRATE_KEYS or bool(mouse_state["clicked"])):
+                mouse_state["clicked"] = True
                 break
-            if len(records) >= capture_config.views:
-                calibrate_requested = True
-                break
+            if key == CAPTURE_KEY and pair_quality.accepted and not auto_saved:
+                pair_records.append(
+                    save_stereo_pair(
+                        output,
+                        left_frame,
+                        right_frame,
+                        left_detection,
+                        right_detection,
+                        left_quality,
+                        right_quality,
+                        len(pair_records),
+                        manual=True,
+                    )
+                )
+                if pair_quality.position_bucket is not None:
+                    bucket_counts[str(pair_quality.position_bucket)] += 1
+                    last_capture_bucket = str(pair_quality.position_bucket)
+                last_capture_at = now
+                active_bucket_since = now
     finally:
         left_source.release()
         right_source.release()
-        cv2.destroyWindow(window_name)
-    manifest = session_manifest(
-        kind="stereo_charuco",
+        destroy_window(window_name)
+    manifest = stereo_manifest(
         output=output,
         config=config,
-        records=records,
-        calibrate_requested=calibrate_requested,
+        left_device=left_device,
+        right_device=right_device,
+        pair_records=pair_records,
+        bucket_counts=dict(bucket_counts),
+        total_pair_frame_count=total_pair_frame_count,
+        qualified_pair_count=qualified_pair_count,
+        calibrate_requested=bool(len(pair_records) >= config.capture.views and mouse_state["clicked"]),
         calibration_output=calibration_output,
     )
+    write_json(output / "session.json", stereo_session_json(output, config, left_device, right_device, pair_records))
     write_json(output / "manifest.json", manifest)
+    write_stereo_summary(output / "summary.md", manifest)
+    write_json(output / "auto_gui_result.json", manifest)
     return manifest
 
 
-def session_manifest(
-    *,
-    kind: str,
-    output: Path,
-    config: ToolConfig,
-    records: list[dict[str, Any]],
-    calibrate_requested: bool,
-    calibration_output: Path | None,
-) -> dict[str, Any]:
-    return {
-        "schema_version": "tennisbot.calibration_capture_session.v1",
-        "created_at": utc_now_iso(),
-        "kind": kind,
-        "status": "ready" if records else "partial",
-        "session_root": str(output),
-        "target": {
-            "profile": config.target.profile,
-            "squares_x": config.target.squares_x,
-            "squares_y": config.target.squares_y,
-            "dictionary": config.target.dictionary,
-            "square_size_m": config.target.square_size_m,
-            "marker_size_m": config.target.marker_size_m,
-        },
-        "camera": {
-            "width_px": config.camera.width_px,
-            "height_px": config.camera.height_px,
-            "fps": config.camera.fps,
-            "fourcc": config.camera.fourcc,
-        },
-        "view_count": len(records),
-        "calibrate_requested": calibrate_requested,
-        "calibration_output": None if calibration_output is None else str(calibration_output),
-        "calibration_status": "not_implemented_in_minimal_migration",
-        "frames": records,
-    }
+def capture_config_with_views(config: ToolConfig, views: int) -> ToolConfig:
+    if views <= 0 or views == config.capture.views:
+        return config
+    capture = CaptureConfig(
+        views=views,
+        min_corners=config.capture.min_corners,
+        min_corner_coverage=config.capture.min_corner_coverage,
+        min_sharpness=config.capture.min_sharpness,
+        min_capture_interval_s=config.capture.min_capture_interval_s,
+        max_views_per_bucket=config.capture.max_views_per_bucket,
+        position_bins_x=config.capture.position_bins_x,
+        position_bins_y=config.capture.position_bins_y,
+        stability_frames=config.capture.stability_frames,
+        stable_center_delta=config.capture.stable_center_delta,
+        stable_area_delta=config.capture.stable_area_delta,
+        dwell_capture_s=config.capture.dwell_capture_s,
+    )
+    return ToolConfig(target=config.target, camera=config.camera, capture=capture)
+
+
+def mouse_state_dict() -> dict[str, Any]:
+    return {"clicked": False, "enabled": False, "bounds": None}
+
+
+def install_mouse_callback(window_name: str, state: dict[str, Any]) -> None:
+    def handle_mouse(event: int, x: int, y: int, _flags: int, _userdata: Any) -> None:
+        bounds = state.get("bounds")
+        if event != cv2.EVENT_LBUTTONDOWN or not state.get("enabled") or bounds is None:
+            return
+        x0, y0, x1, y1 = bounds
+        if x0 <= x <= x1 and y0 <= y <= y1:
+            state["clicked"] = True
+
+    try:
+        cv2.setMouseCallback(window_name, handle_mouse)
+    except cv2.error:
+        return
+
+
+def destroy_window(window_name: str) -> None:
+    try:
+        cv2.destroyWindow(window_name)
+    except cv2.error:
+        return

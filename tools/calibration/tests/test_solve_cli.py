@@ -13,8 +13,8 @@ import numpy as np
 
 from camera_calib_lab.camera_preview import V4L2Control
 from camera_calib_lab.cli import main
-from camera_calib_lab.capture_gui import parse_device
-from camera_calib_lab.solve import target_payload
+from camera_calib_lab.capture_types import parse_device
+from camera_calib_lab.solve import ViewObservation, detect_session_observations, target_payload
 
 
 class SolveCliTest(unittest.TestCase):
@@ -62,6 +62,69 @@ class SolveCliTest(unittest.TestCase):
         self.assertEqual(parse_device("/dev/video2"), 2)
         self.assertEqual(parse_device("1"), 1)
         self.assertEqual(parse_device("/tmp/video"), "/tmp/video")
+
+    def test_session_loader_reads_migrated_mono_session_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            write_session_json(
+                root,
+                {
+                    "topology": "mono",
+                    "target": target_payload({}),
+                    "dry_run": False,
+                    "hardware_validated": True,
+                    "frames": [
+                        {
+                            "view_id": "view001",
+                            "camera_id": "cam1",
+                            "frame_paths": ["cam1/view001/image.png"],
+                            "frame_role": "passive",
+                        }
+                    ],
+                },
+            )
+
+            with patched_session_detection():
+                source = detect_session_observations(root, root / "missing.yaml")
+
+            self.assertEqual(source.topology, "mono")
+            self.assertEqual(len(source.views), 1)
+            self.assertEqual(source.views[0].camera_id, "cam1")
+            self.assertEqual(source.views[0].side, None)
+
+    def test_session_loader_reads_migrated_stereo_session_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            write_session_json(
+                root,
+                {
+                    "topology": "stereo",
+                    "target": target_payload({}),
+                    "dry_run": False,
+                    "hardware_validated": True,
+                    "frames": [
+                        {
+                            "view_id": "view001",
+                            "camera_id": "left",
+                            "frame_paths": ["left/view001/image.png"],
+                            "frame_role": "passive",
+                        },
+                        {
+                            "view_id": "view001",
+                            "camera_id": "right",
+                            "frame_paths": ["right/view001/image.png"],
+                            "frame_role": "passive",
+                        },
+                    ],
+                },
+            )
+
+            with patched_session_detection():
+                source = detect_session_observations(root, root / "missing.yaml")
+
+            self.assertEqual(source.topology, "stereo")
+            self.assertEqual(source.pair_indices, [1])
+            self.assertEqual([view.side for view in source.views], ["left", "right"])
 
     def test_mono_solve_writes_runtime_package(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -147,6 +210,33 @@ def read_json(path: Path) -> dict:
 def run_cli(*args: str) -> int:
     with redirect_stdout(StringIO()):
         return main(list(args))
+
+
+def write_session_json(root: Path, payload: dict) -> None:
+    (root / "session.json").write_text(json.dumps(payload), encoding="utf-8")
+
+
+def patched_session_detection():
+    def fake_detect(image_path: Path, _board: object, _detector: object, camera_id: str, side: str | None, index: int) -> ViewObservation:
+        object_points = charuco_object_points()
+        image_points = np.zeros((len(object_points), 1, 2), dtype=np.float32)
+        return ViewObservation(
+            camera_id=camera_id,
+            side=side,
+            index=index,
+            image_size=(960, 640),
+            object_points=object_points,
+            image_points=image_points,
+            ids=np.arange(len(object_points), dtype=np.int32).reshape(-1, 1),
+            path=str(image_path),
+        )
+
+    return patch.multiple(
+        "camera_calib_lab.solve",
+        create_charuco_board=lambda _target: object(),
+        create_detector=lambda _board: object(),
+        detect_image_observation=fake_detect,
+    )
 
 
 def write_mono_observations(path: Path, *, camera_id: str) -> None:

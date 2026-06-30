@@ -99,17 +99,24 @@ uv run camera-calib-lab capture stereo-charuco-auto-gui \
 
 ## GUI 按键
 
-- `space`：手动保存当前合格帧
-- `c`：结束采集并标记请求标定
+- 移动标定板覆盖不同画面位置；GUI 会显示位置 bucket 网格和已保存 bucket。
+- 自动保存需要满足完整角点覆盖、曝光、清晰度、稳定帧和 bucket/dwell 门控。
+- `space`：手动保存当前已合格帧或双目帧组。
+- `c`：达到 `--views` 后结束采集并标记请求标定。
+- 点击画面右下角 `Calibrate`：达到 `--views` 后结束采集并标记请求标定。
 - `q` 或 `Esc`：退出
 
 ## 输出
 
 工具会写入采集目录，包含：
 
+- `session.json`
 - `manifest.json`
+- `summary.md`
+- `auto_gui_result.json`
+- 每帧 `metadata.json`
 - `cam1/viewXXX/image.png` 或 `left/right/viewXXX/image.png`
-- 每帧 ChArUco 角点数、平均亮度、清晰度
+- 双目采集额外包含 `pairs/viewXXX.json`
 
 默认采集目录如果已存在，会自动追加时间戳，避免覆盖旧采集。
 
