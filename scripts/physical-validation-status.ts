@@ -60,12 +60,11 @@ process.exit(payload.result === "passed" ? 0 : 1);
 
 function runValidationStatus(): GateResult[] {
   const targetMetadata = targetMetadataCheck();
-  const targetPrint = targetPrintCheck();
   const cam1 = monoPackageCheck("cam1", resolve(repoRoot, "artifacts/calibration/cam1/package.json"));
   const cam2 = monoPackageCheck("cam2", resolve(repoRoot, "artifacts/calibration/cam2/package.json"));
   const stereo = stereoPackageCheck(resolve(repoRoot, "artifacts/calibration/stereo_cam1_cam2/package.json"), [cam1, cam2]);
   const live3d = live3dPredictionCheck();
-  return [targetMetadata, targetPrint, cam1, cam2, stereo, live3d];
+  return [targetMetadata, cam1, cam2, stereo, live3d];
 }
 
 function targetMetadataCheck(): GateResult {
@@ -78,7 +77,7 @@ function targetMetadataCheck(): GateResult {
       status: "blocked",
       detail: "target metadata is missing.",
       evidence: path,
-      next: "Generate the DFOptix ChArUco target with the retained CameraCalibLab tooling, then write the target metadata artifact.",
+      next: "Confirm the fixed physical DFOptix ChArUco board metadata, then write the target metadata artifact.",
     };
   }
   const target = objectField(payload, "target");
@@ -96,43 +95,8 @@ function targetMetadataCheck(): GateResult {
       square_size_mm: squareMm,
       files: payload.files,
     }),
-    next: accepted ? undefined : "Regenerate the target before printing.",
+    next: accepted ? undefined : "Confirm the physical target board dimensions before calibration.",
   };
-}
-
-function targetPrintCheck(): GateResult {
-  const path = resolve(repoRoot, "artifacts/calibration_targets/dfoptix_charuco_15mm_print_check.json");
-  const payload = readJson(path);
-  if (payload === undefined) {
-    return {
-      id: "target-print",
-      label: "Printed target measurement",
-      status: "blocked",
-      detail: "no recorded 15.0 mm print measurement was found.",
-      evidence: displayPath(path),
-      next: targetPrintNextAction(),
-    };
-  }
-  const measured = numberField(payload, "measured_square_mm");
-  const tolerance = numberField(payload, "tolerance_mm") ?? 0.2;
-  const passed = payload.accepted === true && measured !== undefined && Math.abs(measured - 15) <= tolerance;
-  return {
-    id: "target-print",
-    label: "Printed target measurement",
-    status: passed ? "passed" : "failed",
-    detail: passed ? `printed target measurement is ${measured} mm.` : "printed target measurement is missing or outside tolerance.",
-    evidence: compactJson({ path: displayPath(path), measured_square_mm: measured, tolerance_mm: tolerance, accepted: payload.accepted }),
-    next: passed ? undefined : "Fix printer scaling and reprint before camera capture.",
-  };
-}
-
-function targetPrintNextAction(): string {
-  const targetMetadata = readJson(resolve(repoRoot, "artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.json"));
-  const files = objectField(targetMetadata, "files");
-  const svgPath = stringField(files, "svg") ?? "artifacts/calibration_targets/dfoptix_charuco_15mm_300dpi.svg";
-  return [
-    `Print ${displayReferencePath(svgPath)} at 100% scale, measure one square, then record the measurement in ${displayPath(resolve(repoRoot, "artifacts/calibration_targets/dfoptix_charuco_15mm_print_check.json"))}.`,
-  ].join(" ");
 }
 
 function monoPackageCheck(cameraId: string, path: string): GateResult {
@@ -334,11 +298,6 @@ function numberField(payload: JsonObject | undefined, key: string): number | und
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
-function stringField(payload: JsonObject | undefined, key: string): string | undefined {
-  const value = payload?.[key];
-  return typeof value === "string" ? value : undefined;
-}
-
 function approximately(value: number | undefined, expected: number, tolerance: number): boolean {
   return value !== undefined && Math.abs(value - expected) <= tolerance;
 }
@@ -353,24 +312,6 @@ function displayPath(path: string): string {
   return resolvedPath === resolvedRoot || !resolvedPath.startsWith(`${resolvedRoot}/`)
     ? path
     : resolvedPath.slice(resolvedRoot.length + 1);
-}
-
-function displayReferencePath(path: string): string {
-  if (path.startsWith("../../artifacts/")) {
-    return path.slice("../../".length);
-  }
-  const bases = [repoRoot];
-  for (const base of bases) {
-    const resolved = resolve(base, path);
-    if (isInsideRepo(resolved)) return displayPath(resolved);
-  }
-  return path;
-}
-
-function isInsideRepo(path: string): boolean {
-  const resolvedRoot = resolve(repoRoot);
-  const resolvedPath = resolve(path);
-  return resolvedPath === resolvedRoot || resolvedPath.startsWith(`${resolvedRoot}/`);
 }
 
 function buildStatusPayload(gates: GateResult[]): StatusPayload {
@@ -473,7 +414,6 @@ function printUsage(): void {
 
 检查 TennisBot 物理验收门槛:
 - ChArUco 标定板元数据
-- 打印标定板方格实测记录
 - cam1 和 cam2 真实单目标定包
 - 真实双目标定包
 - Live3D 硬件报告达到 prediction-ready

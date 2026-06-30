@@ -4,13 +4,8 @@
 
 ## 约定
 
-Python 工具使用 `uv`，前端和 TypeScript 脚本使用 `bun`。除真实物理测量值外，
-入口命令都提供默认路径、默认设备或默认端口；直接运行默认命令应该能进入最常用
-流程。
-
-唯一不提供默认值的是真实打印测量值：
-`scripts/record-target-print-check.ts --measured-square-mm`。这个值必须人工测量后
-显式传入，避免伪造物理验收。
+Python 工具使用 `uv`，前端和 TypeScript 脚本使用 `bun`。入口命令都提供默认
+路径、默认设备或默认端口；直接运行默认命令应该能进入最常用流程。
 
 ## 本机运行入口
 
@@ -238,15 +233,3 @@ bun scripts/physical-validation-status.ts
 ```text
 docs/archive/YYYYMMDD/probes/local_physical_validation_status_YYYYMMDD.md
 ```
-
-记录标定板打印测量：
-
-```bash
-bun scripts/record-target-print-check.ts --measured-square-mm 15.0
-```
-
-默认值：
-
-- 容差：`0.2 mm`
-- JSON：`artifacts/calibration_targets/dfoptix_charuco_15mm_print_check.json`
-- 报告：`docs/archive/YYYYMMDD/calibration/calibration_target_print_check_YYYYMMDD.md`

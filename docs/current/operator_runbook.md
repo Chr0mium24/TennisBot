@@ -40,12 +40,7 @@ Observed result on 2026-06-29:
 ready  Live3D           http://127.0.0.1:5178/
 ```
 
-Normal startup also prints the current physical validation next action. On
-2026-06-29, the observed next action is:
-
-```text
-Physical validation next action: Print the target SVG at 100%, measure one square, then record the measurement in this artifact.
-```
+Normal startup also prints the current physical validation next action.
 
 ## Calibration Order
 
@@ -67,8 +62,8 @@ passed USB camera devices
 
 Use the mainline OpenCV GUI in order:
 
-1. Print the DFOptix ChArUco target at 100% scale and confirm one square
-   measures 15 mm.
+1. Confirm the fixed physical DFOptix ChArUco board is clean, flat, and matches
+   the configured `15 mm` square / `11.25 mm` marker dimensions.
 2. `cd tools/calibration && uv run camera-calib-lab capture charuco-auto-gui ...`
    for each mono camera capture.
 3. `cd tools/calibration && uv run camera-calib-lab capture stereo-charuco-auto-gui ...`

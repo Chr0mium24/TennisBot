@@ -2,11 +2,10 @@
 
 Local-machine-first workspace for the TennisBot stereo vision runtime.
 
-The active repository code lives in top-level `apps/`, `packages/`, and
-`tools/`. Local legacy lab code remains under ignored `desperate/` when
-present. Calibration is handled by the retained original OpenCV
-`desperate/CameraCalibLab` workflow; the deleted standalone
-`tools/calibration` package is no longer part of the active architecture.
+The active repository code lives in top-level `apps/`, `packages/`, `scripts/`,
+and `tools/`. Local legacy lab code can exist under ignored `desperate/` when
+present, but it is outside the active runtime path. Calibration capture is
+handled by the mainline `tools/calibration` OpenCV workflow.
 
 ## Projects
 
@@ -15,6 +14,7 @@ present. Calibration is handled by the retained original OpenCV
 | `apps/live3d` | Browser USB stereo camera UI, ONNX YOLO inference, runtime 3D visualization |
 | `packages/contracts` | Shared TypeScript data contracts |
 | `packages/core` | Artifact validation, stereo pairing, triangulation, trajectory prediction |
+| `tools/calibration` | Fixed DFOptix ChArUco OpenCV mono/stereo capture GUI |
 | `tools/yolo` | Standalone YOLO runtime model package tooling |
 | `artifacts/` | Ignored local runtime outputs for calibration and model packages |
 | `desperate/` | Ignored local-only archive for legacy lab code, not part of the parent Git repository |
@@ -62,17 +62,15 @@ bun run typecheck
 bun run build
 ```
 
-Run the original OpenCV stereo calibration GUI:
+Run the OpenCV stereo calibration GUI:
 
 ```bash
-cd desperate/CameraCalibLab
+cd tools/calibration
 uv run camera-calib-lab capture stereo-charuco-auto-gui \
   --config configs/dfoptix_charuco_15mm_capture.yaml \
-  --output captures/local/dfoptix_stereo_charuco_auto_session \
-  --calibration-output runs/calibrations/dfoptix_stereo_charuco_auto \
-  --views 30 \
   --left-device /dev/video0 \
-  --right-device /dev/video2
+  --right-device /dev/video2 \
+  --views 30
 ```
 
 Create dry-run YOLO artifacts:
@@ -99,69 +97,12 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 
 ## Architecture
 
-- [Current architecture](docs/current_architecture_20260629.md)
-- [Current status](docs/current_status_20260629.md)
-- [Desperate legacy code retirement](docs/desperate_legacy_code_retirement_20260629.md)
-- [Local physical validation checklist](docs/local_physical_validation_checklist_20260629.md)
-- [Local physical validation status script](docs/local_physical_validation_status_script_20260629.md)
-- [Final runtime validation](docs/final_runtime_validation_20260629.md)
-- [Local runtime operator runbook](docs/local_runtime_operator_runbook_20260629.md)
-- [Local runtime launcher next action](docs/local_runtime_launcher_next_action_20260629.md)
-- [Local runtime preflight](docs/local_runtime_preflight_20260629.md)
-- [Local physical validation status](docs/local_physical_validation_status_20260629.md)
-- [Calibration capture session flow](docs/calibration_capture_session_flow_20260629.md)
-- [Calibration capture quality dry run](docs/calibration_capture_quality_20260629.md)
-- [Calibration capture quality hardware probe](docs/calibration_capture_quality_hardware_probe_20260629.md)
-- [Calibration ChArUco detection dry run](docs/calibration_charuco_detection_20260629.md)
-- [Calibration ChArUco detection hardware probe](docs/calibration_charuco_detection_hardware_probe_20260629.md)
-- [Calibration ChArUco target sheet](docs/calibration_charuco_target_sheet_20260629.md)
-- [Calibration mono solve](docs/calibration_mono_solve_20260629.md)
-- [Calibration mono solve capture quality](docs/calibration_mono_solve_capture_quality_20260629.md)
-- [Calibration mono solve ChArUco detection](docs/calibration_charuco_detection_mono_solve_20260629.md)
-- [Calibration stereo solve](docs/calibration_stereo_solve_20260629.md)
-- [Calibration stereo solve capture quality](docs/calibration_stereo_solve_capture_quality_20260629.md)
-- [Calibration stereo solve ChArUco detection](docs/calibration_charuco_detection_stereo_solve_20260629.md)
-- [Calibration frontend review revert](docs/calibration_frontend_review_revert_20260629.md)
-- [Calibration tool deletion result](docs/calibration_tool_deletion_result_20260629.md)
-- [Tool boundary audit](docs/tool_boundary_audit_20260629.md)
-- [Legacy board/runtime shell retirement](docs/legacy_board_retirement_20260629.md)
-- [Live3D hardware smoke](docs/live3d_hardware_smoke_20260629.md)
-- [Live3D hardware acceptance checklist](docs/live3d_hardware_acceptance_checklist_20260629.md)
-- [Live3D hardware acceptance probe](docs/live3d_hardware_acceptance_probe_20260629.md)
-- [Live3D hardware readiness gates probe](docs/live3d_hardware_readiness_gates_20260629.md)
-- [YOLO static sample validation](docs/yolo_static_sample_validation_20260629.md)
-- [Architecture simplification plan](docs/architecture_simplification_plan_20260628.md)
-- [Multi-agent refactor task plan](docs/multi_agent_refactor_tasks_20260628.md)
-- [Multi-agent refactor Wave 1 result](docs/multi_agent_refactor_wave1_result_20260628.md)
-- [Multi-agent refactor Wave 2 core migration plan](docs/multi_agent_refactor_wave2_core_migration_plan_20260628.md)
-- [Multi-agent refactor Wave 2 core migration result](docs/multi_agent_refactor_wave2_core_migration_result_20260628.md)
-- [Multi-agent refactor Wave 3 Live3D core fixture plan](docs/multi_agent_refactor_wave3_live3d_core_fixture_plan_20260628.md)
-- [Multi-agent refactor Wave 3 Live3D core fixture result](docs/multi_agent_refactor_wave3_live3d_core_fixture_result_20260628.md)
-- [Multi-agent refactor Wave 3 Live3D core fixture review](docs/multi_agent_refactor_wave3_live3d_core_fixture_review_20260628.md)
-- [Multi-agent refactor Wave 4 artifact loaders plan](docs/multi_agent_refactor_wave4_artifact_loaders_plan_20260628.md)
-- [Multi-agent refactor Wave 4 artifact loaders result](docs/multi_agent_refactor_wave4_artifact_loaders_result_20260628.md)
-- [Multi-agent refactor Wave 4 artifact loaders review](docs/multi_agent_refactor_wave4_artifact_loaders_review_20260628.md)
-- [Multi-agent refactor Wave 5 calibration tool plan](docs/multi_agent_refactor_wave5_calibration_tool_plan_20260629.md)
-- [Multi-agent refactor Wave 5 calibration tool result](docs/multi_agent_refactor_wave5_calibration_tool_result_20260629.md)
-- [Multi-agent refactor Wave 5 calibration tool review](docs/multi_agent_refactor_wave5_calibration_tool_review_20260629.md)
-- [Multi-agent refactor Wave 6 YOLO tool plan](docs/multi_agent_refactor_wave6_yolo_tool_plan_20260629.md)
-- [Multi-agent refactor Wave 6 YOLO tool result](docs/multi_agent_refactor_wave6_yolo_tool_result_20260629.md)
-- [Multi-agent refactor Wave 6 YOLO tool review](docs/multi_agent_refactor_wave6_yolo_tool_review_20260629.md)
-- [Multi-agent refactor Wave 7 Live3D artifacts plan](docs/multi_agent_refactor_wave7_live3d_artifacts_plan_20260629.md)
-- [Multi-agent refactor Wave 7 Live3D artifacts result](docs/multi_agent_refactor_wave7_live3d_artifacts_result_20260629.md)
-- [Multi-agent refactor Wave 7 Live3D artifacts review](docs/multi_agent_refactor_wave7_live3d_artifacts_review_20260629.md)
-- [Multi-agent refactor Wave 8 Live3D USB camera plan](docs/multi_agent_refactor_wave8_live3d_usb_camera_plan_20260629.md)
-- [Multi-agent refactor Wave 8 Live3D USB camera result](docs/multi_agent_refactor_wave8_live3d_usb_camera_result_20260629.md)
-- [Multi-agent refactor Wave 8 Live3D USB camera review](docs/multi_agent_refactor_wave8_live3d_usb_camera_review_20260629.md)
-- [Multi-agent refactor Wave 9 Live3D YOLO inference plan](docs/multi_agent_refactor_wave9_live3d_yolo_inference_plan_20260629.md)
-- [Multi-agent refactor Wave 9 Live3D YOLO inference result](docs/multi_agent_refactor_wave9_live3d_yolo_inference_result_20260629.md)
-- [Multi-agent refactor Wave 9 Live3D YOLO inference review](docs/multi_agent_refactor_wave9_live3d_yolo_inference_review_20260629.md)
-- [Multi-agent refactor Wave 10 Live3D ONNX backend plan](docs/multi_agent_refactor_wave10_live3d_onnx_backend_plan_20260629.md)
-- [Multi-agent refactor Wave 10 Live3D ONNX backend result](docs/multi_agent_refactor_wave10_live3d_onnx_backend_result_20260629.md)
-- [Multi-agent refactor Wave 10 Live3D ONNX backend review](docs/multi_agent_refactor_wave10_live3d_onnx_backend_review_20260629.md)
-- [Multi-agent refactor Wave 11 Live3D runtime 3D plan](docs/multi_agent_refactor_wave11_live3d_runtime_3d_plan_20260629.md)
-- [Multi-agent refactor Wave 11 Live3D runtime 3D result](docs/multi_agent_refactor_wave11_live3d_runtime_3d_result_20260629.md)
-- [Multi-agent refactor Wave 11 Live3D runtime 3D review](docs/multi_agent_refactor_wave11_live3d_runtime_3d_review_20260629.md)
+- [Current architecture](docs/current/architecture.md)
+- [Current status](docs/current/status.md)
+- [Command usage](docs/current/command_usage.md)
+- [Operator runbook](docs/current/operator_runbook.md)
+- [Camera devices](docs/current/camera_devices.md)
+- [Live3D hardware acceptance](docs/current/live3d_hardware_acceptance.md)
 
 ## Git Workflow
 
