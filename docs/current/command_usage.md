@@ -33,6 +33,7 @@ bun scripts/live3d.ts --status
 
 ```bash
 bun scripts/calib.ts brightness
+bun scripts/calib.ts preview
 bun scripts/calib.ts mono cam1
 bun scripts/calib.ts mono cam2
 bun scripts/calib.ts stereo
@@ -41,6 +42,7 @@ bun scripts/calib.ts stereo
 默认值：
 
 - 亮度检查设备：`/dev/video0,/dev/video2`
+- 预览调试设备：`/dev/video0,/dev/video2`
 - `cam1` 设备：`/dev/video0`，输出：`artifacts/calibration/cam1`
 - `cam2` 设备：`/dev/video2`，输出：`artifacts/calibration/cam2`
 - 双目标定设备：左 `/dev/video0`，右 `/dev/video2`
@@ -51,6 +53,8 @@ bun scripts/calib.ts stereo
 常用选项：
 
 ```bash
+bun scripts/calib.ts preview cam1
+bun scripts/calib.ts preview cam2 --shutter 400 --gain 64
 bun scripts/calib.ts mono cam1 --capture-only
 bun scripts/calib.ts mono cam1 --solve-only --session tools/calibration/captures/local/<session>
 bun scripts/calib.ts stereo --dry-run
@@ -59,8 +63,10 @@ bun scripts/calib.ts stereo --devices /dev/video0,/dev/video2
 
 正常标定顺序是先检查亮度和相机顺序，再分别完成 `cam1`、`cam2` 单目，
 最后完成双目。`mono` 和 `stereo` 默认都是“采集 GUI 结束后继续求解并导出
-运行时包”。`mono/stereo --dry-run` 只打印底层命令；`brightness --dry-run`
-只枚举设备，不调用 `ffmpeg` 采集图像帧。
+运行时包”。`preview` 会打开 OpenCV 实时画面，窗口滑条可调
+`shutter/exposure_time_absolute` 和 `gain`，`q` 或 `esc` 退出。
+`mono/stereo --dry-run` 只打印底层命令；`brightness/preview --dry-run`
+不采集图像帧。
 
 ## 相机亮度检查
 
@@ -81,6 +87,43 @@ bun scripts/calib.ts brightness
 ```bash
 bun scripts/calib.ts brightness --devices /dev/video0,/dev/video2
 ```
+
+## 相机视频调试
+
+双目预览并调快门/增益：
+
+```bash
+bun scripts/calib.ts preview
+```
+
+单路预览：
+
+```bash
+bun scripts/calib.ts preview cam1
+bun scripts/calib.ts preview cam2
+```
+
+指定初始参数：
+
+```bash
+bun scripts/calib.ts preview cam2 --shutter 400 --gain 64
+```
+
+默认值：
+
+- 双目设备：`/dev/video0,/dev/video2`
+- `cam1` 设备：`/dev/video0`
+- `cam2` 设备：`/dev/video2`
+- 分辨率：`1280x720`
+- 帧率：`30`
+- 输入格式：`MJPG`
+- 默认切到手动曝光，方便滑条调整快门
+
+窗口操作：
+
+- 滑条：`shutter` 调 `exposure_time_absolute`
+- 滑条：`gain` 调 UVC `gain`
+- 退出：`q` 或 `esc`
 
 ## 底层标定工具
 

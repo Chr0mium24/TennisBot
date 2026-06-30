@@ -50,6 +50,7 @@ Current commands:
 
 ```bash
 bun scripts/calib.ts brightness
+bun scripts/calib.ts preview
 bun scripts/calib.ts mono cam1
 bun scripts/calib.ts mono cam2
 bun scripts/calib.ts stereo
@@ -144,6 +145,7 @@ Camera brightness sanity check:
 ```bash
 bun scripts/calib.ts brightness
 bun scripts/calib.ts brightness --devices /dev/video0,/dev/video2
+bun scripts/calib.ts preview
 ```
 
 Start the local browser runtime:

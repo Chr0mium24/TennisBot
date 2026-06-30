@@ -54,6 +54,7 @@ Run camera checks and calibration:
 
 ```bash
 bun scripts/calib.ts brightness
+bun scripts/calib.ts preview
 bun scripts/calib.ts mono cam1
 bun scripts/calib.ts mono cam2
 bun scripts/calib.ts stereo

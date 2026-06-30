@@ -56,6 +56,13 @@ try {
       await runStep({ label: "camera brightness", args: ["camera", "brightness", ...brightnessArgs(rest)] }, false),
     );
   }
+  if (command === "preview") {
+    if (rest[0] === "--help" || rest[0] === "-h") {
+      printPreviewUsage();
+      process.exit(0);
+    }
+    process.exit(await runStep({ label: "camera preview", args: ["camera", "preview", ...previewArgs(rest)] }, false));
+  }
   if (command === "mono") {
     process.exit(await runMono(rest));
   }
@@ -310,6 +317,41 @@ function brightnessArgs(args: string[]): string[] {
   return ["--devices", "/dev/video0,/dev/video2", ...args];
 }
 
+function previewArgs(args: string[]): string[] {
+  const [target, ...rest] = args;
+  if (target === "cam1") {
+    return previewMonoArgs("/dev/video0", rest);
+  }
+  if (target === "cam2") {
+    return previewMonoArgs("/dev/video2", rest);
+  }
+  if (target === "stereo") {
+    return previewStereoArgs(rest);
+  }
+  if (target !== undefined && !target.startsWith("-")) {
+    throw new Error(`Unknown preview target: ${target}. Use cam1, cam2, or stereo.`);
+  }
+  return previewStereoArgs(args);
+}
+
+function previewMonoArgs(defaultDevice: string, args: string[]): string[] {
+  if (hasAnyOption(args, ["--device", "--devices"])) {
+    return args;
+  }
+  return ["--device", defaultDevice, ...args];
+}
+
+function previewStereoArgs(args: string[]): string[] {
+  if (hasAnyOption(args, ["--device", "--devices"])) {
+    return args;
+  }
+  return ["--devices", "/dev/video0,/dev/video2", ...args];
+}
+
+function hasAnyOption(args: string[], names: string[]): boolean {
+  return args.some((arg) => names.some((name) => arg === name || arg.startsWith(`${name}=`)));
+}
+
 function defaultSessionPath(mode: Mode, prefix: string): string {
   if (mode === "solve-only") {
     return latestSessionPath(prefix);
@@ -412,27 +454,61 @@ function shellWord(value: string): string {
 function printUsage(): void {
   console.log(`用法:
   bun scripts/calib.ts brightness [camera brightness options]
+  bun scripts/calib.ts preview [cam1|cam2|stereo] [camera preview options]
   bun scripts/calib.ts mono cam1 [options]
   bun scripts/calib.ts mono cam2 [options]
   bun scripts/calib.ts stereo [options]
 
 常用:
   bun scripts/calib.ts brightness
+  bun scripts/calib.ts preview
   bun scripts/calib.ts mono cam1
   bun scripts/calib.ts mono cam2
   bun scripts/calib.ts stereo
 
 默认:
   brightness devices: /dev/video0,/dev/video2
+  preview devices: /dev/video0,/dev/video2
 
 选项:
   --capture-only   只采集，不求解
   --solve-only     只求解，默认使用最新匹配 session
-  --dry-run        mono/stereo 只打印命令；brightness 只枚举设备不采集帧
+  --dry-run        mono/stereo 只打印命令；brightness/preview 不采集图像帧
 
 查看子命令:
+  bun scripts/calib.ts preview --help
   bun scripts/calib.ts mono --help
   bun scripts/calib.ts stereo --help
+`);
+}
+
+function printPreviewUsage(): void {
+  console.log(`用法:
+  bun scripts/calib.ts preview [options]
+  bun scripts/calib.ts preview cam1 [options]
+  bun scripts/calib.ts preview cam2 [options]
+  bun scripts/calib.ts preview stereo [options]
+
+默认:
+  preview: /dev/video0,/dev/video2
+  cam1: /dev/video0
+  cam2: /dev/video2
+
+选项:
+  --device <path>
+  --devices <left,right>
+  --shutter <n>
+  --exposure <n>
+  --gain <n>
+  --auto-exposure
+  --width <px>
+  --height <px>
+  --fps <n>
+  --dry-run
+
+窗口:
+  滑条调 shutter/exposure_time_absolute 和 gain。
+  q 或 esc 退出。
 `);
 }
 

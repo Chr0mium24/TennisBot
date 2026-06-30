@@ -26,10 +26,11 @@ The current quick camera-device tool is:
 ```bash
 bun scripts/calib.ts brightness
 bun scripts/calib.ts brightness --devices /dev/video0,/dev/video2
+bun scripts/calib.ts preview
 ```
 
-It prints average brightness for two USB cameras so a covered or dark camera can
-be identified before calibration or Live3D runs.
+It prints average brightness for two USB cameras and can open a live preview
+with shutter/gain controls before calibration or Live3D runs.
 
 ## Important Gaps
 
@@ -69,6 +70,7 @@ uv run --extra detect tennisbot-yolo detect-gui \
 Capture calibration frames:
 
 ```bash
+bun scripts/calib.ts preview
 bun scripts/calib.ts mono cam1
 bun scripts/calib.ts mono cam2
 bun scripts/calib.ts stereo

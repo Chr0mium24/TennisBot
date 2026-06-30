@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from camera_calib_lab.brightness import BrightnessOptions, print_brightness_report, run_camera_brightness_check
+from camera_calib_lab.camera_preview import PreviewOptions, run_camera_preview
 from camera_calib_lab.capture_gui import run_mono_charuco_gui, run_stereo_charuco_gui
 from camera_calib_lab.solve import solve_mono_package, solve_stereo_package
 
@@ -85,6 +86,43 @@ def camera_brightness(args: argparse.Namespace) -> int:
     return exit_code
 
 
+def camera_preview(args: argparse.Namespace) -> int:
+    try:
+        devices = parse_preview_devices(args)
+    except ValueError as error:
+        print(str(error))
+        return 2
+    report = run_camera_preview(
+        PreviewOptions(
+            devices=devices,
+            width=int(args.width),
+            height=int(args.height),
+            fps=float(args.fps),
+            fourcc=str(args.fourcc),
+            exposure=None if args.exposure is None else int(args.exposure),
+            gain=None if args.gain is None else int(args.gain),
+            auto_exposure=bool(args.auto_exposure),
+            dry_run=bool(args.dry_run),
+            max_width=int(args.max_width),
+        )
+    )
+    if args.dry_run:
+        print(json.dumps(report, indent=2, sort_keys=True))
+    return 0
+
+
+def parse_preview_devices(args: argparse.Namespace) -> list[str]:
+    if args.device and args.devices:
+        raise ValueError("camera preview accepts either --device or --devices, not both")
+    if args.device:
+        return [str(args.device)]
+    devices = str(args.devices) or "/dev/video0,/dev/video2"
+    parsed = [device.strip() for device in devices.split(",") if device.strip()]
+    if not parsed or len(parsed) > 2:
+        raise ValueError("camera preview requires one or two devices")
+    return parsed
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser_kwargs = {"formatter_class": argparse.ArgumentDefaultsHelpFormatter}
     parser = argparse.ArgumentParser(
@@ -159,6 +197,20 @@ def build_parser() -> argparse.ArgumentParser:
     brightness.add_argument("--json", action="store_true", help="输出 JSON 报告")
     brightness.add_argument("--dry-run", action="store_true", help="只解析设备，不调用 ffmpeg 采集")
     brightness.set_defaults(handler=camera_brightness)
+
+    preview = camera_subparsers.add_parser("preview", help="打开相机实时画面并调节快门/增益。", **parser_kwargs)
+    preview.add_argument("--device", default="", help="单相机设备；与 --devices 二选一")
+    preview.add_argument("--devices", default="", help="逗号分隔的一到两个相机设备；默认 /dev/video0,/dev/video2")
+    preview.add_argument("--width", type=int, default=1280, help="预览采集宽度")
+    preview.add_argument("--height", type=int, default=720, help="预览采集高度")
+    preview.add_argument("--fps", type=float, default=30.0, help="预览采集帧率")
+    preview.add_argument("--fourcc", default="MJPG", help="OpenCV FourCC")
+    preview.add_argument("--shutter", "--exposure", dest="exposure", type=int, default=None, help="初始 exposure_time_absolute")
+    preview.add_argument("--gain", type=int, default=None, help="初始 gain")
+    preview.add_argument("--auto-exposure", action="store_true", help="保留自动曝光；默认切到手动曝光以允许调快门")
+    preview.add_argument("--max-width", type=int, default=760, help="单路画面的最大预览宽度")
+    preview.add_argument("--dry-run", action="store_true", help="只打印设备和控制项，不打开视频窗口")
+    preview.set_defaults(handler=camera_preview)
 
     return parser
 

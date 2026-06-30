@@ -21,6 +21,21 @@ class SolveCliTest(unittest.TestCase):
                 main(["camera", "brightness", "--help"])
         self.assertEqual(caught.exception.code, 0)
 
+    def test_camera_preview_help_is_available(self) -> None:
+        with redirect_stdout(StringIO()):
+            with self.assertRaises(SystemExit) as caught:
+                main(["camera", "preview", "--help"])
+        self.assertEqual(caught.exception.code, 0)
+
+    def test_camera_preview_dry_run_reports_devices(self) -> None:
+        output = StringIO()
+        with redirect_stdout(output):
+            code = main(["camera", "preview", "--dry-run", "--devices", "/dev/video0,/dev/video2"])
+        self.assertEqual(code, 0)
+        report = json.loads(output.getvalue())
+        self.assertEqual(report["status"], "dry-run")
+        self.assertEqual([camera["device"] for camera in report["cameras"]], ["/dev/video0", "/dev/video2"])
+
     def test_mono_solve_writes_runtime_package(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

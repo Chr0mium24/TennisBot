@@ -25,6 +25,25 @@ bun scripts/calib.ts brightness --devices /dev/video0,/dev/video2
 
 Requires `ffmpeg` and `v4l2-ctl` on the machine running the cameras.
 
+## Video Preview And Controls
+
+Open a live stereo preview and tune UVC shutter/gain before calibration:
+
+```bash
+bun scripts/calib.ts preview
+```
+
+Open one camera:
+
+```bash
+bun scripts/calib.ts preview cam1
+bun scripts/calib.ts preview cam2
+```
+
+The preview window provides trackbars for `shutter` (`exposure_time_absolute`)
+and `gain`. It uses `v4l2-ctl` to write the controls and exits with `q` or
+`esc`.
+
 ## Where Device Parameters Are Used
 
 Calibration:

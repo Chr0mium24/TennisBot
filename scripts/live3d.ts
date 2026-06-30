@@ -64,7 +64,7 @@ for (const item of started) {
   console.log(`- ${item.surface.name}: ${item.surface.url} (${item.reused ? "reused" : `pid ${item.process?.pid}`})`);
 }
 console.log("");
-console.log("Use bun scripts/calib.ts for camera brightness checks and mono/stereo calibration.");
+console.log("Use bun scripts/calib.ts for camera brightness, preview controls, and mono/stereo calibration.");
 console.log("Use Live3D after calibration and put a visible tennis ball in both camera views.");
 
 const childProcesses = started.flatMap((item) => (item.process === undefined ? [] : [item.process]));
@@ -179,6 +179,7 @@ function printUsage(): void {
 
 标定和相机亮度检查使用:
   bun scripts/calib.ts brightness
+  bun scripts/calib.ts preview
   bun scripts/calib.ts mono cam1
   bun scripts/calib.ts mono cam2
   bun scripts/calib.ts stereo
