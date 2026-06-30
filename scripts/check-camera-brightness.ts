@@ -210,7 +210,6 @@ function commandHints(devices: DeviceResult[]): string[] {
   return [
     `calibration stereo: --left-device ${left.device} --right-device ${right.device}`,
     `Live3D UVC: --uvc-devices ${left.device},${right.device}`,
-    `legacy stereo-gui: --left-device ${left.device} --right-device ${right.device}`,
   ];
 }
 

@@ -41,10 +41,3 @@ Live3D hardware verifier UVC preparation:
 cd apps/live3d
 bun run verify:hardware -- --prepare-uvc-controls --uvc-devices <left>,<right>
 ```
-
-Legacy realtime stereo GUI:
-
-```bash
-cd desperate/TennisBallDetectorLab
-uv run tbl stereo-gui --left-device <left> --right-device <right>
-```
