@@ -21,20 +21,12 @@ The local launcher has reported the browser surface ready:
 ready  Live3D           http://127.0.0.1:5178/
 ```
 
-The latest known preflight passed these software and local-device gates:
-
-```text
-passed Live3D surface
-passed YOLO package
-passed Stereo calibration package
-passed USB camera devices
-```
-
 The current quick camera-device tool is:
 
 ```bash
-bun scripts/check-camera-brightness.ts
-bun scripts/check-camera-brightness.ts --devices /dev/video0,/dev/video2
+cd tools/calibration
+uv run camera-calib-lab camera brightness
+uv run camera-calib-lab camera brightness --devices /dev/video0,/dev/video2
 ```
 
 It prints average brightness for two USB cameras so a covered or dark camera can
@@ -86,8 +78,8 @@ uv run camera-calib-lab capture stereo-charuco-auto-gui --left-device /dev/video
 Start or check Live3D:
 
 ```bash
-bun scripts/start-local-runtime.ts
-bun scripts/start-local-runtime.ts --status
+bun scripts/live3d.ts
+bun scripts/live3d.ts --status
 ```
 
 Run a hardware evidence pass:

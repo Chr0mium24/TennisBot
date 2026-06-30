@@ -18,9 +18,7 @@ TennisBot/
     calibration/     fixed DFOptix ChArUco OpenCV capture GUI
     yolo/            annotation, YOLO package, pure detection GUI
   scripts/
-    check-camera-brightness.ts
-    start-local-runtime.ts
-    operator-preflight.ts
+    live3d.ts        single root launcher/status check for Live3D
   artifacts/         ignored local runtime artifacts
   docs/
     current/         current operational truth
@@ -44,6 +42,7 @@ Owns the mainline OpenCV calibration capture GUI for this project target:
 - stereo capture GUI command;
 - mono ChArUco solve and runtime package export;
 - stereo ChArUco solve and runtime package export;
+- USB camera brightness checks;
 - capture quality checks for corner count, sharpness, and brightness;
 - session manifests with saved frames.
 
@@ -51,6 +50,7 @@ Current commands:
 
 ```bash
 cd tools/calibration
+uv run camera-calib-lab camera brightness
 uv run camera-calib-lab capture charuco-auto-gui --device /dev/video0
 uv run camera-calib-lab capture stereo-charuco-auto-gui --left-device /dev/video0 --right-device /dev/video2
 uv run camera-calib-lab solve mono --session captures/local/cam1_charuco --output ../../artifacts/calibration/cam1 --camera-id cam1
@@ -144,15 +144,16 @@ but the full run still requires a visible tennis ball in both camera views and a
 Camera brightness sanity check:
 
 ```bash
-bun scripts/check-camera-brightness.ts
-bun scripts/check-camera-brightness.ts --devices /dev/video0,/dev/video2
+cd tools/calibration
+uv run camera-calib-lab camera brightness
+uv run camera-calib-lab camera brightness --devices /dev/video0,/dev/video2
 ```
 
 Start the local browser runtime:
 
 ```bash
-bun scripts/start-local-runtime.ts
-bun scripts/start-local-runtime.ts --status
+bun scripts/live3d.ts
+bun scripts/live3d.ts --status
 ```
 
 Verify core packages:

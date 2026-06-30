@@ -15,6 +15,12 @@ from camera_calib_lab.solve import target_payload
 
 
 class SolveCliTest(unittest.TestCase):
+    def test_camera_brightness_help_is_available(self) -> None:
+        with redirect_stdout(StringIO()):
+            with self.assertRaises(SystemExit) as caught:
+                main(["camera", "brightness", "--help"])
+        self.assertEqual(caught.exception.code, 0)
+
     def test_mono_solve_writes_runtime_package(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

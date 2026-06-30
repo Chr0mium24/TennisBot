@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
+from camera_calib_lab.brightness import BrightnessOptions, print_brightness_report, run_camera_brightness_check
 from camera_calib_lab.capture_gui import run_mono_charuco_gui, run_stereo_charuco_gui
 from camera_calib_lab.solve import solve_mono_package, solve_stereo_package
 
@@ -66,6 +67,24 @@ def solve_stereo(args: argparse.Namespace) -> int:
     return 0 if package["accepted"] else 1
 
 
+def camera_brightness(args: argparse.Namespace) -> int:
+    devices = None if args.devices == "" else [device.strip() for device in args.devices.split(",") if device.strip()]
+    report, exit_code = run_camera_brightness_check(
+        BrightnessOptions(
+            devices=devices,
+            width=int(args.width),
+            height=int(args.height),
+            fps=int(args.fps),
+            input_format=args.input_format,
+            timeout_ms=int(args.timeout_ms),
+            json_output=bool(args.json),
+            dry_run=bool(args.dry_run),
+        )
+    )
+    print_brightness_report(report, json_output=bool(args.json))
+    return exit_code
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser_kwargs = {"formatter_class": argparse.ArgumentDefaultsHelpFormatter}
     parser = argparse.ArgumentParser(
@@ -126,6 +145,20 @@ def build_parser() -> argparse.ArgumentParser:
     stereo_solve.add_argument("--epipolar-warning-px", type=float, default=2.0, help="epipolar RMS 质量警告阈值")
     stereo_solve.add_argument("--rectification-warning-px", type=float, default=2.0, help="校正后 y 误差 p95 质量警告阈值")
     stereo_solve.set_defaults(handler=solve_stereo)
+
+    camera = subparsers.add_parser("camera", help="检查本机相机设备。", **parser_kwargs)
+    camera_subparsers = camera.add_subparsers(dest="camera_command", required=True)
+
+    brightness = camera_subparsers.add_parser("brightness", help="采集一帧并估算 USB 相机平均亮度。", **parser_kwargs)
+    brightness.add_argument("--devices", default="", help="逗号分隔的相机设备；默认自动选择前两个 USB V4L2 采集设备")
+    brightness.add_argument("--width", type=int, default=1280, help="采集宽度")
+    brightness.add_argument("--height", type=int, default=720, help="采集高度")
+    brightness.add_argument("--fps", type=int, default=30, help="采集帧率")
+    brightness.add_argument("--input-format", default="mjpeg", help="V4L2 输入格式；失败后会自动重试默认格式")
+    brightness.add_argument("--timeout-ms", type=int, default=5000, help="单设备采集超时")
+    brightness.add_argument("--json", action="store_true", help="输出 JSON 报告")
+    brightness.add_argument("--dry-run", action="store_true", help="只解析设备，不调用 ffmpeg 采集")
+    brightness.set_defaults(handler=camera_brightness)
 
     return parser
 

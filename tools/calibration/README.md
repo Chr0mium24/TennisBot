@@ -17,6 +17,26 @@ cd tools/calibration
 uv sync
 ```
 
+## 相机亮度检查
+
+```bash
+uv run camera-calib-lab camera brightness
+```
+
+默认值：
+
+- 自动选择前两个 USB V4L2 采集设备
+- `1280x720`
+- `30 FPS`
+- `mjpeg`
+- `5000 ms` 超时
+
+指定设备：
+
+```bash
+uv run camera-calib-lab camera brightness --devices /dev/video0,/dev/video2
+```
+
 ## 单目采集
 
 ```bash

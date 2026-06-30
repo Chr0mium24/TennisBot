@@ -8,10 +8,11 @@ Use a quick brightness check to identify which USB camera is dark, for example
 when one lens cap is still on or one camera is blocked.
 
 ```bash
-bun scripts/check-camera-brightness.ts
+cd tools/calibration
+uv run camera-calib-lab camera brightness
 ```
 
-The script captures one grayscale frame from the first two USB V4L2 capture
+The calibration tool captures one grayscale frame from the first two USB V4L2 capture
 devices and prints average brightness on a 0-255 scale. The darker device is
 printed as the likely covered camera.
 
@@ -20,7 +21,8 @@ printed as the likely covered camera.
 If auto order is wrong or you want to test specific devices:
 
 ```bash
-bun scripts/check-camera-brightness.ts --devices /dev/video0,/dev/video2
+cd tools/calibration
+uv run camera-calib-lab camera brightness --devices /dev/video0,/dev/video2
 ```
 
 Requires `ffmpeg` and `v4l2-ctl` on the machine running the cameras.

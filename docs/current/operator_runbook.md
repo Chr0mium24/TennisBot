@@ -18,7 +18,7 @@ The board-side runtime is not part of this flow.
 From the repository root:
 
 ```bash
-bun scripts/start-local-runtime.ts
+bun scripts/live3d.ts
 ```
 
 The launcher builds and starts the browser surface when it is not already
@@ -31,7 +31,7 @@ Live3D:          http://127.0.0.1:5178/
 For a quick status check without starting anything:
 
 ```bash
-bun scripts/start-local-runtime.ts --status
+bun scripts/live3d.ts --status
 ```
 
 Observed result on 2026-06-29:
@@ -40,24 +40,13 @@ Observed result on 2026-06-29:
 ready  Live3D           http://127.0.0.1:5178/
 ```
 
-Normal startup also prints the current physical validation next action.
-
 ## Calibration Order
 
-Before taking calibration frames, run the preflight:
+Before taking calibration frames, check camera brightness/order:
 
 ```bash
-mkdir -p docs/archive/YYYYMMDD/probes
-bun scripts/operator-preflight.ts --output docs/archive/YYYYMMDD/probes/local_runtime_preflight_YYYYMMDD.md
-```
-
-Observed result on 2026-06-29:
-
-```text
-passed Live3D surface
-passed YOLO package
-passed Stereo calibration package
-passed USB camera devices
+cd tools/calibration
+uv run camera-calib-lab camera brightness
 ```
 
 Use the mainline OpenCV GUI in order:
@@ -99,8 +88,3 @@ It proves the app server, runtime snapshot, YOLO artifact, calibration artifact,
 two USB camera streams, and non-black browser frames are working. It is still
 blocked at left/right YOLO detection because no tennis ball is visible in the
 current scene.
-
-The latest preflight report is
-[`local_runtime_preflight_20260629.md`](../archive/20260629/probes/local_runtime_preflight_20260629.md).
-It verifies the Live3D browser surface, the YOLO package, the stereo calibration
-package, and `/dev/video0` plus `/dev/video2`.

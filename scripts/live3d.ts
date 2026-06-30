@@ -18,11 +18,6 @@ type StartedSurface = {
   reused: boolean;
 };
 
-type PhysicalValidationStatus = {
-  result: "passed" | "incomplete";
-  next_action: string | null;
-};
-
 const repoRoot = resolve(import.meta.dirname, "..");
 const surfaces: Surface[] = [
   {
@@ -69,16 +64,7 @@ for (const item of started) {
   console.log(`- ${item.surface.name}: ${item.surface.url} (${item.reused ? "reused" : `pid ${item.process?.pid}`})`);
 }
 console.log("");
-const physicalStatus = await readPhysicalValidationStatus();
-if (physicalStatus === undefined) {
-  console.log("Physical validation next action: unavailable.");
-} else if (physicalStatus.next_action === null) {
-  console.log("Physical validation next action: all gates passed.");
-} else {
-  console.log(`Physical validation next action: ${physicalStatus.next_action}`);
-}
-console.log("");
-console.log("Use tools/calibration OpenCV GUI for local mono/stereo calibration capture.");
+console.log("Use tools/calibration for camera brightness checks and mono/stereo calibration.");
 console.log("Use Live3D after calibration and put a visible tennis ball in both camera views.");
 
 const childProcesses = started.flatMap((item) => (item.process === undefined ? [] : [item.process]));
@@ -148,39 +134,6 @@ async function runChecked(surface: Surface, command: string[], label: string): P
   }
 }
 
-async function readPhysicalValidationStatus(): Promise<PhysicalValidationStatus | undefined> {
-  const reportPath = "/tmp/tennisbot_physical_validation_status.md";
-  const jsonPath = "/tmp/tennisbot_physical_validation_status.json";
-  const process = Bun.spawn(
-    [
-      "bun",
-      "scripts/physical-validation-status.ts",
-      "--output",
-      reportPath,
-      "--output-json",
-      jsonPath,
-    ],
-    {
-      cwd: repoRoot,
-      env: processEnv(),
-      stdin: "ignore",
-      stdout: "pipe",
-      stderr: "pipe",
-    },
-  );
-  await process.exited;
-  await Promise.all([new Response(process.stdout).text(), new Response(process.stderr).text()]);
-  try {
-    const payload = (await Bun.file(jsonPath).json()) as Partial<PhysicalValidationStatus>;
-    if ((payload.result === "passed" || payload.result === "incomplete") && "next_action" in payload) {
-      return { result: payload.result, next_action: payload.next_action ?? null };
-    }
-  } catch {
-    return undefined;
-  }
-  return undefined;
-}
-
 async function appendStream(path: string, stream: ReadableStream<Uint8Array>): Promise<void> {
   const writer = createWriteStream(path, { flags: "a" });
   try {
@@ -205,16 +158,12 @@ async function isServing(url: string): Promise<boolean> {
   }
 }
 
-function processEnv(): Record<string, string> {
-  return Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined));
-}
-
 function sleep(ms: number): Promise<void> {
   return new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
 }
 
 function printUsage(): void {
-  console.log(`用法: bun scripts/start-local-runtime.ts [--status] [--no-build]
+  console.log(`用法: bun scripts/live3d.ts [--status] [--no-build]
 
 默认值:
   URL      http://127.0.0.1:5178/
@@ -228,8 +177,9 @@ function printUsage(): void {
   --status    只检查 URL 是否已经可访问。
   --no-build  启动缺失服务时跳过前端构建。
 
-正常启动还会打印当前物理验收下一步。标定 GUI 使用:
+标定和相机亮度检查使用:
   cd tools/calibration
+  uv run camera-calib-lab camera brightness
   uv run camera-calib-lab capture stereo-charuco-auto-gui
 `);
 }

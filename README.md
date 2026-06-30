@@ -24,25 +24,13 @@ handled by the mainline `tools/calibration` OpenCV workflow.
 Start the local operator surfaces:
 
 ```bash
-bun scripts/start-local-runtime.ts
+bun scripts/live3d.ts
 ```
 
 Check whether they are already serving:
 
 ```bash
-bun scripts/start-local-runtime.ts --status
-```
-
-Run the local preflight:
-
-```bash
-bun scripts/operator-preflight.ts --output docs/local_runtime_preflight_YYYYMMDD.md
-```
-
-Check physical acceptance status:
-
-```bash
-bun scripts/physical-validation-status.ts --output docs/local_physical_validation_status_YYYYMMDD.md
+bun scripts/live3d.ts --status
 ```
 
 Run Live3D:
@@ -66,6 +54,7 @@ Run the OpenCV stereo calibration GUI:
 
 ```bash
 cd tools/calibration
+uv run camera-calib-lab camera brightness
 uv run camera-calib-lab capture stereo-charuco-auto-gui \
   --config configs/dfoptix_charuco_15mm_capture.yaml \
   --left-device /dev/video0 \
