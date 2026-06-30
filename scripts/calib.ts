@@ -451,7 +451,42 @@ function pathFromRepo(value: string): string {
 }
 
 function timestamp(): string {
-  return new Date().toISOString().replace(/\D/g, "").slice(0, 14);
+  const now = new Date();
+  return [
+    now.getFullYear(),
+    twoDigits(now.getMonth() + 1),
+    twoDigits(now.getDate()),
+    "_",
+    twoDigits(now.getHours()),
+    twoDigits(now.getMinutes()),
+    twoDigits(now.getSeconds()),
+    "_",
+    localTimeZoneAbbreviation(now),
+  ].join("");
+}
+
+function twoDigits(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+function localTimeZoneAbbreviation(date: Date): string {
+  const match = date.toString().match(/\(([^)]+)\)$/);
+  const timeZoneName = match?.[1];
+  if (timeZoneName !== undefined) {
+    const abbreviation = timeZoneName
+      .split(/\s+/)
+      .map((word) => word.slice(0, 1))
+      .join("")
+      .replace(/[^A-Za-z0-9]/g, "");
+    if (abbreviation.length > 0) return abbreviation;
+  }
+
+  const offsetMinutes = -date.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? "p" : "m";
+  const absoluteMinutes = Math.abs(offsetMinutes);
+  const hours = Math.floor(absoluteMinutes / 60);
+  const minutes = absoluteMinutes % 60;
+  return `UTC${sign}${twoDigits(hours)}${twoDigits(minutes)}`;
 }
 
 function processEnv(): Record<string, string> {
@@ -549,7 +584,7 @@ function printMonoUsage(): void {
 默认:
   cam1 device: /dev/video0
   cam2 device: /dev/video2
-  session: tools/calibration/captures/local/<cam>_charuco_<timestamp>
+  session: tools/calibration/captures/local/<cam>_charuco_<local_timestamp>
   output: artifacts/calibration/<cam>
 
 选项:
@@ -571,7 +606,7 @@ function printStereoUsage(): void {
 
 默认:
   devices: /dev/video0,/dev/video2
-  session: tools/calibration/captures/local/stereo_charuco_<timestamp>
+  session: tools/calibration/captures/local/stereo_charuco_<local_timestamp>
   left mono: artifacts/calibration/cam1
   right mono: artifacts/calibration/cam2
   output: artifacts/calibration/stereo_cam1_cam2
