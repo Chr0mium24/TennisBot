@@ -69,9 +69,9 @@ def solve_mono_package(
     if source.topology != "mono":
         raise ValueError(f"mono solve requires a mono source, got topology={source.topology!r}")
     views = source.views if camera_id in {None, ""} else [view for view in source.views if view.camera_id == camera_id]
-    if not views and camera_id not in {None, ""} and source.views:
-        views = source.views
     if not views:
+        if camera_id not in {None, ""}:
+            raise ValueError(f"no accepted mono ChArUco views were found for camera_id={camera_id!r}")
         raise ValueError("no accepted mono ChArUco views were found")
     image_size = common_image_size(views)
     object_points = [view.object_points for view in views]

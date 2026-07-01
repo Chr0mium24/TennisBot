@@ -15,12 +15,14 @@ import numpy as np
 from camera_calib_lab.camera_preview import PreviewCamera, draw_preview_frame
 from camera_calib_lab.cli import main
 from camera_calib_lab.capture_artifacts import mono_session_json, stereo_session_json
+from camera_calib_lab.capture_gui import capture_config_with_options
 from camera_calib_lab.capture_types import CameraConfig, CaptureConfig, TargetConfig, ToolConfig, parse_device
 from camera_calib_lab.solve import (
     MonoCameraPackage,
     SourceObservations,
     ViewObservation,
     detect_session_observations,
+    solve_mono_package,
     target_payload,
     validate_stereo_source_devices,
 )
@@ -131,6 +133,12 @@ class SolveCliTest(unittest.TestCase):
         self.assertEqual(session["stereo_rig"]["left"]["v4l2_controls"], left_controls)
         self.assertEqual(session["stereo_rig"]["right"]["v4l2_controls"], right_controls)
 
+    def test_mono_capture_config_override_sets_camera_id(self) -> None:
+        config = capture_config_with_options(tool_config(), 5, camera_id="cam2")
+
+        self.assertEqual(config.camera.camera_id, "cam2")
+        self.assertEqual(config.capture.views, 5)
+
     def test_parse_dev_video_path_as_v4l2_index(self) -> None:
         self.assertEqual(parse_device("/dev/video2"), 2)
         self.assertEqual(parse_device("1"), 1)
@@ -165,6 +173,40 @@ class SolveCliTest(unittest.TestCase):
             self.assertEqual(len(source.views), 1)
             self.assertEqual(source.views[0].camera_id, "cam1")
             self.assertEqual(source.views[0].side, None)
+
+    def test_mono_solve_rejects_requested_camera_id_without_matching_views(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            write_session_json(
+                root,
+                {
+                    "topology": "mono",
+                    "target": target_payload({}),
+                    "camera": {"camera_id": "cam1", "width_px": 960, "height_px": 640, "device": "/dev/video0"},
+                    "dry_run": False,
+                    "hardware_validated": True,
+                    "frames": [
+                        {
+                            "view_id": "view001",
+                            "camera_id": "cam1",
+                            "frame_paths": ["cam1/view001/image.png"],
+                            "frame_role": "passive",
+                        }
+                    ],
+                },
+            )
+
+            with patched_session_detection():
+                with self.assertRaisesRegex(ValueError, "camera_id='cam2'"):
+                    solve_mono_package(
+                        session_path=root,
+                        observations_path=None,
+                        output_path=root / "out",
+                        config_path=root / "missing.yaml",
+                        camera_id="cam2",
+                        min_views=1,
+                        max_rms_px=1.0,
+                    )
 
     def test_session_loader_reads_migrated_stereo_session_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

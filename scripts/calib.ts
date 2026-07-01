@@ -96,6 +96,8 @@ async function runMono(args: string[]): Promise<number> {
         options.config,
         "--device",
         options.device,
+        "--camera-id",
+        options.cameraId,
         "--views",
         options.views,
         "--output",

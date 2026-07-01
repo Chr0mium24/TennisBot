@@ -19,6 +19,7 @@ def capture_charuco_auto_gui(args: argparse.Namespace) -> int:
         calibration_output=Path(args.calibration_output) if args.calibration_output else None,
         views=int(args.views),
         device=args.device,
+        camera_id=args.camera_id or None,
     )
     print(capture_summary(manifest))
     return 0 if manifest["status"] in {"ready", "partial"} else 1
@@ -150,6 +151,7 @@ def build_parser() -> argparse.ArgumentParser:
     mono.add_argument("--calibration-output", default="", help="预留的标定输出路径")
     mono.add_argument("--views", type=int, default=30, help="目标有效采集张数")
     mono.add_argument("--device", default="/dev/video0", help="单目相机设备")
+    mono.add_argument("--camera-id", default="", help="写入采集会话的相机 ID；默认使用配置文件")
     mono.set_defaults(handler=capture_charuco_auto_gui)
 
     stereo = capture_subparsers.add_parser(

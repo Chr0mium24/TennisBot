@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict, deque
+from dataclasses import replace
 from pathlib import Path
 from time import monotonic
 from typing import Any
@@ -57,8 +58,9 @@ def run_mono_charuco_gui(
     calibration_output: Path | None,
     views: int,
     device: str | int,
+    camera_id: str | None = None,
 ) -> dict[str, Any]:
-    config = capture_config_with_views(load_config(config_path), views)
+    config = capture_config_with_options(load_config(config_path), views, camera_id=camera_id)
     output = fresh_output_dir(output_path)
     output.mkdir(parents=True, exist_ok=True)
     board = create_charuco_board(config.target)
@@ -207,7 +209,7 @@ def run_stereo_charuco_gui(
     left_device: str | int,
     right_device: str | int,
 ) -> dict[str, Any]:
-    config = capture_config_with_views(load_config(config_path), views)
+    config = capture_config_with_options(load_config(config_path), views, camera_id=None)
     output = fresh_output_dir(output_path)
     output.mkdir(parents=True, exist_ok=True)
     board = create_charuco_board(config.target)
@@ -397,24 +399,29 @@ def run_stereo_charuco_gui(
     return manifest
 
 
-def capture_config_with_views(config: ToolConfig, views: int) -> ToolConfig:
-    if views <= 0 or views == config.capture.views:
+def capture_config_with_options(config: ToolConfig, views: int, *, camera_id: str | None) -> ToolConfig:
+    capture = config.capture if views <= 0 or views == config.capture.views else capture_config_with_views(config.capture, views)
+    camera = config.camera if camera_id in {None, ""} else replace(config.camera, camera_id=str(camera_id))
+    if capture is config.capture and camera is config.camera:
         return config
-    capture = CaptureConfig(
-        views=views,
-        min_corners=config.capture.min_corners,
-        min_corner_coverage=config.capture.min_corner_coverage,
-        min_sharpness=config.capture.min_sharpness,
-        min_capture_interval_s=config.capture.min_capture_interval_s,
-        max_views_per_bucket=config.capture.max_views_per_bucket,
-        position_bins_x=config.capture.position_bins_x,
-        position_bins_y=config.capture.position_bins_y,
-        stability_frames=config.capture.stability_frames,
-        stable_center_delta=config.capture.stable_center_delta,
-        stable_area_delta=config.capture.stable_area_delta,
-        dwell_capture_s=config.capture.dwell_capture_s,
+    return ToolConfig(target=config.target, camera=camera, capture=capture)
+
+
+def capture_config_with_views(capture: CaptureConfig, views: int) -> CaptureConfig:
+    return CaptureConfig(
+        views=int(views),
+        min_corners=capture.min_corners,
+        min_corner_coverage=capture.min_corner_coverage,
+        min_sharpness=capture.min_sharpness,
+        min_capture_interval_s=capture.min_capture_interval_s,
+        max_views_per_bucket=capture.max_views_per_bucket,
+        position_bins_x=capture.position_bins_x,
+        position_bins_y=capture.position_bins_y,
+        stability_frames=capture.stability_frames,
+        stable_center_delta=capture.stable_center_delta,
+        stable_area_delta=capture.stable_area_delta,
+        dwell_capture_s=capture.dwell_capture_s,
     )
-    return ToolConfig(target=config.target, camera=config.camera, capture=capture)
 
 
 def mouse_state_dict() -> dict[str, Any]:
