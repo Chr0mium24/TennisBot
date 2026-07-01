@@ -9,7 +9,7 @@ This runbook is the local-machine sequence for the current TennisBot runtime:
 1. `tools/calibration` OpenCV GUI for fixed DFOptix ChArUco mono/stereo capture.
 2. `tools/yolo` for pure YOLO detection and runtime model packages.
 3. Live3D for two USB camera streams, ONNX YOLO inference, stereo 3D point,
-   trajectory prediction, and hardware verification.
+   and trajectory prediction.
 
 The board-side runtime is not part of this flow.
 
@@ -73,21 +73,10 @@ Open `http://127.0.0.1:5178/` after the stereo package verifies:
 2. Start YOLO backend and put a tennis ball clearly inside both camera views.
 3. Watch the readiness gates progress through left/right detection, stereo 3D
    point, and prediction curve.
-4. Run the hardware verifier for durable evidence:
+4. Treat `prediction-ready` in the browser readiness gates as the local runtime
+   target for a visible ball pass.
 
-```bash
-cd apps/live3d
-mkdir -p ../../docs/archive/YYYYMMDD/live3d
-bun run verify:hardware -- --prepare-uvc-controls --timeout-ms 30000 --output ../../docs/archive/YYYYMMDD/live3d/live3d_hardware_loop_ball_YYYYMMDD.md
-```
+## Current Runtime Evidence
 
-The hardware run is complete only when it reaches `prediction-ready`.
-
-## Current Hardware Evidence
-
-The latest saved probe is
-[`live3d_hardware_readiness_gates_20260629.md`](../archive/20260629/live3d/live3d_hardware_readiness_gates_20260629.md).
-It proves the app server, runtime snapshot, YOLO artifact, calibration artifact,
-two USB camera streams, and non-black browser frames are working. It is still
-blocked at left/right YOLO detection because no tennis ball is visible in the
-current scene.
+Historical hardware-verifier reports remain under `docs/archive/`, but the
+current operator flow no longer requires a standalone acceptance report.

@@ -11,7 +11,7 @@ The project is at local operator validation. The main tracked paths are now:
   GUI;
 - `packages/core` and `packages/contracts` for runtime algorithms and shared
   contracts;
-- `apps/live3d` for browser camera, YOLO, 3D display, and hardware verification.
+- `apps/live3d` for browser camera, YOLO, and 3D display.
 
 ## Ready Now
 
@@ -46,9 +46,8 @@ Live3D loads stereo calibration artifacts, but it does not know the camera rig's
 pose relative to the tennis court. Current 3D output is camera-frame geometry,
 not court coordinates.
 
-Live3D hardware verification has not completed a real ball pass yet. A complete
-run requires a visible tennis ball in both camera views and a final
-`prediction-ready` runtime snapshot.
+Live3D no longer maintains a standalone hardware acceptance command. Local
+operation relies on the browser readiness gates and visual runtime state.
 
 ## Next Commands
 
@@ -83,12 +82,5 @@ bun scripts/live3d.ts
 bun scripts/live3d.ts --status
 ```
 
-Run a hardware evidence pass:
-
-```bash
-cd apps/live3d
-bun run verify:hardware -- --prepare-uvc-controls --timeout-ms 30000 --output ../../docs/archive/20260629/live3d/live3d_hardware_loop_ball_YYYYMMDD.md
-```
-
-The system should not be treated as physically accepted until the hardware
-report reaches `prediction-ready`.
+Open Live3D and observe the browser readiness gates through camera startup,
+left/right detections, stereo 3D point, and prediction curve.

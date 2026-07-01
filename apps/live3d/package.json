@@ -7,7 +7,6 @@
     "dev": "bun run build && bun ./scripts/serve.js",
     "build": "bun run typecheck && bun build ./src/main.ts --target browser --outdir ./dist/assets && bun ./scripts/copy-static.js",
     "typecheck": "tsc --noEmit",
-    "verify:hardware": "bun ./scripts/verify-hardware.ts",
     "test": "bun test"
   },
   "devDependencies": {

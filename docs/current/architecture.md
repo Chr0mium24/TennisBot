@@ -100,7 +100,7 @@ Owns the real-machine browser runtime:
 - overlays detections;
 - feeds left/right detections to `packages/core`;
 - renders the camera-frame 3D point, trail, prediction curve, and landing point;
-- exposes `window.__tennisbotLive3dSnapshot` for hardware verification.
+- exposes `window.__tennisbotLive3dSnapshot` for local runtime inspection.
 
 Current limitation: Live3D can load stereo calibration artifacts, but it does
 not know the physical camera pose relative to a tennis court. Its 3D output
@@ -136,9 +136,8 @@ This means the package is usable for continued local experiments, but it should
 not be treated as final physical acceptance. Recalibrate with the real mounted
 camera geometry before relying on far-distance depth.
 
-Live3D hardware verification has reached app/artifact/camera readability gates,
-but the full run still requires a visible tennis ball in both camera views and a
-`prediction-ready` snapshot.
+Live3D exposes browser readiness gates for local operation. The standalone
+hardware verifier command has been removed.
 
 ## Main Commands
 
@@ -171,7 +170,6 @@ cd apps/live3d
 bun test
 bun run typecheck
 bun run build
-bun run verify:hardware -- --prepare-uvc-controls --timeout-ms 30000 --output ../../docs/archive/20260629/live3d/live3d_hardware_loop_YYYYMMDD.md
 ```
 
 ## Remaining Engineering Work
@@ -179,5 +177,5 @@ bun run verify:hardware -- --prepare-uvc-controls --timeout-ms 30000 --output ..
 - Recalibrate after the cameras are mounted in their real physical positions.
 - Apply or document the browser-frame scaling, rectification, and camera/world
   transform rules before claiming court-coordinate 3D correctness.
-- Run Live3D with a visible tennis ball until hardware verification reaches
-  `prediction-ready`.
+- Run Live3D with a visible tennis ball and observe the browser readiness gates
+  through `prediction-ready`.

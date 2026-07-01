@@ -292,24 +292,5 @@ bun run typecheck
 bun run build
 ```
 
-硬件链路验证：
-
-```bash
-bun run verify:hardware
-```
-
-默认值：
-
-- Live3D URL：`http://localhost:5178`
-- 超时：`30000 ms`
-- 轮询间隔：`500 ms`
-- Chrome 调试端口：`9233`
-- UVC 设备：`/dev/video0,/dev/video2`
-- 报告：`docs/archive/YYYYMMDD/live3d/live3d_hardware_loop_<timestamp>.md`
-- 截图目录：`<报告文件名>_frames`
-
-如果需要先拉高本地 USB 摄像头曝光/增益：
-
-```bash
-bun run verify:hardware -- --prepare-uvc-controls
-```
+Live3D does not maintain a separate hardware verifier command. Use the browser
+runtime readiness gates directly during local operation.
