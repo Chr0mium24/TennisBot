@@ -75,14 +75,21 @@ uv run --extra detect tennisbot-yolo detect-gui \
 Run local stereo coordinate display:
 
 ```bash
+bun scripts/stereo.ts record
+bun scripts/stereo.ts record --duration 60
 bun scripts/stereo.ts gui --tile
 bun scripts/stereo.ts gui --tile --record-run
 bun scripts/stereo.ts replay
 ```
 
+`record` stores raw left/right videos and timestamp metadata under
+`runs/raw-stereo`. Without `--duration`, it continues until `q` or `esc` is
+pressed in the preview window.
+
 Dry-run the local stereo GUI defaults:
 
 ```bash
+bun scripts/stereo.ts record --dry-run
 bun scripts/stereo.ts gui --dry-run
 ```
 

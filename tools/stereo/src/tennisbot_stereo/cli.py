@@ -12,8 +12,9 @@ import numpy as np
 from .calibration import RuntimeStereoCalibration
 from .detection import BallDetector, HsvBallDetector, YoloBallDetector
 from .matching import StereoBallMatcher
+from .raw_recording import FrameTimestamp, RawStereoVideoRecorder
 from .recording import StereoRunRecorder
-from .render import render_gui
+from .render import render_gui, resize_to_width
 
 
 TOOL_ROOT = Path(__file__).resolve().parents[2]
@@ -21,6 +22,7 @@ REPO_ROOT = TOOL_ROOT.parents[1]
 DEFAULT_CALIBRATION_PACKAGE = REPO_ROOT / "artifacts" / "calibration" / "stereo_cam1_cam2"
 DEFAULT_MODEL = REPO_ROOT / "artifacts" / "models" / "tennis_ball_yolo" / "model.pt"
 DEFAULT_RECORD_ROOT = REPO_ROOT / "runs" / "stereo"
+DEFAULT_RAW_RECORD_ROOT = REPO_ROOT / "runs" / "raw-stereo"
 DEFAULT_DEVICES = ("/dev/video0", "/dev/video2")
 
 
@@ -52,6 +54,9 @@ def build_parser() -> argparse.ArgumentParser:
     gui = subparsers.add_parser("gui", help="打开本机双目坐标 GUI。", **parser_kwargs)
     add_gui_args(gui)
     gui.set_defaults(func=cmd_gui)
+    record = subparsers.add_parser("record", help="录制原始左右双目视频。", **parser_kwargs)
+    add_record_args(record)
+    record.set_defaults(func=cmd_record)
     return parser
 
 
@@ -96,6 +101,23 @@ def add_gui_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--record-run", action="store_true", help="记录本次 GUI 运行的点流和检测流")
     parser.add_argument("--record-root", type=Path, default=DEFAULT_RECORD_ROOT, help="stereo 记录输出根目录")
     parser.add_argument("--record-preview-video", action="store_true", help="同时记录带 overlay 的预览视频")
+    parser.add_argument("--dry-run", action="store_true", help="打印配置，不打开相机")
+
+
+def add_record_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--devices", help="逗号分隔的左右相机设备，会覆盖 --left-device/--right-device")
+    parser.add_argument("--left-device", help="左相机设备；提供 --devices 时忽略")
+    parser.add_argument("--right-device", help="右相机设备；提供 --devices 时忽略")
+    parser.add_argument("--width", type=int, default=3840, help="相机采集宽度")
+    parser.add_argument("--height", type=int, default=2160, help="相机采集高度")
+    parser.add_argument("--fps", type=float, default=30.0, help="相机采集帧率")
+    parser.add_argument("--fourcc", default="MJPG", help="相机 FOURCC")
+    parser.add_argument("--duration", type=float, default=0.0, help="录制秒数；0 表示直到按 q/esc 停止")
+    parser.add_argument("--preview-width", type=int, default=720, help="每路预览降采样宽度")
+    parser.add_argument("--warmup-frames", type=int, default=5, help="相机预热帧数")
+    parser.add_argument("--window", default="TennisBot Raw Stereo Recorder", help="OpenCV 窗口标题")
+    parser.add_argument("--record-root", type=Path, default=DEFAULT_RAW_RECORD_ROOT, help="原始双目视频输出根目录")
+    parser.add_argument("--soft-sync-threshold-ms", type=float, default=25.0, help="软同步时间差标记阈值")
     parser.add_argument("--dry-run", action="store_true", help="打印配置，不打开相机")
 
 
@@ -182,6 +204,65 @@ def cmd_gui(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_record(args: argparse.Namespace) -> int:
+    left_device, right_device = parse_devices(args)
+    validate_record_args(args, left_device, right_device)
+    if args.dry_run:
+        print_record_dry_run(args, left_device, right_device)
+        return 0
+
+    left_cap = open_capture(left_device, args.width, args.height, args.fps, args.fourcc)
+    right_cap = open_capture(right_device, args.width, args.height, args.fps, args.fourcc)
+    cv2.namedWindow(args.window, cv2.WINDOW_NORMAL)
+    start_perf_ns = time.perf_counter_ns()
+    recorder: RawStereoVideoRecorder | None = None
+    frame_id = 0
+
+    try:
+        for _ in range(max(0, args.warmup_frames)):
+            left_cap.read()
+            right_cap.read()
+
+        while True:
+            left_ok, left_frame = left_cap.read()
+            left_timestamp = make_frame_timestamp(start_perf_ns)
+            right_ok, right_frame = right_cap.read()
+            right_timestamp = make_frame_timestamp(start_perf_ns)
+            if not left_ok or not right_ok:
+                raise RuntimeError(f"camera read failed: left_ok={left_ok} right_ok={right_ok}")
+            if left_frame.shape[:2] != right_frame.shape[:2]:
+                raise RuntimeError(f"stereo frame sizes differ: left={left_frame.shape[:2]} right={right_frame.shape[:2]}")
+
+            if recorder is None:
+                actual_size = (int(left_frame.shape[1]), int(left_frame.shape[0]))
+                recorder = create_raw_recorder(args, left_device, right_device, actual_size)
+
+            recorder.record_pair(
+                pair_id=frame_id,
+                left_frame=left_frame,
+                right_frame=right_frame,
+                left_timestamp=left_timestamp,
+                right_timestamp=right_timestamp,
+            )
+            cv2.imshow(args.window, raw_preview_canvas(left_frame, right_frame, args.preview_width))
+            key = cv2.waitKey(1) & 0xFF
+            if key in (27, ord("q")):
+                break
+            if args.duration > 0 and left_timestamp.elapsed_sec >= args.duration:
+                break
+            frame_id += 1
+    except KeyboardInterrupt:
+        pass
+    finally:
+        if recorder is not None:
+            recorder.close()
+            print(f"recorded_session={recorder.session_dir}")
+        left_cap.release()
+        right_cap.release()
+        cv2.destroyWindow(args.window)
+    return 0
+
+
 def parse_devices(args: argparse.Namespace) -> tuple[str, str]:
     if args.devices:
         devices = [item.strip() for item in str(args.devices).split(",") if item.strip()]
@@ -190,7 +271,7 @@ def parse_devices(args: argparse.Namespace) -> tuple[str, str]:
     if not devices:
         devices = list(DEFAULT_DEVICES)
     if len(devices) != 2:
-        raise ValueError("stereo GUI requires exactly two camera devices")
+        raise ValueError("stereo command requires exactly two camera devices")
     return devices[0], devices[1]
 
 
@@ -213,6 +294,21 @@ def validate_args(args: argparse.Namespace, left_device: str, right_device: str,
         raise FileNotFoundError(args.calibration_package)
     if mode == "run" and args.detector == "yolo" and not args.model.is_file():
         raise FileNotFoundError(args.model)
+
+
+def validate_record_args(args: argparse.Namespace, left_device: str, right_device: str) -> None:
+    if not left_device or not right_device:
+        raise ValueError("left and right camera devices must be non-empty")
+    if len(args.fourcc) != 4:
+        raise ValueError("--fourcc must contain exactly four characters, for example MJPG")
+    for name in ("width", "height", "preview_width"):
+        if getattr(args, name) <= 0:
+            raise ValueError(f"--{name.replace('_', '-')} must be positive")
+    for name in ("fps", "soft_sync_threshold_ms"):
+        if getattr(args, name) <= 0:
+            raise ValueError(f"--{name.replace('_', '-')} must be positive")
+    if args.duration < 0:
+        raise ValueError("--duration must be non-negative")
 
 
 def build_matcher(args: argparse.Namespace, calibration: RuntimeStereoCalibration) -> StereoBallMatcher:
@@ -301,6 +397,51 @@ def create_recorder(
     )
 
 
+def create_raw_recorder(
+    args: argparse.Namespace,
+    left_device: str,
+    right_device: str,
+    actual_size: tuple[int, int],
+) -> RawStereoVideoRecorder:
+    return RawStereoVideoRecorder.create(
+        root=args.record_root,
+        fps=args.fps,
+        frame_size=actual_size,
+        soft_sync_threshold_ms=args.soft_sync_threshold_ms,
+        metadata={
+            "capture": {
+                "left_device": left_device,
+                "right_device": right_device,
+                "requested_width": args.width,
+                "requested_height": args.height,
+                "actual_width": actual_size[0],
+                "actual_height": actual_size[1],
+                "fps": args.fps,
+                "fourcc": args.fourcc,
+            },
+            "recording": {
+                "duration_sec": None if args.duration == 0 else args.duration,
+                "preview_width": args.preview_width,
+            },
+        },
+    )
+
+
+def make_frame_timestamp(start_perf_ns: int) -> FrameTimestamp:
+    now_perf_ns = time.perf_counter_ns()
+    return FrameTimestamp(
+        monotonic_ns=now_perf_ns,
+        unix_ns=time.time_ns(),
+        elapsed_sec=(now_perf_ns - start_perf_ns) / 1_000_000_000.0,
+    )
+
+
+def raw_preview_canvas(left_frame: np.ndarray, right_frame: np.ndarray, preview_width: int) -> np.ndarray:
+    left_preview = resize_to_width(left_frame, preview_width)
+    right_preview = resize_to_width(right_frame, preview_width)
+    return np.hstack((left_preview, right_preview))
+
+
 def print_dry_run(args: argparse.Namespace, left_device: str, right_device: str) -> None:
     print("stereo_gui=dry-run")
     print(f"devices={left_device},{right_device}")
@@ -310,6 +451,17 @@ def print_dry_run(args: argparse.Namespace, left_device: str, right_device: str)
     print(f"detector={args.detector} tile={args.tile} imgsz={args.imgsz}")
     print(f"limits=epipolar<={args.max_epipolar_error_px:g}px depth<={args.max_depth_m:g}m")
     print(f"record_run={args.record_run} record_root={args.record_root}")
+
+
+def print_record_dry_run(args: argparse.Namespace, left_device: str, right_device: str) -> None:
+    duration = "unlimited" if args.duration == 0 else f"{args.duration:g}s"
+    print("stereo_record=dry-run")
+    print(f"devices={left_device},{right_device}")
+    print(f"capture={args.width}x{args.height}@{args.fps:g} fourcc={args.fourcc}")
+    print(f"duration={duration}")
+    print(f"preview_width={args.preview_width}")
+    print(f"record_root={args.record_root}")
+    print(f"soft_sync_threshold_ms={args.soft_sync_threshold_ms:g}")
 
 
 def main(argv: list[str] | None = None) -> int:

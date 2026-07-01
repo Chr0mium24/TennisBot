@@ -16,8 +16,11 @@ if (argv.length === 0 || argv[0] === "--help" || argv[0] === "-h") {
 try {
   const command = argv[0];
   const rest = argv.slice(1);
-  if (command === "gui") {
+  if (command === "gui" || command === "preview") {
     process.exit(await runStereoGui(rest));
+  }
+  if (command === "record") {
+    process.exit(await runStereoRecord(rest));
   }
   if (command === "replay") {
     process.exit(await runStereoReplay(rest));
@@ -40,6 +43,17 @@ async function runStereoGui(args: string[]): Promise<number> {
     ...args,
   ];
   const proc = Bun.spawn(command, {
+    cwd: stereoCwd,
+    env: process.env,
+    stdin: "inherit",
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  return await waitForChild(proc);
+}
+
+async function runStereoRecord(args: string[]): Promise<number> {
+  const proc = Bun.spawn(["uv", "run", "tennisbot-stereo", "record", ...args], {
     cwd: stereoCwd,
     env: process.env,
     stdin: "inherit",
@@ -136,16 +150,22 @@ async function waitForChild(proc: ReturnType<typeof Bun.spawn>): Promise<number>
 
 function printUsage(): void {
   console.log(`用法:
+  bun scripts/stereo.ts record [options]
+  bun scripts/stereo.ts preview [options]
   bun scripts/stereo.ts gui [options]
   bun scripts/stereo.ts replay [options]
 
-启动本机 4K 双目 YOLO 坐标 GUI。默认值:
+录制原始左右双目视频，或启动本机 4K 双目 YOLO 坐标 GUI。默认值:
   相机       /dev/video0,/dev/video2
   采集       3840x2160@30 MJPG
   标定包     artifacts/calibration/stereo_cam1_cam2
   模型       artifacts/models/tennis_ball_yolo/model.pt
 
 常用命令:
+  bun scripts/stereo.ts record
+  bun scripts/stereo.ts record --duration 60
+  bun scripts/stereo.ts record --dry-run
+  bun scripts/stereo.ts preview
   bun scripts/stereo.ts gui
   bun scripts/stereo.ts gui --tile
   bun scripts/stereo.ts gui --dry-run
@@ -155,6 +175,8 @@ function printUsage(): void {
   bun scripts/stereo.ts replay
 
 说明:
+  record 写入 runs/raw-stereo/<session>/left.mp4 和 right.mp4，不运行 YOLO。
+  record 不传 --duration 时持续录制，预览窗口按 q 或 esc 停止。
   GUI 显示的是左相机坐标系：x right, y down, z forward。
   replay 会打开本地前端列出 runs/stereo 里的记录，时间段选择在浏览器中完成。
   YOLO 实跑会自动使用 tools/stereo 的 uv extra: detect。

@@ -17,10 +17,10 @@ TennisBot/
   tools/
     calibration/     fixed DFOptix ChArUco OpenCV capture GUI
     yolo/            annotation, YOLO package, pure detection GUI
-    stereo/          local OpenCV stereo YOLO coordinate GUI
+    stereo/          raw stereo recorder and local stereo coordinate GUI
   scripts/
     live3d.ts        single root launcher/status check for Live3D
-    stereo.ts        root launcher for the local stereo coordinate GUI
+    stereo.ts        root launcher for stereo record/preview/replay
   artifacts/         ignored local runtime artifacts
   docs/
     current/         current operational truth
@@ -89,6 +89,7 @@ Owns the local OpenCV stereo-coordinate GUI:
 - reads the current runtime stereo calibration package;
 - rectifies detected centers, pairs candidates, triangulates a camera-frame
   3D point, and displays x/y/z/range plus stereo diagnostics.
+- records raw left/right stereo video under `runs/raw-stereo`;
 - records long local sessions under `runs/stereo`;
 - serves a local replay frontend that lists records, selects time windows with
   UI sliders, and renders camera-frame 3D points plus prediction curves.
@@ -96,6 +97,7 @@ Owns the local OpenCV stereo-coordinate GUI:
 Current command:
 
 ```bash
+bun scripts/stereo.ts record
 bun scripts/stereo.ts gui --tile
 bun scripts/stereo.ts gui --tile --record-run
 bun scripts/stereo.ts replay
@@ -186,6 +188,7 @@ bun scripts/live3d.ts --status
 Start the local OpenCV stereo-coordinate GUI:
 
 ```bash
+bun scripts/stereo.ts record
 bun scripts/stereo.ts gui --tile
 ```
 

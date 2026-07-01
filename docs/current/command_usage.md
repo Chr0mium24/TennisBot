@@ -30,12 +30,16 @@ bun scripts/live3d.ts --status
 启动本机 4K 双目 YOLO 坐标 GUI：
 
 ```bash
+bun scripts/stereo.ts record
 bun scripts/stereo.ts gui
 ```
 
 常用选项：
 
 ```bash
+bun scripts/stereo.ts record --duration 60
+bun scripts/stereo.ts record --dry-run
+bun scripts/stereo.ts preview
 bun scripts/stereo.ts gui --tile
 bun scripts/stereo.ts gui --tile --record-run
 bun scripts/stereo.ts gui --dry-run
@@ -52,7 +56,12 @@ bun scripts/stereo.ts replay
 - 格式：`MJPG`
 - 标定包：`artifacts/calibration/stereo_cam1_cam2`
 - 模型：`artifacts/models/tennis_ball_yolo/model.pt`
-- 记录目录：`runs/stereo`
+- 原始双目视频目录：`runs/raw-stereo`
+- GUI 点流记录目录：`runs/stereo`
+
+`record` 写入 `left.mp4`、`right.mp4`、`session.json`、`frames.ndjson` 和
+`pairs.ndjson`。不传 `--duration` 时会一直录制，预览窗口按 `q` 或 `esc`
+停止；预览只做原始双目画面降采样，不运行 YOLO、矫正或 overlay。
 
 `replay` 会打开本地前端，列出 `runs/stereo` 下面的记录；选中记录后在
 页面里用两个进度条选择轨迹时间段，并基于选中点系生成 3D 显示和相机坐标

@@ -38,6 +38,7 @@ bun scripts/live3d.ts --status
 Start the local stereo coordinate GUI:
 
 ```bash
+bun scripts/stereo.ts record
 bun scripts/stereo.ts gui --tile
 ```
 
@@ -89,10 +90,14 @@ After the stereo package verifies:
 
 1. Run `bun scripts/stereo.ts gui --dry-run` to confirm default devices,
    artifact paths, and 4K capture settings.
-2. Run `bun scripts/stereo.ts gui --tile` for YOLO detection on small 4K balls.
-3. Add `--record-run` for long trajectory recording under `runs/stereo`.
-4. Use `--detector hsv` only as a camera/geometry debugging fallback.
-5. Read the right panel as left-camera-frame coordinates: x right, y down,
+2. Run `bun scripts/stereo.ts record` when raw left/right stereo video is
+   needed. It writes under `runs/raw-stereo` and stops on `q` or `esc`; use
+   `--duration <seconds>` only for an automatic stop.
+3. Run `bun scripts/stereo.ts gui --tile` for YOLO detection on small 4K balls.
+4. Add `--record-run` for long trajectory point/detection recording under
+   `runs/stereo`.
+5. Use `--detector hsv` only as a camera/geometry debugging fallback.
+6. Read the right panel as left-camera-frame coordinates: x right, y down,
    z forward.
 
 Open the replay frontend:

@@ -1,17 +1,25 @@
-# TennisBot Stereo GUI
+# TennisBot Stereo Tools
 
-`tools/stereo` is the local OpenCV stereo-coordinate GUI. It opens two USB
-cameras, runs tennis-ball detection, rectifies detections with the current
-stereo calibration artifact, triangulates the ball in the camera frame, and
-shows x/y/z/range plus stereo diagnostics.
+`tools/stereo` contains the raw stereo video recorder and the local OpenCV
+stereo-coordinate GUI. The GUI opens two USB cameras, runs tennis-ball
+detection, rectifies detections with the current stereo calibration artifact,
+triangulates the ball in the camera frame, and shows x/y/z/range plus stereo
+diagnostics.
 
 Run from the repository root through the launcher:
 
 ```bash
+bun scripts/stereo.ts record
 bun scripts/stereo.ts gui
 ```
 
-Record a long run:
+Record a fixed-length raw stereo video:
+
+```bash
+bun scripts/stereo.ts record --duration 60
+```
+
+Record a long point/detection run from the coordinate GUI:
 
 ```bash
 bun scripts/stereo.ts gui --tile --record-run
@@ -44,7 +52,22 @@ It is not a tennis-court world coordinate.
 
 ## Recording Format
 
-Recorded sessions are written under `runs/stereo/<session>/`:
+Raw stereo recordings are written under `runs/raw-stereo/<session>/`:
+
+```text
+session.json
+left.mp4
+right.mp4
+frames.ndjson
+pairs.ndjson
+```
+
+`bun scripts/stereo.ts record` uses the default cameras and 4K MJPG capture
+settings. Without `--duration`, it records until `q` or `esc` is pressed in the
+preview window. The preview is only a downsampled raw stereo image; this path
+does not run YOLO, rectification, or overlay rendering.
+
+GUI point/detection sessions are written under `runs/stereo/<session>/`:
 
 ```text
 session.json
