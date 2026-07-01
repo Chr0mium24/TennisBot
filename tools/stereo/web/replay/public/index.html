@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TennisBot Stereo Replay</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <aside class="sidebar">
+        <header>
+          <p class="eyebrow">TennisBot</p>
+          <h1>Stereo Replay</h1>
+        </header>
+        <section>
+          <div class="section-title">Records</div>
+          <div id="session-list" class="session-list"></div>
+        </section>
+      </aside>
+      <section class="workspace">
+        <header class="toolbar">
+          <div>
+            <p class="eyebrow">camera-frame trajectory</p>
+            <h2 id="record-title">No record selected</h2>
+          </div>
+          <div id="record-stats" class="stats"></div>
+        </header>
+        <section class="selector">
+          <div class="range-row">
+            <label for="start-range">Start</label>
+            <input id="start-range" type="range" min="0" max="0" value="0" />
+            <output id="start-label">0.00s</output>
+          </div>
+          <div class="range-row">
+            <label for="end-range">End</label>
+            <input id="end-range" type="range" min="0" max="0" value="0" />
+            <output id="end-label">0.00s</output>
+          </div>
+        </section>
+        <section class="scene-wrap">
+          <canvas id="scene"></canvas>
+          <div id="empty-state" class="empty-state">No selected trajectory points.</div>
+        </section>
+        <section class="detail-grid">
+          <article>
+            <h3>Selected Points</h3>
+            <p id="selection-stats">No selection.</p>
+          </article>
+          <article>
+            <h3>Prediction</h3>
+            <p id="prediction-stats">Prediction waits for at least two selected points.</p>
+          </article>
+        </section>
+      </section>
+    </main>
+    <script type="module" src="/assets/client.js"></script>
+  </body>
+</html>

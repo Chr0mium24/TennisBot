@@ -12,6 +12,7 @@ import numpy as np
 from .calibration import RuntimeStereoCalibration
 from .detection import BallDetector, HsvBallDetector, YoloBallDetector
 from .matching import StereoBallMatcher
+from .recording import StereoRunRecorder
 from .render import render_gui
 
 
@@ -19,6 +20,7 @@ TOOL_ROOT = Path(__file__).resolve().parents[2]
 REPO_ROOT = TOOL_ROOT.parents[1]
 DEFAULT_CALIBRATION_PACKAGE = REPO_ROOT / "artifacts" / "calibration" / "stereo_cam1_cam2"
 DEFAULT_MODEL = REPO_ROOT / "artifacts" / "models" / "tennis_ball_yolo" / "model.pt"
+DEFAULT_RECORD_ROOT = REPO_ROOT / "runs" / "stereo"
 DEFAULT_DEVICES = ("/dev/video0", "/dev/video2")
 
 
@@ -91,6 +93,9 @@ def add_gui_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--plot-x-m", type=float, default=3.0, help="X/Z 小图左右范围")
     parser.add_argument("--warmup-frames", type=int, default=5, help="相机预热帧数")
     parser.add_argument("--window", default="TennisBot Stereo Ball Position", help="OpenCV 窗口标题")
+    parser.add_argument("--record-run", action="store_true", help="记录本次 GUI 运行的点流和检测流")
+    parser.add_argument("--record-root", type=Path, default=DEFAULT_RECORD_ROOT, help="stereo 记录输出根目录")
+    parser.add_argument("--record-preview-video", action="store_true", help="同时记录带 overlay 的预览视频")
     parser.add_argument("--dry-run", action="store_true", help="打印配置，不打开相机")
 
 
@@ -111,6 +116,8 @@ def cmd_gui(args: argparse.Namespace) -> int:
     right_cap = open_capture(right_device, args.width, args.height, args.fps, args.fourcc)
     cv2.namedWindow(args.window, cv2.WINDOW_NORMAL)
     fps_meter = FpsMeter()
+    recorder = create_recorder(args, left_device, right_device, calibration) if args.record_run else None
+    start_perf = time.perf_counter()
     frame_id = 0
 
     try:
@@ -122,6 +129,7 @@ def cmd_gui(args: argparse.Namespace) -> int:
             left_ok, left_frame = left_cap.read()
             right_ok, right_frame = right_cap.read()
             timestamp = time.perf_counter()
+            timestamp_unix_ms = int(time.time() * 1000)
             if not left_ok or not right_ok:
                 raise RuntimeError(f"camera read failed: left_ok={left_ok} right_ok={right_ok}")
             if left_frame.shape[:2] != right_frame.shape[:2]:
@@ -134,6 +142,7 @@ def cmd_gui(args: argparse.Namespace) -> int:
 
             left_detections, right_detections = detector.detect_pair(left_frame, right_frame)
             match = matcher.select(left_detections, right_detections)
+            frame_fps = fps_meter.update(timestamp)
             canvas = render_gui(
                 left_frame,
                 right_frame,
@@ -141,18 +150,32 @@ def cmd_gui(args: argparse.Namespace) -> int:
                 right_detections,
                 match,
                 matcher.last_diagnostics,
-                fps=fps_meter.update(timestamp),
+                fps=frame_fps,
                 frame_id=frame_id,
                 display_camera_width=args.display_camera_width,
                 plot_depth_m=args.plot_depth_m,
                 plot_x_m=args.plot_x_m,
             )
+            if recorder is not None:
+                recorder.record_frame(
+                    frame_id=frame_id,
+                    elapsed_sec=timestamp - start_perf,
+                    timestamp_unix_ms=timestamp_unix_ms,
+                    left_detections=left_detections,
+                    right_detections=right_detections,
+                    match=match,
+                    diagnostics=matcher.last_diagnostics,
+                )
+                recorder.record_preview(canvas, args.fps)
             cv2.imshow(args.window, canvas)
             key = cv2.waitKey(1) & 0xFF
             if key in (27, ord("q")):
                 break
             frame_id += 1
     finally:
+        if recorder is not None:
+            recorder.close()
+            print(f"recorded_session={recorder.session_dir}")
         left_cap.release()
         right_cap.release()
         cv2.destroyWindow(args.window)
@@ -242,6 +265,42 @@ def open_capture(device: str, width: int, height: int, fps: float, fourcc: str) 
     return capture
 
 
+def create_recorder(
+    args: argparse.Namespace,
+    left_device: str,
+    right_device: str,
+    calibration: RuntimeStereoCalibration,
+) -> StereoRunRecorder:
+    return StereoRunRecorder.create(
+        root=args.record_root,
+        record_preview_video=args.record_preview_video,
+        metadata={
+            "capture": {
+                "left_device": left_device,
+                "right_device": right_device,
+                "width": args.width,
+                "height": args.height,
+                "fps": args.fps,
+                "fourcc": args.fourcc,
+            },
+            "detector": {
+                "type": args.detector,
+                "model": str(args.model) if args.detector == "yolo" else None,
+                "tile": args.tile,
+                "imgsz": args.imgsz,
+            },
+            "calibration": {
+                "package": str(args.calibration_package),
+                "image_size": {
+                    "width": calibration.image_size[0],
+                    "height": calibration.image_size[1],
+                },
+                "baseline_m": calibration.baseline_m,
+            },
+        },
+    )
+
+
 def print_dry_run(args: argparse.Namespace, left_device: str, right_device: str) -> None:
     print("stereo_gui=dry-run")
     print(f"devices={left_device},{right_device}")
@@ -250,6 +309,7 @@ def print_dry_run(args: argparse.Namespace, left_device: str, right_device: str)
     print(f"capture={args.width}x{args.height}@{args.fps:g} fourcc={args.fourcc}")
     print(f"detector={args.detector} tile={args.tile} imgsz={args.imgsz}")
     print(f"limits=epipolar<={args.max_epipolar_error_px:g}px depth<={args.max_depth_m:g}m")
+    print(f"record_run={args.record_run} record_root={args.record_root}")
 
 
 def main(argv: list[str] | None = None) -> int:

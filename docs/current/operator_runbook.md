@@ -90,9 +90,19 @@ After the stereo package verifies:
 1. Run `bun scripts/stereo.ts gui --dry-run` to confirm default devices,
    artifact paths, and 4K capture settings.
 2. Run `bun scripts/stereo.ts gui --tile` for YOLO detection on small 4K balls.
-3. Use `--detector hsv` only as a camera/geometry debugging fallback.
-4. Read the right panel as left-camera-frame coordinates: x right, y down,
+3. Add `--record-run` for long trajectory recording under `runs/stereo`.
+4. Use `--detector hsv` only as a camera/geometry debugging fallback.
+5. Read the right panel as left-camera-frame coordinates: x right, y down,
    z forward.
+
+Open the replay frontend:
+
+```bash
+bun scripts/stereo.ts replay
+```
+
+The replay page lists recorded sessions and uses two UI range sliders for the
+selected trajectory window. Do not pass replay time windows through CLI flags.
 
 ## Current Runtime Evidence
 

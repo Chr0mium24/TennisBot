@@ -37,9 +37,11 @@ bun scripts/stereo.ts gui
 
 ```bash
 bun scripts/stereo.ts gui --tile
+bun scripts/stereo.ts gui --tile --record-run
 bun scripts/stereo.ts gui --dry-run
 bun scripts/stereo.ts gui --detector hsv
 bun scripts/stereo.ts gui --devices /dev/video0,/dev/video2
+bun scripts/stereo.ts replay
 ```
 
 默认值：
@@ -50,6 +52,11 @@ bun scripts/stereo.ts gui --devices /dev/video0,/dev/video2
 - 格式：`MJPG`
 - 标定包：`artifacts/calibration/stereo_cam1_cam2`
 - 模型：`artifacts/models/tennis_ball_yolo/model.pt`
+- 记录目录：`runs/stereo`
+
+`replay` 会打开本地前端，列出 `runs/stereo` 下面的记录；选中记录后在
+页面里用两个进度条选择轨迹时间段，并基于选中点系生成 3D 显示和相机坐标
+预测曲线。时间段不通过命令行参数传入。
 
 ## 标定快捷入口
 

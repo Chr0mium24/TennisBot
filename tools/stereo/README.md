@@ -11,6 +11,18 @@ Run from the repository root through the launcher:
 bun scripts/stereo.ts gui
 ```
 
+Record a long run:
+
+```bash
+bun scripts/stereo.ts gui --tile --record-run
+```
+
+Open the replay frontend:
+
+```bash
+bun scripts/stereo.ts replay
+```
+
 Direct tool command:
 
 ```bash
@@ -29,3 +41,19 @@ artifacts/models/tennis_ball_yolo/model.pt
 
 The reported 3D point is in the left camera frame: x right, y down, z forward.
 It is not a tennis-court world coordinate.
+
+## Recording Format
+
+Recorded sessions are written under `runs/stereo/<session>/`:
+
+```text
+session.json
+points.ndjson
+detections.ndjson
+preview.mp4   # only when --record-preview-video is used
+```
+
+The replay frontend lists these directories, loads a selected record, and uses
+two UI range sliders to choose a time window. It renders selected 3D points and
+a camera-frame prediction curve in the browser. Time-window selection is not
+passed through command-line arguments.

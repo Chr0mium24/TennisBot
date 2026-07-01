@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 type ForwardedSignal = "SIGINT" | "SIGTERM";
@@ -17,6 +18,9 @@ try {
   const rest = argv.slice(1);
   if (command === "gui") {
     process.exit(await runStereoGui(rest));
+  }
+  if (command === "replay") {
+    process.exit(await runStereoReplay(rest));
   }
   throw new Error(`Unknown command: ${command}`);
 } catch (error) {
@@ -43,6 +47,46 @@ async function runStereoGui(args: string[]): Promise<number> {
     stderr: "inherit",
   });
   return await waitForChild(proc);
+}
+
+async function runStereoReplay(args: string[]): Promise<number> {
+  const replayCwd = resolve(stereoCwd, "web/replay");
+  if (!args.includes("--help") && !args.includes("-h")) {
+    const installCode = await ensureReplayDependencies(replayCwd);
+    if (installCode !== 0) return installCode;
+    const build = Bun.spawn(["bun", "run", "build"], {
+      cwd: replayCwd,
+      env: process.env,
+      stdin: "ignore",
+      stdout: "inherit",
+      stderr: "inherit",
+    });
+    const buildCode = await build.exited;
+    if (buildCode !== 0) return buildCode;
+  }
+  const proc = Bun.spawn(["bun", "./src/server.ts", ...args], {
+    cwd: replayCwd,
+    env: process.env,
+    stdin: "inherit",
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  return await waitForChild(proc);
+}
+
+async function ensureReplayDependencies(replayCwd: string): Promise<number> {
+  if (existsSync(resolve(replayCwd, "node_modules/three"))) {
+    return 0;
+  }
+  console.log("Installing stereo replay frontend dependencies...");
+  const install = Bun.spawn(["bun", "install", "--frozen-lockfile"], {
+    cwd: replayCwd,
+    env: process.env,
+    stdin: "ignore",
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  return await install.exited;
 }
 
 function detectExtraArgs(args: string[]): string[] {
@@ -91,7 +135,9 @@ async function waitForChild(proc: ReturnType<typeof Bun.spawn>): Promise<number>
 }
 
 function printUsage(): void {
-  console.log(`用法: bun scripts/stereo.ts gui [options]
+  console.log(`用法:
+  bun scripts/stereo.ts gui [options]
+  bun scripts/stereo.ts replay [options]
 
 启动本机 4K 双目 YOLO 坐标 GUI。默认值:
   相机       /dev/video0,/dev/video2
@@ -103,11 +149,14 @@ function printUsage(): void {
   bun scripts/stereo.ts gui
   bun scripts/stereo.ts gui --tile
   bun scripts/stereo.ts gui --dry-run
+  bun scripts/stereo.ts gui --tile --record-run
   bun scripts/stereo.ts gui --detector hsv
   bun scripts/stereo.ts gui --devices /dev/video0,/dev/video2
+  bun scripts/stereo.ts replay
 
 说明:
   GUI 显示的是左相机坐标系：x right, y down, z forward。
+  replay 会打开本地前端列出 runs/stereo 里的记录，时间段选择在浏览器中完成。
   YOLO 实跑会自动使用 tools/stereo 的 uv extra: detect。
 `);
 }

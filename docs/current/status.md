@@ -76,6 +76,8 @@ Run local stereo coordinate display:
 
 ```bash
 bun scripts/stereo.ts gui --tile
+bun scripts/stereo.ts gui --tile --record-run
+bun scripts/stereo.ts replay
 ```
 
 Dry-run the local stereo GUI defaults:

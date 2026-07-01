@@ -89,11 +89,16 @@ Owns the local OpenCV stereo-coordinate GUI:
 - reads the current runtime stereo calibration package;
 - rectifies detected centers, pairs candidates, triangulates a camera-frame
   3D point, and displays x/y/z/range plus stereo diagnostics.
+- records long local sessions under `runs/stereo`;
+- serves a local replay frontend that lists records, selects time windows with
+  UI sliders, and renders camera-frame 3D points plus prediction curves.
 
 Current command:
 
 ```bash
 bun scripts/stereo.ts gui --tile
+bun scripts/stereo.ts gui --tile --record-run
+bun scripts/stereo.ts replay
 ```
 
 It displays camera-frame geometry only: x right, y down, z forward.
