@@ -68,6 +68,10 @@ Owns tennis-ball detector tooling:
 - runtime model package create/verify;
 - pure OpenCV YOLO detection GUI via `tennisbot-yolo detect-gui`.
 
+The annotation and model-package paths use the default `uv sync` environment and
+do not require Torch, CUDA, or Ultralytics. `detect-gui` is isolated behind the
+optional `detect` extra.
+
 It does not own stereo geometry, calibration, camera/world transforms, Live3D
 state, or trajectory prediction.
 

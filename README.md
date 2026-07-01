@@ -60,6 +60,10 @@ bun scripts/calib.ts mono cam2
 bun scripts/calib.ts stereo
 ```
 
+Calibration and YOLO annotation/package commands do not require Torch, CUDA, or
+Ultralytics. Keep the default `uv sync` path for `tools/calibration` and
+`tools/yolo`; only pure YOLO camera detection uses `uv run --extra detect ...`.
+
 Create dry-run YOLO artifacts:
 
 ```bash

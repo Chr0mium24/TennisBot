@@ -17,6 +17,9 @@ cd tools/calibration
 uv sync
 ```
 
+这个环境只安装 OpenCV、NumPy、PyYAML 和开发测试依赖；标定采集、求解和
+导出不依赖 `torch`、`ultralytics` 或 CUDA/NVIDIA Python 包。
+
 ## 相机亮度检查
 
 ```bash

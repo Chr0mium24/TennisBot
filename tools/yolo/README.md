@@ -16,6 +16,20 @@ uv sync
 uv run pytest -q
 ```
 
+默认 `uv sync` 只安装标注服务和模型包工具依赖，不安装 `torch`、
+`ultralytics`、CUDA 或 NVIDIA Python 包。`uv.lock` 会记录 optional
+`detect` extra 的完整解析结果，所以能看到这些包名；只有运行
+`uv sync --extra detect`、`uv sync --all-extras` 或
+`uv run --extra detect ...` 时才会把它们装进当前环境。
+
+如果旧的 `.venv` 曾经装过检测 extra，回到无 Torch/CUDA 环境时运行：
+
+```bash
+uv sync
+```
+
+不要加 `--inexact`、`--all-extras` 或 `--extra detect`。
+
 ## 标注前端
 
 ```bash
@@ -83,6 +97,9 @@ uv run tennisbot-yolo package create \
 如果同时提供多个模型，`--default-model` 必须指向其中一个。
 
 ## 纯 YOLO 检测 GUI
+
+这个命令是唯一需要 `tools/yolo` 的 `detect` extra 的入口；它会通过
+`ultralytics` 传递安装 Torch/CUDA 相关包。
 
 ```bash
 uv run --extra detect tennisbot-yolo detect-gui

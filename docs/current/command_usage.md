@@ -7,6 +7,11 @@
 Python 工具使用 `uv`，前端和 TypeScript 脚本使用 `bun`。入口命令都提供默认
 路径、默认设备或默认端口；直接运行默认命令应该能进入最常用流程。
 
+`tools/calibration` 和 `tools/yolo` 的标注/模型包命令都可以在无
+`torch`、无 CUDA/NVIDIA Python 包的环境里运行。不要使用
+`uv sync --all-extras` 或 `uv run --extra detect ...`，除非要跑纯 YOLO
+相机检测 GUI。
+
 ## 本机运行入口
 
 启动 Live3D：
@@ -247,6 +252,9 @@ cd tools/yolo
 ```bash
 uv run tennisbot-yolo annotate
 ```
+
+默认 `uv sync` 不安装 `torch`、`ultralytics` 或 CUDA/NVIDIA Python 包。
+`detect-gui` 是 `tools/yolo` 中唯一需要 `--extra detect` 的命令。
 
 默认值：
 
