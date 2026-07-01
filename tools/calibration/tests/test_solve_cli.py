@@ -25,6 +25,7 @@ from camera_calib_lab.solve import (
     solve_mono_package,
     stereo_calibration_flags,
     target_payload,
+    undistorted_epipolar_rms_px,
     validate_stereo_source_devices,
 )
 from camera_calib_lab.v4l2_controls import V4L2Control, v4l2_controls_snapshot
@@ -437,6 +438,27 @@ class SolveCliTest(unittest.TestCase):
 
         self.assertTrue(flags & cv2.CALIB_FIX_INTRINSIC)
         self.assertTrue(flags & cv2.CALIB_RATIONAL_MODEL)
+
+    def test_undistorted_epipolar_rms_uses_normalized_geometry(self) -> None:
+        focal = 100.0
+        camera_matrix = np.array([[focal, 0.0, 0.0], [0.0, focal, 0.0], [0.0, 0.0, 1.0]], dtype=np.float64)
+        dist_coeffs = np.zeros((5, 1), dtype=np.float64)
+        essential = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, -1.0], [0.0, 1.0, 0.0]], dtype=np.float64)
+        left_points = [np.array([[[10.0, 20.0]], [[30.0, 40.0]], [[50.0, 60.0]]], dtype=np.float32)]
+        right_points = [np.array([[[15.0, 20.0]], [[35.0, 40.0]], [[55.0, 60.0]]], dtype=np.float32)]
+
+        rms = undistorted_epipolar_rms_px(
+            left_points,
+            right_points,
+            camera_matrix,
+            dist_coeffs,
+            camera_matrix,
+            dist_coeffs,
+            essential,
+        )
+
+        self.assertIsNotNone(rms)
+        self.assertLess(float(rms), 1.0e-6)
 
 
 def read_json(path: Path) -> dict:

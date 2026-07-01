@@ -233,7 +233,15 @@ def solve_stereo_package(
         rotation,
         translation,
     )
-    epipolar_rms = epipolar_rms_px(left_image_points, right_image_points, fundamental)
+    epipolar_rms = undistorted_epipolar_rms_px(
+        left_image_points,
+        right_image_points,
+        left_k,
+        left_dist,
+        right_k,
+        right_dist,
+        essential,
+    )
     rectification_y_p95 = rectification_y_p95_px(
         left_image_points,
         right_image_points,
@@ -813,20 +821,37 @@ def camera_intrinsics_json(
     }
 
 
-def epipolar_rms_px(
+def undistorted_epipolar_rms_px(
     left_points_by_view: list[np.ndarray],
     right_points_by_view: list[np.ndarray],
-    fundamental: np.ndarray,
+    left_k: np.ndarray,
+    left_dist: np.ndarray,
+    right_k: np.ndarray,
+    right_dist: np.ndarray,
+    essential: np.ndarray,
 ) -> float | None:
     left = np.concatenate([points.reshape(-1, 2) for points in left_points_by_view], axis=0)
     right = np.concatenate([points.reshape(-1, 2) for points in right_points_by_view], axis=0)
     if left.size == 0 or right.size == 0:
         return None
-    lines_right = cv2.computeCorrespondEpilines(left.reshape(-1, 1, 2), 1, fundamental).reshape(-1, 3)
-    lines_left = cv2.computeCorrespondEpilines(right.reshape(-1, 1, 2), 2, fundamental).reshape(-1, 3)
-    right_dist = line_distances(lines_right, right)
-    left_dist = line_distances(lines_left, left)
-    return float(np.sqrt(np.mean(np.concatenate([left_dist, right_dist]) ** 2)))
+    left_undistorted = cv2.undistortPoints(left.reshape(-1, 1, 2), left_k, left_dist).reshape(-1, 2)
+    right_undistorted = cv2.undistortPoints(right.reshape(-1, 1, 2), right_k, right_dist).reshape(-1, 2)
+    left_h = homogeneous_points(left_undistorted)
+    right_h = homogeneous_points(right_undistorted)
+    lines_right = (essential @ left_h.T).T
+    lines_left = (essential.T @ right_h.T).T
+    right_distances = line_distances(lines_right, right_undistorted)
+    left_distances = line_distances(lines_left, left_undistorted)
+    normalized_rms = np.sqrt(np.mean(np.concatenate([left_distances, right_distances]) ** 2))
+    return float(normalized_rms * average_focal_px(left_k, right_k))
+
+
+def homogeneous_points(points: np.ndarray) -> np.ndarray:
+    return np.concatenate([points, np.ones((points.shape[0], 1), dtype=points.dtype)], axis=1)
+
+
+def average_focal_px(left_k: np.ndarray, right_k: np.ndarray) -> float:
+    return float((left_k[0, 0] + left_k[1, 1] + right_k[0, 0] + right_k[1, 1]) / 4.0)
 
 
 def line_distances(lines: np.ndarray, points: np.ndarray) -> np.ndarray:
