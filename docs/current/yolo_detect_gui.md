@@ -28,6 +28,12 @@ uv run --extra detect tennisbot-yolo detect-gui \
 The GUI is detection-only. It intentionally does not prove stereo geometry or
 prediction correctness.
 
+For stereo x/y/z display, use the local stereo GUI instead:
+
+```bash
+bun scripts/stereo.ts gui --tile
+```
+
 ## Verification
 
 ```bash

@@ -353,6 +353,8 @@ export function convertRectificationArtifact(
   return {
     leftCameraId: json.left_camera_id,
     rightCameraId: json.right_camera_id,
+    leftRectificationMatrix: json.r1 === undefined ? undefined : matrix3x3FromArtifact(json.r1),
+    rightRectificationMatrix: json.r2 === undefined ? undefined : matrix3x3FromArtifact(json.r2),
     leftProjectionMatrix: matrix3x4FromArtifact(json.p1),
     rightProjectionMatrix: matrix3x4FromArtifact(json.p2),
     imageSize: convertImageSize(json.image_size),
@@ -480,6 +482,8 @@ function validateRectificationJson(
   requireString(json, `${path}.left_camera_id`, errors);
   requireString(json, `${path}.right_camera_id`, errors);
   requireImageSize(json.image_size, `${path}.image_size`, errors);
+  optionalMatrix3x3(json.r1, `${path}.r1`, errors);
+  optionalMatrix3x3(json.r2, `${path}.r2`, errors);
   requireMatrix3x4(json.p1, `${path}.p1`, errors);
   requireMatrix3x4(json.p2, `${path}.p2`, errors);
   return json as unknown as RectificationArtifactJson;
@@ -655,6 +659,12 @@ function requireMatrix3x3(value: unknown, path: string, errors: string[]): void 
 
 function requireMatrix3x4(value: unknown, path: string, errors: string[]): void {
   requireNestedNumberMatrix(value, path, 3, 4, errors);
+}
+
+function optionalMatrix3x3(value: unknown, path: string, errors: string[]): void {
+  if (value !== undefined) {
+    requireMatrix3x3(value, path, errors);
+  }
 }
 
 function requireNestedNumberMatrix(

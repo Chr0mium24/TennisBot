@@ -1,6 +1,6 @@
 # TennisBot Current Status
 
-Date: 2026-06-30
+Date: 2026-07-01
 
 ## Current Step
 
@@ -9,6 +9,7 @@ The project is at local operator validation. The main tracked paths are now:
 - `tools/calibration` for the fixed DFOptix ChArUco OpenCV capture GUI;
 - `tools/yolo` for annotation, model package operations, and pure YOLO detect
   GUI;
+- `tools/stereo` for local 4K stereo YOLO coordinate display;
 - `packages/core` and `packages/contracts` for runtime algorithms and shared
   contracts;
 - `apps/live3d` for browser camera, YOLO, and 3D display.
@@ -64,6 +65,18 @@ uv run --extra detect tennisbot-yolo detect-gui \
   --tile \
   --imgsz 1280 \
   --display-width 720
+```
+
+Run local stereo coordinate display:
+
+```bash
+bun scripts/stereo.ts gui --tile
+```
+
+Dry-run the local stereo GUI defaults:
+
+```bash
+bun scripts/stereo.ts gui --dry-run
 ```
 
 Capture calibration frames:

@@ -47,6 +47,8 @@ describe('runtime data contracts', () => {
     const projections: RectifiedStereoProjectionMatrices = {
       leftCameraId: 'cam-left',
       rightCameraId: 'cam-right',
+      leftRectificationMatrix: identityMatrix,
+      rightRectificationMatrix: identityMatrix,
       leftProjectionMatrix: {
         values: [1000, 0, 640, 0, 0, 1000, 360, 0, 0, 0, 1, 0],
         storage: 'row-major',
@@ -59,6 +61,7 @@ describe('runtime data contracts', () => {
     };
 
     expect(projections.leftProjectionMatrix.values).toHaveLength(12);
+    expect(projections.leftRectificationMatrix?.values).toHaveLength(9);
     expect(projections.rightProjectionMatrix.storage).toBe('row-major');
   });
 
@@ -89,6 +92,8 @@ describe('runtime data contracts', () => {
       left,
       right,
       maxTimestampDeltaMs: 8,
+      leftRectifiedCenterPx: { x: 622, y: 332 },
+      rightRectifiedCenterPx: { x: 590, y: 332 },
       matchConfidence: 0.88,
       disparityPx: 32,
       epipolarErrorPx: 0,
@@ -118,6 +123,9 @@ describe('runtime data contracts', () => {
       rejectedByTimestampCount: 1,
       rejectedByEpipolarCount: 1,
       rejectedByDisparityCount: 1,
+      rejectedByDepthCount: 0,
+      rejectedByReprojectionCount: 0,
+      rejectedByTriangulationCount: 0,
       bestCost: -0.7,
     };
     expect(pairingDiagnostics.rejectedByTimestampCount).toBe(1);

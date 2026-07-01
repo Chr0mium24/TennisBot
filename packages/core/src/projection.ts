@@ -1,5 +1,7 @@
 import type {
   CameraIntrinsics,
+  ImageSize,
+  Matrix3x3,
   Matrix3x4,
   RectifiedStereoProjectionMatrices,
   StereoCalibration,
@@ -25,12 +27,13 @@ export type TriangulationResult =
     };
 
 export function normalizeImagePoint(intrinsics: CameraIntrinsics, pointPx: Vector2): NormalizedImagePoint {
-  const [fx, , cx, , fy, cy] = intrinsics.cameraMatrix.values;
+  const [fx, skew, cx, , fy, cy] = intrinsics.cameraMatrix.values;
+  const y = (pointPx.y - cy) / fy;
 
   return {
     cameraId: intrinsics.cameraId,
-    x: (pointPx.x - cx) / fx,
-    y: (pointPx.y - cy) / fy,
+    x: (pointPx.x - cx - skew * y) / fx,
+    y,
   };
 }
 
@@ -53,6 +56,106 @@ export function epipolarErrorRectified(leftPx: Vector2, rightPx: Vector2): numbe
 
 export function disparityPx(leftPx: Vector2, rightPx: Vector2): number {
   return leftPx.x - rightPx.x;
+}
+
+export function rectifiedDisparityPx(
+  projections: RectifiedStereoProjectionMatrices,
+  leftPx: Vector2,
+  rightPx: Vector2,
+): number {
+  const sign = projections.rightProjectionMatrix.values[3] > 0 ? -1 : 1;
+  return sign * disparityPx(leftPx, rightPx);
+}
+
+export function rectifyImagePoint(
+  intrinsics: CameraIntrinsics,
+  rectificationMatrix: Matrix3x3,
+  projectionMatrix: Matrix3x4,
+  pointPx: Vector2,
+): Vector2 {
+  const normalized = undistortNormalizedPoint(intrinsics, pointPx);
+  const ray = multiplyMatrix3x3Vector(rectificationMatrix, {
+    x: normalized.x,
+    y: normalized.y,
+    z: 1,
+  });
+  const p = projectionMatrix.values;
+  const x = p[0] * ray.x + p[1] * ray.y + p[2] * ray.z;
+  const y = p[4] * ray.x + p[5] * ray.y + p[6] * ray.z;
+  const w = p[8] * ray.x + p[9] * ray.y + p[10] * ray.z;
+
+  if (!Number.isFinite(w) || Math.abs(w) < 1e-9) {
+    throw new RangeError('Point cannot be rectified because homogeneous depth is zero.');
+  }
+
+  return { x: x / w, y: y / w };
+}
+
+export function scaleCameraIntrinsicsForImageSize(
+  intrinsics: CameraIntrinsics,
+  targetImageSize: ImageSize,
+): CameraIntrinsics {
+  assertPositiveImageSize(targetImageSize);
+  const scaleX = targetImageSize.widthPx / intrinsics.imageSize.widthPx;
+  const scaleY = targetImageSize.heightPx / intrinsics.imageSize.heightPx;
+  const matrix = intrinsics.cameraMatrix.values;
+
+  return {
+    ...intrinsics,
+    imageSize: targetImageSize,
+    cameraMatrix: {
+      ...intrinsics.cameraMatrix,
+      values: [
+        matrix[0] * scaleX,
+        matrix[1] * scaleX,
+        matrix[2] * scaleX,
+        matrix[3] * scaleY,
+        matrix[4] * scaleY,
+        matrix[5] * scaleY,
+        matrix[6],
+        matrix[7],
+        matrix[8],
+      ],
+    },
+  };
+}
+
+export function scaleRectifiedProjectionForImageSize(
+  projections: RectifiedStereoProjectionMatrices,
+  targetImageSize: ImageSize,
+): RectifiedStereoProjectionMatrices {
+  assertPositiveImageSize(targetImageSize);
+  if (projections.imageSize === undefined) {
+    return {
+      ...projections,
+      imageSize: targetImageSize,
+    };
+  }
+
+  const scaleX = targetImageSize.widthPx / projections.imageSize.widthPx;
+  const scaleY = targetImageSize.heightPx / projections.imageSize.heightPx;
+
+  return {
+    ...projections,
+    imageSize: targetImageSize,
+    leftProjectionMatrix: scaleProjectionMatrix(projections.leftProjectionMatrix, scaleX, scaleY),
+    rightProjectionMatrix: scaleProjectionMatrix(projections.rightProjectionMatrix, scaleX, scaleY),
+  };
+}
+
+export function scaleStereoCalibrationForImageSize(
+  calibration: StereoCalibration,
+  targetImageSize: ImageSize,
+): StereoCalibration {
+  return {
+    ...calibration,
+    left: scaleCameraIntrinsicsForImageSize(calibration.left, targetImageSize),
+    right: scaleCameraIntrinsicsForImageSize(calibration.right, targetImageSize),
+    rectifiedProjection:
+      calibration.rectifiedProjection === undefined
+        ? undefined
+        : scaleRectifiedProjectionForImageSize(calibration.rectifiedProjection, targetImageSize),
+  };
 }
 
 export function reprojectPoint(projection: Matrix3x4, pointMeters: Vector3): Vector2 {
@@ -80,7 +183,7 @@ export function stereoReprojectionDiagnostics(
   const rightReprojectionErrorPx = distancePx(rightReprojected, rightPx);
 
   return {
-    disparityPx: disparityPx(leftPx, rightPx),
+    disparityPx: rectifiedDisparityPx(projections, leftPx, rightPx),
     epipolarErrorPx: epipolarErrorRectified(leftPx, rightPx),
     leftReprojectionErrorPx,
     rightReprojectionErrorPx,
@@ -141,16 +244,18 @@ export function triangulateStereoPair(
   }
 
   try {
+    const leftPx = pair.leftRectifiedCenterPx ?? pair.left.centerPx;
+    const rightPx = pair.rightRectifiedCenterPx ?? pair.right.centerPx;
     const positionMeters = triangulateRectifiedStereoPoint(
       calibration.rectifiedProjection,
-      pair.left.centerPx,
-      pair.right.centerPx,
+      leftPx,
+      rightPx,
     );
     const diagnostics = stereoReprojectionDiagnostics(
       calibration.rectifiedProjection,
       positionMeters,
-      pair.left.centerPx,
-      pair.right.centerPx,
+      leftPx,
+      rightPx,
     );
 
     return {
@@ -174,6 +279,86 @@ export function triangulateStereoPair(
 
 function distancePx(a: Vector2, b: Vector2): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function undistortNormalizedPoint(intrinsics: CameraIntrinsics, pointPx: Vector2): Vector2 {
+  const distorted = normalizeImagePoint(intrinsics, pointPx);
+  if (intrinsics.distortionModel === 'none') {
+    return { x: distorted.x, y: distorted.y };
+  }
+  if (intrinsics.distortionModel === 'opencv-fisheye') {
+    throw new RangeError('OpenCV fisheye rectification is not supported by the TypeScript runtime.');
+  }
+
+  const [k1 = 0, k2 = 0, p1 = 0, p2 = 0, k3 = 0, k4 = 0, k5 = 0, k6 = 0] =
+    intrinsics.distortionCoefficients;
+  let x = distorted.x;
+  let y = distorted.y;
+
+  for (let iteration = 0; iteration < 8; iteration += 1) {
+    const radius2 = x * x + y * y;
+    const radius4 = radius2 * radius2;
+    const radius6 = radius4 * radius2;
+    const radialDenominator = 1 + k1 * radius2 + k2 * radius4 + k3 * radius6;
+    const radialNumerator = 1 + k4 * radius2 + k5 * radius4 + k6 * radius6;
+
+    if (Math.abs(radialDenominator) < 1e-12 || !Number.isFinite(radialDenominator)) {
+      throw new RangeError('Cannot undistort point because radial distortion is singular.');
+    }
+
+    const inverseDistortion = radialNumerator / radialDenominator;
+    const deltaX = 2 * p1 * x * y + p2 * (radius2 + 2 * x * x);
+    const deltaY = p1 * (radius2 + 2 * y * y) + 2 * p2 * x * y;
+    x = (distorted.x - deltaX) * inverseDistortion;
+    y = (distorted.y - deltaY) * inverseDistortion;
+  }
+
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    throw new RangeError('Cannot undistort point because the normalized coordinates are not finite.');
+  }
+
+  return { x, y };
+}
+
+function multiplyMatrix3x3Vector(matrix: Matrix3x3, vector: Vector3): Vector3 {
+  const m = matrix.values;
+  return {
+    x: m[0] * vector.x + m[1] * vector.y + m[2] * vector.z,
+    y: m[3] * vector.x + m[4] * vector.y + m[5] * vector.z,
+    z: m[6] * vector.x + m[7] * vector.y + m[8] * vector.z,
+  };
+}
+
+function scaleProjectionMatrix(projection: Matrix3x4, scaleX: number, scaleY: number): Matrix3x4 {
+  const p = projection.values;
+  return {
+    ...projection,
+    values: [
+      p[0] * scaleX,
+      p[1] * scaleX,
+      p[2] * scaleX,
+      p[3] * scaleX,
+      p[4] * scaleY,
+      p[5] * scaleY,
+      p[6] * scaleY,
+      p[7] * scaleY,
+      p[8],
+      p[9],
+      p[10],
+      p[11],
+    ],
+  };
+}
+
+function assertPositiveImageSize(imageSize: ImageSize): void {
+  if (
+    imageSize.widthPx <= 0 ||
+    imageSize.heightPx <= 0 ||
+    !Number.isFinite(imageSize.widthPx) ||
+    !Number.isFinite(imageSize.heightPx)
+  ) {
+    throw new RangeError('Image size must contain positive finite width and height.');
+  }
 }
 
 function projectionEquationRow(

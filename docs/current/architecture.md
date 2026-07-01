@@ -1,6 +1,6 @@
 # TennisBot Current Architecture
 
-Date: 2026-06-29
+Date: 2026-07-01
 
 ## Current Shape
 
@@ -17,8 +17,10 @@ TennisBot/
   tools/
     calibration/     fixed DFOptix ChArUco OpenCV capture GUI
     yolo/            annotation, YOLO package, pure detection GUI
+    stereo/          local OpenCV stereo YOLO coordinate GUI
   scripts/
     live3d.ts        single root launcher/status check for Live3D
+    stereo.ts        root launcher for the local stereo coordinate GUI
   artifacts/         ignored local runtime artifacts
   docs/
     current/         current operational truth
@@ -78,12 +80,31 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 uv run --extra detect tennisbot-yolo detect-gui --devices /dev/video0,/dev/video2 --model ../../artifacts/models/tennis_ball_yolo/model.pt --tile
 ```
 
+### `tools/stereo`
+
+Owns the local OpenCV stereo-coordinate GUI:
+
+- opens two USB cameras at 4K MJPG by default;
+- runs YOLO or HSV tennis-ball detection;
+- reads the current runtime stereo calibration package;
+- rectifies detected centers, pairs candidates, triangulates a camera-frame
+  3D point, and displays x/y/z/range plus stereo diagnostics.
+
+Current command:
+
+```bash
+bun scripts/stereo.ts gui --tile
+```
+
+It displays camera-frame geometry only: x right, y down, z forward.
+
 ### `packages/core`
 
 Owns pure runtime algorithms and artifact validation:
 
 - YOLO and stereo calibration artifact metadata loaders;
-- stereo detection pairing;
+- stereo detection pairing with rectification, disparity/depth filtering, and
+  reprojection diagnostics;
 - rectified stereo triangulation;
 - projectile trajectory prediction.
 
@@ -113,11 +134,12 @@ measured and applied.
 1. tools/calibration captures mono/stereo ChArUco sessions
 2. tools/calibration solves mono/stereo calibration packages under artifacts/calibration/...
 3. tools/yolo creates or verifies artifacts/models/tennis_ball_yolo
-4. apps/live3d loads the YOLO and calibration artifacts
-5. the operator starts two USB cameras in the browser
-6. Live3D runs YOLO on left/right frames
-7. packages/core pairs detections, triangulates a 3D point, and predicts motion
-8. Live3D renders detections, 3D trail, prediction curve, and readiness gates
+4. tools/stereo can run the local OpenCV 4K stereo coordinate GUI
+5. apps/live3d can load the YOLO and calibration artifacts
+6. the operator starts two USB cameras in the browser
+7. Live3D runs YOLO on left/right frames
+8. packages/core pairs detections, triangulates a 3D point, and predicts motion
+9. Live3D renders detections, 3D trail, prediction curve, and readiness gates
 ```
 
 ## Current Validation State
@@ -153,6 +175,12 @@ Start the local browser runtime:
 ```bash
 bun scripts/live3d.ts
 bun scripts/live3d.ts --status
+```
+
+Start the local OpenCV stereo-coordinate GUI:
+
+```bash
+bun scripts/stereo.ts gui --tile
 ```
 
 Verify core packages:

@@ -1,6 +1,6 @@
 # Local Runtime Operator Runbook
 
-Date: 2026-06-30
+Date: 2026-07-01
 
 ## Scope
 
@@ -8,7 +8,8 @@ This runbook is the local-machine sequence for the current TennisBot runtime:
 
 1. `tools/calibration` OpenCV GUI for fixed DFOptix ChArUco mono/stereo capture.
 2. `tools/yolo` for pure YOLO detection and runtime model packages.
-3. Live3D for two USB camera streams, ONNX YOLO inference, stereo 3D point,
+3. `tools/stereo` for local OpenCV 4K stereo YOLO coordinate display.
+4. Live3D for two USB camera streams, ONNX YOLO inference, stereo 3D point,
    and trajectory prediction.
 
 The board-side runtime is not part of this flow.
@@ -32,6 +33,12 @@ For a quick status check without starting anything:
 
 ```bash
 bun scripts/live3d.ts --status
+```
+
+Start the local stereo coordinate GUI:
+
+```bash
+bun scripts/stereo.ts gui --tile
 ```
 
 Observed result on 2026-06-29:
@@ -75,6 +82,17 @@ Open `http://127.0.0.1:5178/` after the stereo package verifies:
    point, and prediction curve.
 4. Treat `prediction-ready` in the browser readiness gates as the local runtime
    target for a visible ball pass.
+
+## Local Stereo GUI Order
+
+After the stereo package verifies:
+
+1. Run `bun scripts/stereo.ts gui --dry-run` to confirm default devices,
+   artifact paths, and 4K capture settings.
+2. Run `bun scripts/stereo.ts gui --tile` for YOLO detection on small 4K balls.
+3. Use `--detector hsv` only as a camera/geometry debugging fallback.
+4. Read the right panel as left-camera-frame coordinates: x right, y down,
+   z forward.
 
 ## Current Runtime Evidence
 

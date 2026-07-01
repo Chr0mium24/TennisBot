@@ -18,6 +18,8 @@ export interface TimestampedStereoDetectionPair {
   left: YoloDetection2D;
   right: YoloDetection2D;
   maxTimestampDeltaMs: number;
+  leftRectifiedCenterPx?: Vector2;
+  rightRectifiedCenterPx?: Vector2;
   matchConfidence?: number;
   disparityPx?: number;
   epipolarErrorPx?: number;
@@ -29,6 +31,9 @@ export interface StereoPairingDiagnostics {
   rejectedByTimestampCount: number;
   rejectedByEpipolarCount: number;
   rejectedByDisparityCount: number;
+  rejectedByTriangulationCount?: number;
+  rejectedByDepthCount?: number;
+  rejectedByReprojectionCount?: number;
   bestCost: number | null;
 }
 

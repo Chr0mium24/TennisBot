@@ -102,6 +102,11 @@ describe('artifact loaders', () => {
         0, 1200, 540, 0,
         0, 0, 1, 0,
       ]);
+      expect(result.value.rectifiedProjection?.leftRectificationMatrix?.values).toEqual([
+        1, 0, 0,
+        0, 1, 0,
+        0, 0, 1,
+      ]);
     }
   });
 
@@ -260,6 +265,16 @@ function validStereoBundle(): {
       left_camera_id: 'cam1',
       right_camera_id: 'cam2',
       image_size: { width: 1920, height: 1080 },
+      r1: [
+        [1, 0, 0],
+        [0, 1, 0],
+        [0, 0, 1],
+      ],
+      r2: [
+        [1, 0, 0],
+        [0, 1, 0],
+        [0, 0, 1],
+      ],
       p1: [
         [1200, 0, 960, 0],
         [0, 1200, 540, 0],

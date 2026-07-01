@@ -1,6 +1,6 @@
 # 命令入口使用说明
 
-日期：2026-06-30
+日期：2026-07-01
 
 ## 约定
 
@@ -26,6 +26,30 @@ bun scripts/live3d.ts
 ```bash
 bun scripts/live3d.ts --status
 ```
+
+启动本机 4K 双目 YOLO 坐标 GUI：
+
+```bash
+bun scripts/stereo.ts gui
+```
+
+常用选项：
+
+```bash
+bun scripts/stereo.ts gui --tile
+bun scripts/stereo.ts gui --dry-run
+bun scripts/stereo.ts gui --detector hsv
+bun scripts/stereo.ts gui --devices /dev/video0,/dev/video2
+```
+
+默认值：
+
+- 相机：`/dev/video0,/dev/video2`
+- 分辨率：`3840x2160`
+- 帧率：`30`
+- 格式：`MJPG`
+- 标定包：`artifacts/calibration/stereo_cam1_cam2`
+- 模型：`artifacts/models/tennis_ball_yolo/model.pt`
 
 ## 标定快捷入口
 
@@ -268,6 +292,9 @@ uv run --extra detect tennisbot-yolo detect-gui
 ```bash
 uv run --extra detect tennisbot-yolo detect-gui --tile
 ```
+
+注意：`tools/yolo detect-gui` 只显示检测框；需要显示球相对相机的
+x/y/z 坐标时使用根入口 `bun scripts/stereo.ts gui`。
 
 ## Live3D
 

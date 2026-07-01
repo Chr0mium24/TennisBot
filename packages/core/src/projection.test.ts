@@ -12,7 +12,10 @@ import {
   epipolarErrorRectified,
   normalizeImagePoint,
   projectCameraPoint,
+  rectifiedDisparityPx,
+  rectifyImagePoint,
   reprojectPoint,
+  scaleStereoCalibrationForImageSize,
   selectBestStereoPair,
   stereoReprojectionDiagnostics,
   triangulateRectifiedStereoPoint,
@@ -33,6 +36,8 @@ const leftIntrinsics: CameraIntrinsics = {
 const rectifiedProjection: RectifiedStereoProjectionMatrices = {
   leftCameraId: 'cam-left',
   rightCameraId: 'cam-right',
+  leftRectificationMatrix: { values: [1, 0, 0, 0, 1, 0, 0, 0, 1], storage: 'row-major' },
+  rightRectificationMatrix: { values: [1, 0, 0, 0, 1, 0, 0, 0, 1], storage: 'row-major' },
   leftProjectionMatrix: {
     values: [1000, 0, 640, 0, 0, 1000, 360, 0, 0, 0, 1, 0],
     storage: 'row-major',
@@ -41,7 +46,20 @@ const rectifiedProjection: RectifiedStereoProjectionMatrices = {
     values: [1000, 0, 640, -200, 0, 1000, 360, 0, 0, 0, 1, 0],
     storage: 'row-major',
   },
+  imageSize: { widthPx: 1280, heightPx: 720 },
   baselineMeters: 0.2,
+};
+
+const calibration: StereoCalibration = {
+  left: leftIntrinsics,
+  right: { ...leftIntrinsics, cameraId: 'cam-right' },
+  extrinsics: {
+    leftCameraId: 'cam-left',
+    rightCameraId: 'cam-right',
+    rotationLeftToRight: { values: [1, 0, 0, 0, 1, 0, 0, 0, 1], storage: 'row-major' },
+    translationLeftToRightMeters: { x: 0.2, y: 0, z: 0 },
+  },
+  rectifiedProjection,
 };
 
 describe('projection geometry', () => {
@@ -67,6 +85,27 @@ describe('projection geometry', () => {
   test('computes rectified epipolar error and disparity', () => {
     expect(epipolarErrorRectified({ x: 690, y: 380 }, { x: 590, y: 382.5 })).toBe(2.5);
     expect(disparityPx({ x: 690, y: 380 }, { x: 590, y: 382.5 })).toBe(100);
+    expect(rectifiedDisparityPx(rectifiedProjection, { x: 690, y: 380 }, { x: 590, y: 382.5 })).toBe(100);
+    expect(rectifiedDisparityPx(
+      {
+        ...rectifiedProjection,
+        rightProjectionMatrix: {
+          ...rectifiedProjection.rightProjectionMatrix,
+          values: [1000, 0, 640, 200, 0, 1000, 360, 0, 0, 0, 1, 0],
+        },
+      },
+      { x: 590, y: 380 },
+      { x: 690, y: 382.5 },
+    )).toBe(100);
+  });
+
+  test('rectifies an undistorted point through identity rectification', () => {
+    expect(rectifyImagePoint(
+      leftIntrinsics,
+      rectifiedProjection.leftRectificationMatrix!,
+      rectifiedProjection.leftProjectionMatrix,
+      { x: 690, y: 380 },
+    )).toEqual({ x: 690, y: 380 });
   });
 
   test('reprojects a known 3D point through row-major 3x4 matrices', () => {
@@ -107,17 +146,6 @@ describe('projection geometry', () => {
   });
 
   test('triangulates a timestamped stereo detection pair with diagnostics', () => {
-    const calibration: StereoCalibration = {
-      left: leftIntrinsics,
-      right: { ...leftIntrinsics, cameraId: 'cam-right' },
-      extrinsics: {
-        leftCameraId: 'cam-left',
-        rightCameraId: 'cam-right',
-        rotationLeftToRight: { values: [1, 0, 0, 0, 1, 0, 0, 0, 1], storage: 'row-major' },
-        translationLeftToRightMeters: { x: 0.2, y: 0, z: 0 },
-      },
-      rectifiedProjection,
-    };
     const pair = makePair(makeDetection('left', 'cam-left', 690, 380, 0.9), makeDetection('right', 'cam-right', 590, 380, 0.9));
 
     const result = triangulateStereoPair(calibration, pair);
@@ -128,6 +156,17 @@ describe('projection geometry', () => {
       expect(result.point.diagnostics?.disparityPx).toBe(100);
       expect(result.point.reprojectionErrorPx).toBeCloseTo(0, 10);
     }
+  });
+
+  test('scales stereo calibration to the runtime image size', () => {
+    const scaled = scaleStereoCalibrationForImageSize(calibration, { widthPx: 2560, heightPx: 1440 });
+
+    expect(scaled.left.imageSize).toEqual({ widthPx: 2560, heightPx: 1440 });
+    expect(scaled.left.cameraMatrix.values[0]).toBe(2000);
+    expect(scaled.left.cameraMatrix.values[2]).toBe(1280);
+    expect(scaled.rectifiedProjection?.leftProjectionMatrix.values[0]).toBe(2000);
+    expect(scaled.rectifiedProjection?.leftProjectionMatrix.values[2]).toBe(1280);
+    expect(scaled.rectifiedProjection?.rightProjectionMatrix.values[3]).toBe(-400);
   });
 });
 
@@ -182,6 +221,38 @@ describe('stereo pairing', () => {
     expect(result.match?.left.detectionId).toBe('near-left');
     expect(result.match?.right.detectionId).toBe('near-right');
   });
+
+  test('uses calibration-aware depth filtering before selecting a stereo pair', () => {
+    const goodPoint = { x: 0.1, y: 0.04, z: 2 };
+    const farPoint = { x: 0.1, y: 0.04, z: 10 };
+    const result = selectBestStereoPair({
+      pairId: 'pair-depth-filtered',
+      timestampUnixMs: 1710000000000,
+      maxTimestampDeltaMs: 8,
+      leftDetections: [
+        detectionFromProjection('left-far', 'cam-left', rectifiedProjection.leftProjectionMatrix, farPoint, 0.99),
+        detectionFromProjection('left-good', 'cam-left', rectifiedProjection.leftProjectionMatrix, goodPoint, 0.7),
+      ],
+      rightDetections: [
+        detectionFromProjection('right-far', 'cam-right', rectifiedProjection.rightProjectionMatrix, farPoint, 0.99),
+        detectionFromProjection('right-good', 'cam-right', rectifiedProjection.rightProjectionMatrix, goodPoint, 0.7),
+      ],
+      calibration,
+      spec: {
+        maxEpipolarErrorPx: 3,
+        minDisparityPx: 10,
+        maxDisparityPx: 200,
+        maxDepthMeters: 3,
+        reprojectionWeight: 0.25,
+        temporal3dWeight: 0.02,
+      },
+    });
+
+    expect(result.match?.left.detectionId).toBe('left-good');
+    expect(result.match?.right.detectionId).toBe('right-good');
+    expect(result.match?.disparityPx).toBe(100);
+    expect(result.diagnostics.rejectedByDepthCount).toBeGreaterThan(0);
+  });
 });
 
 function makeDetection(
@@ -212,4 +283,15 @@ function makePair(left: YoloDetection2D, right: YoloDetection2D): TimestampedSte
     right,
     maxTimestampDeltaMs: 8,
   };
+}
+
+function detectionFromProjection(
+  detectionId: string,
+  cameraId: string,
+  projection: RectifiedStereoProjectionMatrices['leftProjectionMatrix'],
+  pointMeters: { x: number; y: number; z: number },
+  confidence: number,
+): YoloDetection2D {
+  const center = reprojectPoint(projection, pointMeters);
+  return makeDetection(detectionId, cameraId, center.x, center.y, confidence);
 }

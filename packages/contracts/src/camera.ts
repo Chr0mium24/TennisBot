@@ -34,6 +34,8 @@ export interface StereoCalibration {
 export interface RectifiedStereoProjectionMatrices {
   leftCameraId: string;
   rightCameraId: string;
+  leftRectificationMatrix?: Matrix3x3;
+  rightRectificationMatrix?: Matrix3x3;
   leftProjectionMatrix: Matrix3x4;
   rightProjectionMatrix: Matrix3x4;
   imageSize?: ImageSize;
