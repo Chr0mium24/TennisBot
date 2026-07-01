@@ -211,20 +211,34 @@ def target_json(target: TargetConfig) -> dict[str, Any]:
     }
 
 
-def camera_json(camera_id: str, camera: CameraConfig, device: str | int | None = None) -> dict[str, Any]:
-    return {
+def camera_json(
+    camera_id: str,
+    camera: CameraConfig,
+    device: str | int | None = None,
+    v4l2_controls: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    payload = {
         "camera_id": camera_id,
         "width_px": camera.width_px,
         "height_px": camera.height_px,
         "fps": camera.fps,
         "device": None if device is None else str(device),
     }
+    if v4l2_controls is not None:
+        payload["v4l2_controls"] = v4l2_controls
+    return payload
 
 
-def stereo_rig_json(config: CameraConfig, left_device: str | int, right_device: str | int) -> dict[str, Any]:
+def stereo_rig_json(
+    config: CameraConfig,
+    left_device: str | int,
+    right_device: str | int,
+    left_v4l2_controls: dict[str, Any] | None = None,
+    right_v4l2_controls: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     return {
         "rig_id": "stereo",
-        "left": camera_json(LEFT_CAMERA_ID, config, left_device),
-        "right": camera_json(RIGHT_CAMERA_ID, config, right_device),
+        "left": camera_json(LEFT_CAMERA_ID, config, left_device, left_v4l2_controls),
+        "right": camera_json(RIGHT_CAMERA_ID, config, right_device, right_v4l2_controls),
         "metadata": {},
     }

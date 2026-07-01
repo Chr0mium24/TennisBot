@@ -12,9 +12,10 @@ from unittest.mock import patch
 import cv2
 import numpy as np
 
-from camera_calib_lab.camera_preview import PreviewCamera, V4L2Control, draw_preview_frame
+from camera_calib_lab.camera_preview import PreviewCamera, draw_preview_frame
 from camera_calib_lab.cli import main
-from camera_calib_lab.capture_types import parse_device
+from camera_calib_lab.capture_artifacts import mono_session_json, stereo_session_json
+from camera_calib_lab.capture_types import CameraConfig, CaptureConfig, TargetConfig, ToolConfig, parse_device
 from camera_calib_lab.solve import (
     MonoCameraPackage,
     SourceObservations,
@@ -23,6 +24,7 @@ from camera_calib_lab.solve import (
     target_payload,
     validate_stereo_source_devices,
 )
+from camera_calib_lab.v4l2_controls import V4L2Control, v4l2_controls_snapshot
 
 
 class SolveCliTest(unittest.TestCase):
@@ -81,6 +83,53 @@ class SolveCliTest(unittest.TestCase):
         self.assertEqual(preview.shape[:2], (427, 760))
         self.assertGreater(int(green_pixels.sum()), 1500)
         self.assertGreater(int(green_rows[-1] - green_rows[0]), 70)
+
+    def test_v4l2_snapshot_records_calibration_controls(self) -> None:
+        controls = {
+            "auto_exposure": V4L2Control("auto_exposure", 0, 3, 1, 3, 3),
+            "exposure_time_absolute": V4L2Control(
+                "exposure_time_absolute",
+                3,
+                2047,
+                1,
+                166,
+                200,
+            ),
+            "brightness": V4L2Control("brightness", -64, 64, 1, 0, 64),
+            "gain": V4L2Control("gain", 0, 255, 1, 0, 255),
+            "focus_absolute": V4L2Control("focus_absolute", 0, 255, 1, 0, 8),
+        }
+
+        with patch("camera_calib_lab.v4l2_controls.read_v4l2_controls", return_value=controls):
+            snapshot = v4l2_controls_snapshot("/dev/video0")
+
+        self.assertEqual(snapshot["auto_exposure"]["current"], 3)
+        self.assertEqual(snapshot["exposure_time_absolute"]["current"], 200)
+        self.assertEqual(snapshot["brightness"]["current"], 64)
+        self.assertEqual(snapshot["gain"]["current"], 255)
+        self.assertNotIn("focus_absolute", snapshot)
+
+    def test_session_json_records_mono_v4l2_controls(self) -> None:
+        controls = {"brightness": v4l2_payload(current=64)}
+        session = mono_session_json(Path("/session"), tool_config(), "/dev/video0", [], controls)
+
+        self.assertEqual(session["camera"]["v4l2_controls"], controls)
+
+    def test_session_json_records_stereo_v4l2_controls(self) -> None:
+        left_controls = {"brightness": v4l2_payload(current=64)}
+        right_controls = {"brightness": v4l2_payload(current=32)}
+        session = stereo_session_json(
+            Path("/session"),
+            tool_config(),
+            "/dev/video0",
+            "/dev/video2",
+            [],
+            left_controls,
+            right_controls,
+        )
+
+        self.assertEqual(session["stereo_rig"]["left"]["v4l2_controls"], left_controls)
+        self.assertEqual(session["stereo_rig"]["right"]["v4l2_controls"], right_controls)
 
     def test_parse_dev_video_path_as_v4l2_index(self) -> None:
         self.assertEqual(parse_device("/dev/video2"), 2)
@@ -382,6 +431,14 @@ def patched_session_detection():
         create_detector=lambda _board: object(),
         detect_image_observation=fake_detect,
     )
+
+
+def tool_config() -> ToolConfig:
+    return ToolConfig(target=TargetConfig(), camera=CameraConfig(), capture=CaptureConfig())
+
+
+def v4l2_payload(*, current: int) -> dict[str, int | bool]:
+    return {"available": True, "min": -64, "max": 64, "step": 1, "default": 0, "current": current}
 
 
 def mono_package(camera_id: str, source_device: str) -> MonoCameraPackage:

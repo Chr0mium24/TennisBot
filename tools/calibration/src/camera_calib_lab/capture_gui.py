@@ -42,6 +42,7 @@ from camera_calib_lab.capture_types import (
     write_json,
 )
 from camera_calib_lab.charuco_detection import create_charuco_board, create_detector, detect_charuco
+from camera_calib_lab.v4l2_controls import v4l2_controls_snapshot
 
 
 QUIT_KEYS = {27, ord("q"), ord("Q")}
@@ -63,6 +64,7 @@ def run_mono_charuco_gui(
     board = create_charuco_board(config.target)
     detector = create_detector(board)
     source = OpenCVCamera(device or 0, config.camera)
+    v4l2_controls = v4l2_controls_snapshot(device or 0)
     records: list[dict[str, Any]] = []
     bucket_counts: dict[str, int] = defaultdict(int)
     recent_qualities: deque[AutoCaptureQuality] = deque(maxlen=max(1, int(config.capture.stability_frames) - 1))
@@ -181,6 +183,7 @@ def run_mono_charuco_gui(
         output=output,
         config=config,
         device=device,
+        v4l2_controls=v4l2_controls,
         records=records,
         bucket_counts=dict(bucket_counts),
         total_frame_count=total_frame_count,
@@ -188,7 +191,7 @@ def run_mono_charuco_gui(
         calibrate_requested=bool(len(records) >= config.capture.views and mouse_state["clicked"]),
         calibration_output=calibration_output,
     )
-    write_json(output / "session.json", mono_session_json(output, config, device, records))
+    write_json(output / "session.json", mono_session_json(output, config, device, records, v4l2_controls))
     write_json(output / "manifest.json", manifest)
     write_mono_summary(output / "summary.md", manifest)
     write_json(output / "auto_gui_result.json", manifest)
@@ -211,6 +214,8 @@ def run_stereo_charuco_gui(
     detector = create_detector(board)
     left_source = OpenCVCamera(left_device or 0, config.camera)
     right_source = OpenCVCamera(right_device or 1, config.camera)
+    left_v4l2_controls = v4l2_controls_snapshot(left_device or 0)
+    right_v4l2_controls = v4l2_controls_snapshot(right_device or 1)
     pair_records: list[dict[str, Any]] = []
     bucket_counts: dict[str, int] = defaultdict(int)
     recent_left: deque[AutoCaptureQuality] = deque(maxlen=max(1, int(config.capture.stability_frames) - 1))
@@ -365,6 +370,8 @@ def run_stereo_charuco_gui(
         config=config,
         left_device=left_device,
         right_device=right_device,
+        left_v4l2_controls=left_v4l2_controls,
+        right_v4l2_controls=right_v4l2_controls,
         pair_records=pair_records,
         bucket_counts=dict(bucket_counts),
         total_pair_frame_count=total_pair_frame_count,
@@ -372,7 +379,18 @@ def run_stereo_charuco_gui(
         calibrate_requested=bool(len(pair_records) >= config.capture.views and mouse_state["clicked"]),
         calibration_output=calibration_output,
     )
-    write_json(output / "session.json", stereo_session_json(output, config, left_device, right_device, pair_records))
+    write_json(
+        output / "session.json",
+        stereo_session_json(
+            output,
+            config,
+            left_device,
+            right_device,
+            pair_records,
+            left_v4l2_controls,
+            right_v4l2_controls,
+        ),
+    )
     write_json(output / "manifest.json", manifest)
     write_stereo_summary(output / "summary.md", manifest)
     write_json(output / "auto_gui_result.json", manifest)

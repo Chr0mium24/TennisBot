@@ -138,6 +138,7 @@ def mono_manifest(
     output: Path,
     config: ToolConfig,
     device: str | int,
+    v4l2_controls: dict[str, Any] | None,
     records: list[dict[str, Any]],
     bucket_counts: dict[str, int],
     total_frame_count: int,
@@ -152,7 +153,7 @@ def mono_manifest(
         "status": "ready" if ready else "partial",
         "session_root": str(output),
         "target": target_json(config.target),
-        "camera": camera_json(config.camera.camera_id, config.camera, device),
+        "camera": camera_json(config.camera.camera_id, config.camera, device, v4l2_controls),
         "topology": "mono",
         "frame_count": len(records),
         "total_frame_count": int(total_frame_count),
@@ -183,6 +184,8 @@ def stereo_manifest(
     config: ToolConfig,
     left_device: str | int,
     right_device: str | int,
+    left_v4l2_controls: dict[str, Any] | None,
+    right_v4l2_controls: dict[str, Any] | None,
     pair_records: list[dict[str, Any]],
     bucket_counts: dict[str, int],
     total_pair_frame_count: int,
@@ -197,7 +200,13 @@ def stereo_manifest(
         "status": "ready" if ready else "partial",
         "session_root": str(output),
         "target": target_json(config.target),
-        "stereo_rig": stereo_rig_json(config.camera, left_device, right_device),
+        "stereo_rig": stereo_rig_json(
+            config.camera,
+            left_device,
+            right_device,
+            left_v4l2_controls,
+            right_v4l2_controls,
+        ),
         "topology": "stereo",
         "pair_count": len(pair_records),
         "frame_count": 2 * len(pair_records),
@@ -223,12 +232,18 @@ def stereo_manifest(
     }
 
 
-def mono_session_json(output: Path, config: ToolConfig, device: str | int, records: list[dict[str, Any]]) -> dict[str, Any]:
+def mono_session_json(
+    output: Path,
+    config: ToolConfig,
+    device: str | int,
+    records: list[dict[str, Any]],
+    v4l2_controls: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     return {
         "session_id": output.name,
         "topology": "mono",
         "target": target_json(config.target),
-        "camera": camera_json(config.camera.camera_id, config.camera, device),
+        "camera": camera_json(config.camera.camera_id, config.camera, device, v4l2_controls),
         "frames": [
             {
                 "view_id": item["view_id"],
@@ -251,6 +266,8 @@ def stereo_session_json(
     left_device: str | int,
     right_device: str | int,
     pair_records: list[dict[str, Any]],
+    left_v4l2_controls: dict[str, Any] | None = None,
+    right_v4l2_controls: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     frames = []
     for pair in pair_records:
@@ -269,7 +286,13 @@ def stereo_session_json(
         "session_id": output.name,
         "topology": "stereo",
         "target": target_json(config.target),
-        "stereo_rig": stereo_rig_json(config.camera, left_device, right_device),
+        "stereo_rig": stereo_rig_json(
+            config.camera,
+            left_device,
+            right_device,
+            left_v4l2_controls,
+            right_v4l2_controls,
+        ),
         "frames": frames,
         "created_at": utc_now_iso(),
         "source": "real",
