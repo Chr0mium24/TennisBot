@@ -202,7 +202,7 @@ def solve_stereo_package(
         left_image_points.append(left_img)
         right_image_points.append(right_img)
         matched_counts.append(int(obj.shape[0]))
-    flags = cv2.CALIB_FIX_INTRINSIC
+    flags = stereo_calibration_flags()
     (
         stereo_rms,
         left_k,
@@ -413,6 +413,10 @@ def load_source_observations(*, session_path: Path | None, observations_path: Pa
     if session_path is None:
         raise ValueError("either --session or --observations is required")
     return detect_session_observations(session_path, config_path)
+
+
+def stereo_calibration_flags() -> int:
+    return cv2.CALIB_FIX_INTRINSIC | cv2.CALIB_RATIONAL_MODEL
 
 
 def load_observations_json(path: Path) -> SourceObservations:

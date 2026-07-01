@@ -23,6 +23,7 @@ from camera_calib_lab.solve import (
     ViewObservation,
     detect_session_observations,
     solve_mono_package,
+    stereo_calibration_flags,
     target_payload,
     validate_stereo_source_devices,
 )
@@ -430,6 +431,12 @@ class SolveCliTest(unittest.TestCase):
             self.assertIn("epipolar=", report)
             self.assertIn(f"result={stereo_pkg.as_posix()}", report)
             self.assertNotIn('"schema_version"', report)
+
+    def test_stereo_solve_preserves_rational_distortion_model(self) -> None:
+        flags = stereo_calibration_flags()
+
+        self.assertTrue(flags & cv2.CALIB_FIX_INTRINSIC)
+        self.assertTrue(flags & cv2.CALIB_RATIONAL_MODEL)
 
 
 def read_json(path: Path) -> dict:
