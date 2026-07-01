@@ -564,7 +564,6 @@ function printPreviewUsage(): void {
   --devices <left,right>
   --shutter <n>
   --exposure <n>
-  --gain <n>
   --brightness <n>
   --auto-exposure
   --width <px>
@@ -573,7 +572,7 @@ function printPreviewUsage(): void {
   --dry-run
 
 窗口:
-  滑条调 shutter/exposure_time_absolute、gain 和 brightness。
+  滑条调 shutter/exposure_time_absolute 和 brightness。
   q 或 esc 退出。
 `);
 }

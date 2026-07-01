@@ -53,7 +53,6 @@ class SolveCliTest(unittest.TestCase):
     def test_camera_preview_dry_run_uses_visible_manual_defaults(self) -> None:
         controls = {
             "exposure_time_absolute": V4L2Control("exposure_time_absolute", 3, 2047, 1, 166, 166),
-            "gain": V4L2Control("gain", 0, 255, 1, 32, 32),
             "brightness": V4L2Control("brightness", -64, 64, 1, -5, -5),
         }
         output = StringIO()
@@ -63,8 +62,8 @@ class SolveCliTest(unittest.TestCase):
         self.assertEqual(code, 0)
         camera = json.loads(output.getvalue())["cameras"][0]
         self.assertEqual(camera["exposure_time_absolute"]["selected"], 2047)
-        self.assertEqual(camera["gain"]["selected"], 255)
         self.assertEqual(camera["brightness"]["selected"], 64)
+        self.assertNotIn("gain", camera)
 
     def test_camera_preview_overlay_is_readable_after_4k_resize(self) -> None:
         frame = np.zeros((2160, 3840, 3), dtype=np.uint8)
@@ -72,7 +71,7 @@ class SolveCliTest(unittest.TestCase):
             label="left",
             device="/dev/video0",
             source=None,  # type: ignore[arg-type]
-            controls=SimpleNamespace(exposure_value=100, gain_value=255, brightness_value=64),  # type: ignore[arg-type]
+            controls=SimpleNamespace(exposure_value=100, brightness_value=64),  # type: ignore[arg-type]
         )
 
         preview = draw_preview_frame(frame, camera, max_width=760)
