@@ -144,19 +144,20 @@ measured and applied.
 
 ## Current Validation State
 
-The latest known imported stereo package is accepted by the artifact verifier,
-but it has a review warning:
+The current local stereo package under `artifacts/calibration/stereo_cam1_cam2`
+is accepted with no runtime quality warning:
 
 ```text
-stereo_rms_px=0.423652
-epipolar_rms_px=4.330
-runtime review threshold=2.000
-baseline_m=0.052486
+stereo_rms_reprojection_px=0.212138
+epipolar_rms_px=0.256774
+rectification_y_p95_px=0.429620
+baseline_m=0.164989
 ```
 
-This means the package is usable for continued local experiments, but it should
-not be treated as final physical acceptance. Recalibrate with the real mounted
-camera geometry before relying on far-distance depth.
+The epipolar metric is computed after undistorting points and evaluating the
+essential-matrix constraint in normalized coordinates, converted back to pixels
+by average focal length. The remaining physical gap is court/world pose: current
+3D output is in the left camera frame.
 
 Live3D exposes browser readiness gates for local operation.
 

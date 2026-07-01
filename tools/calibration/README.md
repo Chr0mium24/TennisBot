@@ -187,5 +187,6 @@ uv run camera-calib-lab solve stereo \
 - `summary.md`
 - `review.html`
 
-`epipolar` 和校正后 `y` 误差超过阈值时会写入质量警告；`stereo RMS`、有效组数
-和 baseline 会决定包是否 accepted。
+`epipolar` 使用去畸变后的归一化点和 essential matrix 计算，再按平均焦距换算成像素；
+校正后 `y` 误差使用 rectified points 的 y 差。两者超过阈值时会写入质量警告；
+`stereo RMS`、有效组数和 baseline 会决定包是否 accepted。

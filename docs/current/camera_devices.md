@@ -27,7 +27,7 @@ Requires `ffmpeg` and `v4l2-ctl` on the machine running the cameras.
 
 ## Video Preview And Controls
 
-Open a live stereo preview and tune UVC shutter/gain before calibration:
+Open a live stereo preview and tune UVC shutter/brightness before calibration:
 
 ```bash
 bun scripts/calib.ts preview
@@ -41,11 +41,11 @@ bun scripts/calib.ts preview cam2
 ```
 
 The preview window provides trackbars for `shutter`
-(`exposure_time_absolute`), `gain`, and `brightness`. By default it switches to
-manual exposure, captures `3840x2160` at `30 FPS`, and starts from high
-visibility values so a camera with a low numeric brightness sample does not
-appear as a black preview. It uses `v4l2-ctl` to write the controls and exits
-with `q` or `esc`.
+(`exposure_time_absolute`) and `brightness`. By default it switches to manual
+exposure, captures `3840x2160` at `30 FPS`, and starts from high visibility
+values so a camera with a low numeric brightness sample does not appear as a
+black preview. It uses `v4l2-ctl` to write the controls and exits with `q` or
+`esc`.
 
 ## Where Device Parameters Are Used
 

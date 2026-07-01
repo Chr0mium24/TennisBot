@@ -31,17 +31,22 @@ bun scripts/calib.ts preview
 ```
 
 It prints average brightness for two USB cameras and can open a live preview
-with shutter/gain controls before calibration or Live3D runs.
+with shutter and brightness controls before calibration or Live3D runs.
 
 ## Important Gaps
 
-The latest imported calibration package is not final physical acceptance. It has
-`epipolar_rms_px=4.330`, above the `2.000` runtime review threshold. Fresh
-calibration is still needed after the cameras are fixed in their real positions.
+The current local stereo calibration package is accepted and has no runtime
+quality warning:
+
+```text
+stereo_rms_reprojection_px=0.2121
+epipolar_rms_px=0.2568
+rectification_y_p95_px=0.4296
+baseline_m=0.1650
+```
 
 `tools/calibration` now mainlines the capture GUI, ChArUco mono solve, ChArUco
-stereo solve, and runtime calibration package export. Fresh real calibration
-still requires visible physical target captures after the cameras are fixed.
+stereo solve, and runtime calibration package export.
 
 Live3D loads stereo calibration artifacts, but it does not know the camera rig's
 pose relative to the tennis court. Current 3D output is camera-frame geometry,

@@ -55,7 +55,7 @@ Before taking calibration frames, check camera brightness/order:
 bun scripts/calib.ts brightness
 ```
 
-Open the live camera preview if exposure, gain, or UVC brightness needs tuning:
+Open the live camera preview if exposure or UVC brightness needs tuning:
 
 ```bash
 bun scripts/calib.ts preview
@@ -65,7 +65,7 @@ Use the mainline OpenCV GUI in order:
 
 1. Confirm the fixed physical DFOptix ChArUco board is clean, flat, and matches
    the configured `15 mm` square / `11.25 mm` marker dimensions.
-2. Tune camera shutter/gain/brightness in `bun scripts/calib.ts preview` if the
+2. Tune camera shutter/brightness in `bun scripts/calib.ts preview` if the
    view is too dark, saturated, or noisy.
 3. `bun scripts/calib.ts mono cam1` for the left mono capture and solve.
 4. `bun scripts/calib.ts mono cam2` for the right mono capture and solve.
