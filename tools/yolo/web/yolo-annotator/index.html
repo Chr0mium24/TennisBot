@@ -2010,7 +2010,12 @@
           updateBackendExcludedStatus(entry, result.previous_excluded, result.excluded);
           updateUi();
           render();
-          setStatus(result.excluded ? "Sample excluded from training" : "Sample restored for training");
+          if (result.excluded && currentIndex < images.length - 1) {
+            await go(1);
+            setStatus("Sample excluded from training; moved to next image");
+          } else {
+            setStatus(result.excluded ? "Sample excluded from training" : "Sample restored for training");
+          }
         } catch (error) {
           console.error(error);
           setStatus(error.message || "Could not toggle sample exclusion");
