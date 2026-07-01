@@ -208,6 +208,36 @@ class SolveCliTest(unittest.TestCase):
             self.assertEqual(camera["camera_id"], "cam1")
             self.assertTrue(verification["accepted"])
 
+    def test_mono_solve_stdout_is_concise_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            observations = root / "mono_observations.json"
+            output = root / "mono_package"
+            write_mono_observations(observations, camera_id="cam1")
+
+            code, report = run_cli_output(
+                "solve",
+                "mono",
+                "--observations",
+                str(observations),
+                "--output",
+                str(output),
+                "--camera-id",
+                "cam1",
+                "--min-views",
+                "4",
+                "--max-rms-px",
+                "1.0",
+            )
+
+            self.assertEqual(code, 0)
+            self.assertTrue(report.startswith("solve status=accepted "))
+            self.assertIn("views=6/6", report)
+            self.assertRegex(report, r"points=\d+")
+            self.assertRegex(report, r"rms=\d+\.\d{4}px")
+            self.assertIn(f"result={output.as_posix()}", report)
+            self.assertNotIn('"schema_version"', report)
+
     def test_stereo_solve_writes_runtime_package(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -252,14 +282,62 @@ class SolveCliTest(unittest.TestCase):
             self.assertEqual(rectification["schema_version"], "calibration.rectification.v1")
             self.assertTrue(verification["accepted"])
 
+    def test_stereo_solve_stdout_is_concise_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            mono_left_obs = root / "mono_left.json"
+            mono_right_obs = root / "mono_right.json"
+            stereo_obs = root / "stereo.json"
+            left_pkg = root / "left_pkg"
+            right_pkg = root / "right_pkg"
+            stereo_pkg = root / "stereo_pkg"
+            write_mono_observations(mono_left_obs, camera_id="cam1")
+            write_mono_observations(mono_right_obs, camera_id="cam2")
+            self.assertEqual(run_cli("solve", "mono", "--observations", str(mono_left_obs), "--output", str(left_pkg), "--camera-id", "cam1", "--min-views", "4"), 0)
+            self.assertEqual(run_cli("solve", "mono", "--observations", str(mono_right_obs), "--output", str(right_pkg), "--camera-id", "cam2", "--min-views", "4"), 0)
+            write_stereo_observations(stereo_obs)
+
+            code, report = run_cli_output(
+                "solve",
+                "stereo",
+                "--observations",
+                str(stereo_obs),
+                "--left-mono",
+                str(left_pkg),
+                "--right-mono",
+                str(right_pkg),
+                "--output",
+                str(stereo_pkg),
+                "--min-pairs",
+                "4",
+                "--max-rms-px",
+                "1.0",
+            )
+
+            self.assertEqual(code, 0)
+            self.assertTrue(report.startswith("solve status=accepted "))
+            self.assertIn("pairs=6/6", report)
+            self.assertIn("points=left:", report)
+            self.assertRegex(report, r"rms=\d+\.\d{4}px")
+            self.assertIn("epipolar=", report)
+            self.assertIn(f"result={stereo_pkg.as_posix()}", report)
+            self.assertNotIn('"schema_version"', report)
+
 
 def read_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def run_cli(*args: str) -> int:
-    with redirect_stdout(StringIO()):
-        return main(list(args))
+    code, _output = run_cli_output(*args)
+    return code
+
+
+def run_cli_output(*args: str) -> tuple[int, str]:
+    output = StringIO()
+    with redirect_stdout(output):
+        code = main(list(args))
+    return code, output.getvalue()
 
 
 def write_session_json(root: Path, payload: dict) -> None:

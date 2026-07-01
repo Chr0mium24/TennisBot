@@ -193,10 +193,12 @@ async function runSteps(steps: CommandStep[], dryRun: boolean): Promise<number> 
 
 async function runStep(step: CommandStep, dryRun: boolean): Promise<number> {
   const command = [...calibrationCommand, ...step.args];
-  console.log(`${step.label}:`);
-  console.log(`  cd ${displayPath(calibrationCwd)}`);
-  console.log(`  ${displayCommand(command)}`);
-  if (dryRun) return 0;
+  if (dryRun) {
+    console.log(`${step.label}:`);
+    console.log(`  cd ${displayPath(calibrationCwd)}`);
+    console.log(`  ${displayCommand(command)}`);
+    return 0;
+  }
   const proc = Bun.spawn(command, {
     cwd: calibrationCwd,
     env: processEnv(),

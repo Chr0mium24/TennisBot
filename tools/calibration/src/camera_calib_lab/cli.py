@@ -3,9 +3,11 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from typing import Any
 
 from camera_calib_lab.brightness import BrightnessOptions, print_brightness_report, run_camera_brightness_check
 from camera_calib_lab.camera_preview import PreviewOptions, run_camera_preview
+from camera_calib_lab.cli_summary import capture_summary, mono_solve_summary, stereo_solve_summary
 from camera_calib_lab.capture_gui import run_mono_charuco_gui, run_stereo_charuco_gui
 from camera_calib_lab.solve import solve_mono_package, solve_stereo_package
 
@@ -18,7 +20,7 @@ def capture_charuco_auto_gui(args: argparse.Namespace) -> int:
         views=int(args.views),
         device=args.device,
     )
-    print(json.dumps(manifest, indent=2, sort_keys=True))
+    print(capture_summary(manifest))
     return 0 if manifest["status"] in {"ready", "partial"} else 1
 
 
@@ -31,31 +33,34 @@ def capture_stereo_charuco_auto_gui(args: argparse.Namespace) -> int:
         left_device=args.left_device,
         right_device=args.right_device,
     )
-    print(json.dumps(manifest, indent=2, sort_keys=True))
+    print(capture_summary(manifest))
     return 0 if manifest["status"] in {"ready", "partial"} else 1
 
 
 def solve_mono(args: argparse.Namespace) -> int:
+    output_path = Path(args.output)
     package = solve_mono_package(
         session_path=Path(args.session) if args.session else None,
         observations_path=Path(args.observations) if args.observations else None,
-        output_path=Path(args.output),
+        output_path=output_path,
         config_path=Path(args.config),
         camera_id=args.camera_id or None,
         min_views=int(args.min_views),
         max_rms_px=float(args.max_rms_px),
     )
-    print(json.dumps(package, indent=2, sort_keys=True))
+    verification = read_written_json(output_path / "verification.json")
+    print(mono_solve_summary(package, verification, output_path))
     return 0 if package["accepted"] else 1
 
 
 def solve_stereo(args: argparse.Namespace) -> int:
+    output_path = Path(args.output)
     package = solve_stereo_package(
         session_path=Path(args.session) if args.session else None,
         observations_path=Path(args.observations) if args.observations else None,
         left_mono_path=Path(args.left_mono),
         right_mono_path=Path(args.right_mono),
-        output_path=Path(args.output),
+        output_path=output_path,
         config_path=Path(args.config),
         left_camera_id=args.left_camera_id,
         right_camera_id=args.right_camera_id,
@@ -64,8 +69,12 @@ def solve_stereo(args: argparse.Namespace) -> int:
         epipolar_warning_px=float(args.epipolar_warning_px),
         rectification_warning_px=float(args.rectification_warning_px),
     )
-    print(json.dumps(package, indent=2, sort_keys=True))
+    print(stereo_solve_summary(package, output_path))
     return 0 if package["accepted"] else 1
+
+
+def read_written_json(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def camera_brightness(args: argparse.Namespace) -> int:
