@@ -32,6 +32,14 @@ uv sync
 
 ## 标注前端
 
+从仓库根目录启动：
+
+```bash
+bun scripts/yolo.ts annotate
+```
+
+或从工具目录直接启动：
+
 ```bash
 uv run tennisbot-yolo annotate
 ```

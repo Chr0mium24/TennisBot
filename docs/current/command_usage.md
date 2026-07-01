@@ -241,15 +241,16 @@ uv run camera-calib-lab solve stereo \
 
 ## YOLO 工具
 
-进入目录：
+从仓库根目录启动标注前端：
+
+```bash
+bun scripts/yolo.ts annotate
+```
+
+也可以直接进入工具目录运行：
 
 ```bash
 cd tools/yolo
-```
-
-启动标注前端：
-
-```bash
 uv run tennisbot-yolo annotate
 ```
 
@@ -262,6 +263,12 @@ uv run tennisbot-yolo annotate
 - 标签目录：`tools/yolo/yolo/dataset/labels`
 - 排除列表：`tools/yolo/yolo/dataset/excluded_images.txt`
 - 地址：`127.0.0.1:8765`
+
+指定端口：
+
+```bash
+bun scripts/yolo.ts annotate --port 8766
+```
 
 验证默认模型包：
 

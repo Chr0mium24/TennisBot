@@ -64,6 +64,12 @@ Calibration and YOLO annotation/package commands do not require Torch, CUDA, or
 Ultralytics. Keep the default `uv sync` path for `tools/calibration` and
 `tools/yolo`; only pure YOLO camera detection uses `uv run --extra detect ...`.
 
+Start the YOLO annotation frontend/backend:
+
+```bash
+bun scripts/yolo.ts annotate
+```
+
 Create dry-run YOLO artifacts:
 
 ```bash

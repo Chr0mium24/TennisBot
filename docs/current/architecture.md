@@ -20,6 +20,7 @@ TennisBot/
     stereo/          raw stereo recorder and local stereo coordinate GUI
   scripts/
     live3d.ts        single root launcher/status check for Live3D
+    yolo.ts          root launcher for the YOLO annotation frontend/backend
     stereo.ts        root launcher for stereo record/preview/replay
   artifacts/         ignored local runtime artifacts
   docs/
@@ -78,8 +79,8 @@ state, or trajectory prediction.
 Current commands:
 
 ```bash
+bun scripts/yolo.ts annotate
 cd tools/yolo
-uv run tennisbot-yolo annotate
 uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_yolo
 uv run --extra detect tennisbot-yolo detect-gui --devices /dev/video0,/dev/video2 --model ../../artifacts/models/tennis_ball_yolo/model.pt --tile
 ```
