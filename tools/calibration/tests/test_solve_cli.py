@@ -6,12 +6,13 @@ import unittest
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import cv2
 import numpy as np
 
-from camera_calib_lab.camera_preview import V4L2Control
+from camera_calib_lab.camera_preview import PreviewCamera, V4L2Control, draw_preview_frame
 from camera_calib_lab.cli import main
 from camera_calib_lab.capture_types import parse_device
 from camera_calib_lab.solve import (
@@ -64,6 +65,23 @@ class SolveCliTest(unittest.TestCase):
         self.assertEqual(camera["exposure_time_absolute"]["selected"], 2047)
         self.assertEqual(camera["gain"]["selected"], 255)
         self.assertEqual(camera["brightness"]["selected"], 64)
+
+    def test_camera_preview_overlay_is_readable_after_4k_resize(self) -> None:
+        frame = np.zeros((2160, 3840, 3), dtype=np.uint8)
+        camera = PreviewCamera(
+            label="left",
+            device="/dev/video0",
+            source=None,  # type: ignore[arg-type]
+            controls=SimpleNamespace(exposure_value=100, gain_value=255, brightness_value=64),  # type: ignore[arg-type]
+        )
+
+        preview = draw_preview_frame(frame, camera, max_width=760)
+        green_pixels = (preview[:, :, 1] > 180) & (preview[:, :, 0] < 120) & (preview[:, :, 2] < 120)
+        green_rows = np.flatnonzero(green_pixels.any(axis=1))
+
+        self.assertEqual(preview.shape[:2], (427, 760))
+        self.assertGreater(int(green_pixels.sum()), 1500)
+        self.assertGreater(int(green_rows[-1] - green_rows[0]), 70)
 
     def test_parse_dev_video_path_as_v4l2_index(self) -> None:
         self.assertEqual(parse_device("/dev/video2"), 2)

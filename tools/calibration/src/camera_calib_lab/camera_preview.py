@@ -267,20 +267,40 @@ def dry_run_payload(options: PreviewOptions) -> dict[str, Any]:
 def draw_preview_frame(frame: np.ndarray, camera: PreviewCamera, *, max_width: int) -> np.ndarray:
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     mean_gray = float(np.mean(gray))
-    preview = frame.copy()
+    width, height = preview_size(frame, max_width=max_width)
+    preview = cv2.resize(frame, (width, height), interpolation=cv2.INTER_AREA)
     lines = [
-        f"{camera.label} {camera.device}",
+        f"{camera.label.upper()} {camera.device}",
         (
-            f"shutter={camera.controls.exposure_value} gain={camera.controls.gain_value} "
-            f"brightness={camera.controls.brightness_value} mean={mean_gray:.1f}"
+            f"shutter {camera.controls.exposure_value} | gain {camera.controls.gain_value} | "
+            f"brightness {camera.controls.brightness_value}"
         ),
-        "trackbars: shutter/gain/brightness  q/esc: quit",
+        f"mean {mean_gray:.1f} | q/esc quit",
     ]
+    draw_preview_text(preview, lines)
+    return preview
+
+
+def draw_preview_text(preview: np.ndarray, lines: list[str]) -> None:
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    scale = preview_text_scale(lines, preview.shape[1], font)
+    thickness = max(2, int(round(scale * 2.0)))
+    line_gap = max(34, int(round(scale * 38)))
+    x = max(18, int(round(preview.shape[1] * 0.02)))
     for index, line in enumerate(lines):
-        y = 28 + index * 26
-        cv2.putText(preview, line, (18, y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (20, 220, 20), 2, cv2.LINE_AA)
-    width, height = preview_size(preview, max_width=max_width)
-    return cv2.resize(preview, (width, height), interpolation=cv2.INTER_AREA)
+        y = int(round(scale * 34)) + index * line_gap
+        cv2.putText(preview, line, (x, y), font, scale, (0, 0, 0), thickness + 3, cv2.LINE_AA)
+        cv2.putText(preview, line, (x, y), font, scale, (40, 255, 40), thickness, cv2.LINE_AA)
+
+
+def preview_text_scale(lines: list[str], width: int, font: int) -> float:
+    scale = max(0.95, min(1.2, width / 900.0))
+    thickness = max(2, int(round(scale * 2.0)))
+    available_width = max(1, width - 36)
+    text_width = max((cv2.getTextSize(line, font, scale, thickness)[0][0] for line in lines), default=1)
+    if text_width <= available_width:
+        return scale
+    return max(0.78, scale * (available_width / float(text_width)))
 
 
 def combine_previews(previews: list[np.ndarray]) -> np.ndarray:
