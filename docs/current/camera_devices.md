@@ -57,6 +57,5 @@ bun scripts/calib.ts mono cam2 --device <device>
 bun scripts/calib.ts stereo --left-device <left> --right-device <right>
 ```
 
-Live3D no longer has a separate hardware verifier command. Use the calibration
-preview controls above to prepare USB camera exposure/gain before opening the
-browser runtime.
+Before opening the browser runtime, use the calibration preview controls above
+to prepare USB camera exposure/gain.

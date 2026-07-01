@@ -203,10 +203,10 @@ rendered stereo solve dry-run: accepted=true, stereo_rms_reprojection_px=3.59824
 ```
 
 The hardware probe proves this tool can open and save frames from the two local
-USB cameras and can apply the same UVC brightness/gain/manual-exposure preset
-used by the Live3D hardware verifier. The saved real frames are still uniform
-gray and do not contain a visible calibration target, so they are not sufficient
-for a mono or stereo solve.
+USB cameras and can apply a UVC brightness/gain/manual-exposure preset before a
+Live3D browser run. The saved real frames are still uniform gray and do not
+contain a visible calibration target, so they are not sufficient for a mono or
+stereo solve.
 
 ## Remaining Work
 

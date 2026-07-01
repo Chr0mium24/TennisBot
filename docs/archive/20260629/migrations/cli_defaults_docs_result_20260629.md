@@ -21,9 +21,6 @@
   - `docs/archive/YYYYMMDD/probes/local_runtime_preflight_YYYYMMDD.md`
   - `docs/archive/YYYYMMDD/probes/local_physical_validation_status_YYYYMMDD.md`
   - `docs/archive/YYYYMMDD/calibration/calibration_target_print_check_YYYYMMDD.md`
-  - `docs/archive/YYYYMMDD/live3d/live3d_hardware_loop_<timestamp>.md`
-- `physical-validation-status.ts` 改为递归查找 `docs/` 下归档的
-  `live3d_hardware*.md` 报告。
 - 主要命令的 `--help` 现在会显示默认值，并尽量使用中文说明。
 
 ## 特意保留的例外
@@ -48,7 +45,6 @@
 - `bun scripts/operator-preflight.ts --help`
 - `bun scripts/physical-validation-status.ts --help`
 - `bun scripts/record-target-print-check.ts --help`
-- `bun run verify:hardware -- --help` in `apps/live3d`
 - `bun test` in `apps/live3d`: 45 passed
 - `bun run typecheck` in `apps/live3d`
 - `bun run build` in `apps/live3d`

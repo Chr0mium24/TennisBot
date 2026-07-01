@@ -46,8 +46,8 @@ Live3D loads stereo calibration artifacts, but it does not know the camera rig's
 pose relative to the tennis court. Current 3D output is camera-frame geometry,
 not court coordinates.
 
-Live3D no longer maintains a standalone hardware acceptance command. Local
-operation relies on the browser readiness gates and visual runtime state.
+Local Live3D operation relies on the browser readiness gates and visual runtime
+state.
 
 ## Next Commands
 

@@ -10,7 +10,6 @@
 - [操作员运行手册](current/operator_runbook.md)
 - [相机设备检查](current/camera_devices.md)
 - [YOLO 检测 GUI](current/yolo_detect_gui.md)
-- [Live3D 硬件验收](current/live3d_hardware_acceptance.md)
 
 ## 工具入口
 

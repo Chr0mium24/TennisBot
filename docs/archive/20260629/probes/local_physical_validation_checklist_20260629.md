@@ -151,12 +151,7 @@ Runtime gates:
   - stereo triangulated ball point;
   - prediction curve and landing point.
 
-Final evidence command:
-
-```bash
-cd apps/live3d
-bun run verify:hardware -- --prepare-uvc-controls --timeout-ms 30000 --output ../../docs/live3d_hardware_loop_ball_YYYYMMDD.md
-```
+Final browser check:
 
 Pass condition:
 

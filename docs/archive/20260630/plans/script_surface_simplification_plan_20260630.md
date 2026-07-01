@@ -20,7 +20,6 @@ brightness inspection into the calibration tool boundary.
 ## Non-Goals
 
 - Do not delete historical archive records.
-- Do not remove Live3D hardware verification under `apps/live3d`.
 - Do not change ROS/Gazebo receiving-loop claims or add substitute receiving
   logic.
 

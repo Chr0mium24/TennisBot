@@ -112,14 +112,14 @@ artifacts/calibration_targets/dfoptix_charuco_15mm_print_check.json
 }
 ```
 
-### Live3D prediction-ready hardware run
+### Live3D prediction-ready runtime run
 
 - status: blocked
-- detail: no Live3D hardware report has reached prediction-ready.
-- next: Put a visible tennis ball in both camera views and run apps/live3d verify:hardware until it passes.
+- detail: no Live3D run has reached prediction-ready.
+- next: Put a visible tennis ball in both camera views and watch the browser
+  readiness gates until prediction is ready.
 
 ```text
-report: docs/live3d_hardware_readiness_gates_20260629.md
 - Result: failed
 - Error: Runtime 3D prediction did not reach ready.
 - Max left detections: 0
@@ -127,4 +127,3 @@ report: docs/live3d_hardware_readiness_gates_20260629.md
 - Max prediction samples: 0
 - Runtime 3D codes: idle, left-detections-missing
 ```
-

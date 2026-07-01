@@ -136,8 +136,7 @@ This means the package is usable for continued local experiments, but it should
 not be treated as final physical acceptance. Recalibrate with the real mounted
 camera geometry before relying on far-distance depth.
 
-Live3D exposes browser readiness gates for local operation. The standalone
-hardware verifier command has been removed.
+Live3D exposes browser readiness gates for local operation.
 
 ## Main Commands
 

@@ -80,12 +80,8 @@ Usability judgement:
 - Brightness should not be near black or saturated white under calibration
   lighting.
 - Device order must be stable for the whole capture session.
-- If exposure or gain is poor, prepare UVC controls before Live3D validation:
-
-```bash
-cd apps/live3d
-bun run verify:hardware -- --prepare-uvc-controls --uvc-devices /dev/video0,/dev/video2
-```
+- If exposure or gain is poor, prepare UVC controls in the calibration preview
+  before opening Live3D.
 
 ## Phase 3: Physical Target Board Check
 
@@ -202,17 +198,8 @@ Start the local runtime from the repository root:
 bun scripts/start-local-runtime.ts
 ```
 
-Then run the hardware verifier with a visible tennis ball in both camera views:
-
-```bash
-cd apps/live3d
-mkdir -p ../../docs/archive/20260630/live3d
-bun run verify:hardware -- \
-  --prepare-uvc-controls \
-  --uvc-devices /dev/video0,/dev/video2 \
-  --timeout-ms 30000 \
-  --output ../../docs/archive/20260630/live3d/live3d_hardware_loop_ball_20260630.md
-```
+Then open Live3D with a visible tennis ball in both camera views and watch the
+readiness gates.
 
 The hardware evidence is complete only when the report reaches
 `prediction-ready`.
@@ -241,6 +228,6 @@ Proceed in this order:
 4. Mono captures.
 5. Stereo capture.
 6. Solve/import package.
-7. Live3D hardware verification.
+7. Live3D visible-ball runtime check.
 
 Do not move the cameras between steps 4 and 7.

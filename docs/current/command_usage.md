@@ -292,5 +292,4 @@ bun run typecheck
 bun run build
 ```
 
-Live3D does not maintain a separate hardware verifier command. Use the browser
-runtime readiness gates directly during local operation.
+Use the browser runtime readiness gates directly during local operation.

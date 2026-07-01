@@ -34,10 +34,10 @@ packages if needed.
 - `apps/live3d/`
 - references to `@tennisbot/live3d`
 - references to the Live3D URL `http://127.0.0.1:5178/`
-- runtime launcher, preflight, and hardware verifier entries that only start or
+- runtime launcher, preflight, and runtime validation entries that only start or
   validate `apps/live3d`
 - docs under `docs/` that describe Live3D waves, Live3D artifacts, Live3D ONNX
-  backend, Live3D USB cameras, Live3D runtime 3D, or Live3D hardware validation
+  backend, Live3D USB cameras, or Live3D runtime 3D
 
 ### Board-side code
 
