@@ -166,7 +166,7 @@ rotate_degrees = [-2.0, 2.0]
 scale = [0.6, 1.8]
 stretch_x = [0.9, 1.1]
 stretch_y = [0.9, 1.1]
-rotate_degrees = [-8, 8]
+rotate_degrees = [-180, 180]
 ```
 
 说明：
@@ -174,6 +174,7 @@ rotate_degrees = [-8, 8]
 - `frame.rotate_degrees` 是整张生成图的轻微旋转，用来模拟相机滚转/抖动。
 - 整图旋转后，所有原始 bbox 和新贴球 bbox 都会用四角变换重新取水平外接框。
 - `ball.stretch_x/stretch_y` 是球 sprite 的轻微拉伸，模拟运动拖影和成像变形。
+- `ball.rotate_degrees` 只旋转贴上去的球 sprite，可以用较大范围模拟不同拖影方向。
 - 这些参数不要开太大；整图旋转过大会让水平 bbox 明显变松。
 
 ### 5. 生成增强数据集
