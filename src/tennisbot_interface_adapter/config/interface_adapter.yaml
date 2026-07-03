@@ -1,0 +1,25 @@
+vision_interface_adapter:
+  ros__parameters:
+    # External interface topics.
+    interface_chassis_topic: /robot/chassis_position
+    interface_raw_target_topic: /target/raw
+
+    # Vision-side topics owned by this repository.
+    vision_chassis_topic: /vision/chassis_position
+    vision_target_topic: /vision/target_prediction
+
+    forward_chassis_position: true
+    forward_target_prediction: true
+
+    # Expected nominal rates are 30 Hz. The adapter only drops messages when
+    # inputs exceed these rates; set a value <= 0 to disable a limiter.
+    max_chassis_rate_hz: 30.0
+    max_target_rate_hz: 30.0
+    rate_limit_slack: 0.10
+
+    future_stamp_tolerance: 0.02
+    max_predicted_time: 5.0
+
+    # Broad sanity bounds around the tennis court, in metres.
+    max_abs_target_x: 15.0
+    max_abs_target_y: 8.0

@@ -14,6 +14,7 @@ handled by the mainline `tools/calibration` OpenCV workflow.
 | `apps/live3d` | Browser USB stereo camera UI, ONNX YOLO inference, runtime 3D visualization |
 | `packages/contracts` | Shared TypeScript data contracts |
 | `packages/core` | Artifact validation, stereo pairing, triangulation, trajectory prediction |
+| `src` | ROS2 target interface packages and TennisBot vision adapter packages |
 | `tools/calibration` | Fixed DFOptix ChArUco OpenCV mono/stereo capture GUI |
 | `tools/yolo` | Standalone YOLO runtime model package tooling |
 | `artifacts/` | Ignored local runtime outputs for calibration and model packages |

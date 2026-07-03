@@ -14,6 +14,9 @@ TennisBot/
   packages/
     contracts/       shared TypeScript data contracts
     core/            artifact loaders, stereo pairing, triangulation, prediction
+  src/
+    interface/       imported ROS2 target interface packages
+    tennisbot_*      repository-owned ROS2 vision interface adapter packages
   tools/
     calibration/     fixed DFOptix ChArUco OpenCV capture GUI
     yolo/            annotation, YOLO package, pure detection GUI
@@ -122,6 +125,20 @@ Owns pure runtime algorithms and artifact validation:
 
 It has no browser UI, OpenCV GUI, camera device access, dataset management, or
 training code.
+
+### `src`
+
+Owns tracked ROS2 interface integration:
+
+- `src/interface/target_msgs`: imported external target interface messages;
+- `src/interface/target_manager`: validates, filters, and rate-limits raw
+  target predictions before planner/state-machine consumption;
+- `src/tennisbot_vision_msgs`: repository-owned vision-side ROS messages;
+- `src/tennisbot_interface_adapter`: event-driven bridge between vision-side
+  topics and the imported external interface.
+
+The nominal vision target and chassis-position paths are 30 Hz. The managed
+target output remains at most 10 Hz by design.
 
 ### `apps/live3d`
 
