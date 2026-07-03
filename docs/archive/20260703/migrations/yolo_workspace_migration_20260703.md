@@ -30,7 +30,7 @@
 ## 验证结果
 
 ```bash
-rg -n "tools/yolo/yolo|TOOL_ROOT / \"yolo\"|/yolo/dataset|yolo/runs|ANNOTATOR_SCRIPT|serve_annotator\\.py" tools/yolo scripts/yolo.ts docs/current .gitignore -g '!docs/current/yolo_workspace_migration_20260703.md' -g '!tools/yolo/MIGRATION_CHECKLIST.md' -g '!**/__pycache__/**' -g '!**/node_modules/**'
+rg -n "tools/yolo/yolo|TOOL_ROOT / \"yolo\"|/yolo/dataset|yolo/runs|ANNOTATOR_SCRIPT|serve_annotator\\.py" tools/yolo scripts/yolo.ts docs/current docs/archive/20260703 .gitignore -g '!docs/archive/20260703/migrations/yolo_workspace_migration_20260703.md' -g '!tools/yolo/MIGRATION_CHECKLIST.md' -g '!**/__pycache__/**' -g '!**/node_modules/**'
 cd tools/yolo && uv run pytest -q
 uv run --project tools/yolo tennisbot-yolo annotate --help
 uv run --project tools/yolo --extra augment tennisbot-yolo sprites extract --help

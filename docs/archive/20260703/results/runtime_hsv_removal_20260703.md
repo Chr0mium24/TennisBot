@@ -28,7 +28,7 @@
 ## 验证结果
 
 ```bash
-rg -n "\bHSV\b|\bhsv\b|HsvBallDetector|--detector|hsv_|args\.detector|detector_name" scripts tools/stereo src/tennisbot_headless_vision docs/current -g '!runtime_hsv_removal_20260703.md' -g '!**/node_modules/**' -g '!**/__pycache__/**'
+rg -n "\bHSV\b|\bhsv\b|HsvBallDetector|--detector|hsv_|args\.detector|detector_name" scripts tools/stereo src/tennisbot_headless_vision docs/current docs/archive/20260703 -g '!docs/archive/20260703/results/runtime_hsv_removal_20260703.md' -g '!**/node_modules/**' -g '!**/__pycache__/**'
 cd tools/stereo && uv run pytest -q
 bun scripts/stereo.ts --help
 bun scripts/stereo.ts gui --help
