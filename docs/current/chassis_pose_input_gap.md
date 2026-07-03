@@ -63,22 +63,14 @@ coordinates and predicted ground landing point will be wrong.
 The runtime algorithm is not Cartesian internally. It runs in the
 field/interface frame.
 
-Current conversion boundary:
+Current boundary:
 
-- `tennisbot_headless_vision` converts `/robot/chassis_position` into its
-  internal pose buffer;
-- if `chassis_position_input_frame: cartesian`, the headless node applies:
-
-```text
-field_x = cartesian_y
-field_y = -cartesian_x
-field_yaw = cartesian_yaw - pi / 2
-```
-
-- if `chassis_position_input_frame: field`, the headless node assumes
-  `x/y/yaw` are already in the field/interface frame;
-- trajectory fitting and `/target/raw` publishing use field/interface
-  coordinates.
+- `target_msgs/ChassisPosition` must already carry `x/y/yaw` in the
+  field/interface frame;
+- `tennisbot_headless_vision` copies `/robot/chassis_position` into its
+  internal pose buffer without Cartesian conversion;
+- trajectory fitting, logging, and `/target/raw` publishing use
+  field/interface coordinates.
 
 ## Relevant Files
 

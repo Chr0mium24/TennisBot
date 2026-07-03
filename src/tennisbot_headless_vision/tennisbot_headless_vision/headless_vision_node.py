@@ -36,17 +36,12 @@ def finite_float(value: object, *, name: str) -> float:
     return result
 
 
-def normalize_angle(angle_rad: float) -> float:
-    return (angle_rad + math.pi) % (2.0 * math.pi) - math.pi
-
-
 class HeadlessVisionNode(Node):
     def __init__(self) -> None:
         super().__init__("headless_vision")
 
         self.declare_parameter("chassis_position_topic", "/robot/chassis_position")
         self.declare_parameter("raw_target_topic", "/target/raw")
-        self.declare_parameter("chassis_position_input_frame", "field")
         self.declare_parameter("runtime_rate_hz", 30.0)
         self.declare_parameter("enable_camera", True)
         self.declare_parameter("dry_run", False)
@@ -108,7 +103,6 @@ class HeadlessVisionNode(Node):
         self._enable_camera = bool(self.get_parameter("enable_camera").value)
         self._dry_run = bool(self.get_parameter("dry_run").value)
         self._runtime_rate_hz = self._positive("runtime_rate_hz")
-        self._chassis_position_input_frame = self._frame_parameter("chassis_position_input_frame")
         self._single_task_mode = bool(self.get_parameter("single_task_mode").value)
         self._single_task_shutdown_on_complete = bool(
             self.get_parameter("single_task_shutdown_on_complete").value
@@ -194,21 +188,14 @@ class HeadlessVisionNode(Node):
             raw_x = finite_float(msg.x, name="chassis position x")
             raw_y = finite_float(msg.y, name="chassis position y")
             raw_yaw = finite_float(msg.yaw, name="chassis position yaw")
-            x = raw_x
-            y = raw_y
-            yaw = raw_yaw
-            if self._chassis_position_input_frame == "cartesian":
-                x = raw_y
-                y = -raw_x
-                yaw = normalize_angle(yaw - math.pi / 2.0)
             pose = PoseSample(
                 stamp_ns=time_to_nanoseconds(msg.publish_stamp),
-                x=x,
-                y=y,
+                x=raw_x,
+                y=raw_y,
                 z=0.0,
                 roll=0.0,
                 pitch=0.0,
-                yaw=yaw,
+                yaw=raw_yaw,
             )
         except ValueError as exc:
             self.get_logger().warning(f"Dropped invalid chassis position: {exc}")
@@ -222,7 +209,6 @@ class HeadlessVisionNode(Node):
                 "y": raw_y,
                 "yaw": raw_yaw,
             },
-            input_frame=self._chassis_position_input_frame,
             pose=pose,
         )
 
@@ -393,12 +379,6 @@ class HeadlessVisionNode(Node):
             raise ValueError(f"parameter '{name}' must be a list of {length} floats")
         result = tuple(finite_float(item, name=f"{name}[{index}]") for index, item in enumerate(value))
         return result
-
-    def _frame_parameter(self, name: str) -> str:
-        value = str(self.get_parameter(name).value).strip().lower()
-        if value not in {"field", "cartesian"}:
-            raise ValueError(f"parameter '{name}' must be 'field' or 'cartesian'")
-        return value
 
     def close(self) -> None:
         self._runtime_logger.close()
@@ -574,9 +554,7 @@ class RuntimeRunLogger:
                 "model_path": str(node.get_parameter("model_path").value),
                 "calibration_package": str(node.get_parameter("calibration_package").value),
                 "tile": bool(node.get_parameter("tile").value),
-                "chassis_position_input_frame": str(
-                    node.get_parameter("chassis_position_input_frame").value
-                ),
+                "chassis_position_frame": "field",
                 "initial_task_id": int(node.get_parameter("initial_task_id").value),
                 "single_task_mode": bool(node.get_parameter("single_task_mode").value),
             },
@@ -675,7 +653,6 @@ class RuntimeRunLogger:
         *,
         stamp: Time,
         source: dict[str, float | int],
-        input_frame: str,
         pose: PoseSample,
     ) -> None:
         self._write(
@@ -683,7 +660,7 @@ class RuntimeRunLogger:
             {
                 "stamp": stamp_to_dict(stamp),
                 "source": source,
-                "input_frame": input_frame,
+                "frame": "field",
                 "field_pose": pose_to_dict(pose),
             },
         )

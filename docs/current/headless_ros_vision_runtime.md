@@ -181,10 +181,11 @@ field_yaw = cartesian_yaw - pi / 2
 cartesian_yaw = field_yaw + pi / 2
 ```
 
-The algorithm should convert observations into field/interface coordinates as
-soon as camera points are transformed through chassis pose. Trajectory fitting,
-quality checks, prediction, logging, and `/target/raw` should all use the same
-field/interface frame.
+This mapping is an upstream interface-layer responsibility. The headless vision
+runtime does not expose a Cartesian input mode; it expects
+`target_msgs/ChassisPosition` to already use field/interface `x/y/yaw`.
+Trajectory fitting, quality checks, prediction, logging, and `/target/raw`
+should all use the same field/interface frame.
 
 Do not convert only at the `/target/raw` publish boundary. That would leave
 intermediate state, diagnostics, and future decisions in a different frame from

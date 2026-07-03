@@ -64,24 +64,6 @@ def transform_chassis_point_to_field(
     )
 
 
-def cartesian_pose_to_field(
-    x: float,
-    y: float,
-    z: float,
-    roll: float,
-    pitch: float,
-    yaw: float,
-) -> tuple[float, float, float, float, float, float]:
-    return (
-        y,
-        -x,
-        z,
-        roll,
-        pitch,
-        normalize_angle(yaw - math.pi / 2.0),
-    )
-
-
 def rpy_matrix(roll: float, pitch: float, yaw: float) -> tuple[tuple[float, float, float], ...]:
     cr = math.cos(roll)
     sr = math.sin(roll)
@@ -106,7 +88,3 @@ def mat_vec_mul(
         matrix[1][0] * vector[0] + matrix[1][1] * vector[1] + matrix[1][2] * vector[2],
         matrix[2][0] * vector[0] + matrix[2][1] * vector[1] + matrix[2][2] * vector[2],
     )
-
-
-def normalize_angle(angle_rad: float) -> float:
-    return (angle_rad + math.pi) % (2.0 * math.pi) - math.pi

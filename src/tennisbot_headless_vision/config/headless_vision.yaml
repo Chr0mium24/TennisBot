@@ -4,10 +4,7 @@ headless_vision:
     raw_target_topic: /target/raw
     # /robot/chassis_position is target_msgs/ChassisPosition:
     # publish_stamp, sequence_id, x_m, y_m, yaw_rad.
-    # Use "field" when x/y/yaw are already in the field/interface frame.
-    # Use "cartesian" to apply field_x=cartesian_y,
-    # field_y=-cartesian_x, field_yaw=cartesian_yaw-pi/2.
-    chassis_position_input_frame: field
+    # x/y/yaw must already be in the field/interface frame.
     runtime_rate_hz: 30.0
     enable_camera: true
     dry_run: false

@@ -83,16 +83,13 @@ After the stereo package verifies and the camera rig is mounted:
 1. Measure and set `camera_translation_m` and `camera_rotation_rpy_rad` in
    `src/tennisbot_headless_vision/config/headless_vision.yaml`.
 2. Confirm the interface bridge is publishing `/robot/chassis_position`
-   as `target_msgs/ChassisPosition`.
-3. Set `chassis_position_input_frame` in
-   `src/tennisbot_headless_vision/config/headless_vision.yaml` to `field`
-   or `cartesian`.
-4. Launch `tennisbot_headless_vision` and confirm it publishes `/target/raw`
+   as `target_msgs/ChassisPosition` in the field/interface frame.
+3. Launch `tennisbot_headless_vision` and confirm it publishes `/target/raw`
    only when a real ball is detected in both cameras and recent chassis
    position is available.
-5. Launch external `target_manager` from the sourced control workspace and
+4. Launch external `target_manager` from the sourced control workspace and
    confirm `/target/managed` before enabling chassis planner behavior.
-6. For evidence capture, prefer `bun scripts/headless.ts run --record` or
+5. For evidence capture, prefer `bun scripts/headless.ts run --record` or
    `bun scripts/headless.ts task --task-id <id> --session <name>` so the video,
    chassis position, YOLO detections, selected observations, and raw targets
    share one timestamped session directory.

@@ -174,7 +174,7 @@ ros2 interface show target_msgs/msg/ManagedTarget
 ### 3. 确认底盘位置输入
 
 真实主链路需要 interface 层发布 `/robot/chassis_position`，消息类型是
-`target_msgs/ChassisPosition`：
+`target_msgs/ChassisPosition`。其中 `x/y/yaw` 必须已经是球场/接口坐标系：
 
 ```text
 publish_stamp
