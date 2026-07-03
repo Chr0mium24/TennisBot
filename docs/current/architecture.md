@@ -130,12 +130,9 @@ Owns tracked ROS2 interface integration:
 - external `target_msgs` from the sourced control workspace (`~/tennis_robot_ws/install`);
 - `src/interface/target_manager`: validates, filters, and rate-limits raw
   target predictions before planner/state-machine consumption;
-- `src/tennisbot_vision_msgs`: repository-owned vision-side ROS messages;
-- `src/tennisbot_interface_adapter`: optional compatibility bridge between
-  vision-side topics and the imported external interface;
 - `src/tennisbot_headless_vision`: headless ROS stereo vision runtime that
   consumes camera frames plus `/robot/chassis_state` and publishes
-  `/target/raw`.
+  `/target/raw`, with optional timestamped runtime logging.
 
 The nominal raw target path is 30 Hz. The managed target output remains at most
 10 Hz by design.
@@ -165,6 +162,10 @@ observations and recent `/robot/chassis_state` samples.
 8. the node publishes `/target/raw`
 9. `target_manager` publishes `/target/managed` for the planner/state machine
 ```
+
+When runtime logging is enabled, headless sessions are written under
+`runs/headless/<session>/` with left/right video, frame timestamps, chassis
+state, YOLO detections, selected observations, raw targets, and runtime events.
 
 ## Current Validation State
 
@@ -206,6 +207,13 @@ colcon build --base-paths src --packages-select \
 source install/setup.bash
 ros2 launch tennisbot_headless_vision headless_vision.launch.py
 ros2 launch target_manager target_manager.launch.py
+```
+
+One-shot or logged runtime launcher:
+
+```bash
+bun scripts/headless.ts run --record --session test01 --tile
+bun scripts/headless.ts task --task-id 42 --session catch42 --tile
 ```
 
 Start the local OpenCV stereo-coordinate GUI:

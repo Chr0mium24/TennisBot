@@ -16,11 +16,11 @@ Already available:
 - `tools/stereo` has tested OpenCV stereo detection, matching, triangulation,
   and local recording paths.
 - external `target_msgs` is provided by the sourced control workspace.
-- `src/tennisbot_interface_adapter` remains available as an optional
-  compatibility bridge for vision-side topics.
 - `src/tennisbot_headless_vision` owns the first headless stereo camera,
   field-frame transform, trajectory fit, and direct `/target/raw` publishing
   path.
+- `scripts/headless.ts` launches the main chain with optional timestamped
+  runtime logging and single-task mode.
 
 Not yet available:
 
@@ -252,8 +252,7 @@ sigma_x
 sigma_y
 ```
 
-The optional `tennisbot_interface_adapter` package is no longer part of the
-main runtime chain.
+There is no separate vision-interface adapter in the main runtime chain.
 
 ### 8. Confirm Target Semantics
 
@@ -293,6 +292,36 @@ left/right camera frames
   -> /target/managed
   -> chassis planner / state machine
 ```
+
+## Runtime Logging
+
+Enable logging from the Bun launcher:
+
+```bash
+bun scripts/headless.ts run --record --session test01 --tile
+bun scripts/headless.ts task --task-id 42 --session catch42 --tile
+```
+
+The session directory is `runs/headless/<session>/` and contains:
+
+```text
+session.json
+left.mp4
+right.mp4
+frames.ndjson
+chassis.ndjson
+detections.ndjson
+observations.ndjson
+targets.ndjson
+events.ndjson
+```
+
+`frames.ndjson` carries the ROS capture timestamp for each left/right video
+frame. `chassis.ndjson` stores raw `/robot/chassis_state` plus the converted
+field pose. `detections.ndjson` stores YOLO detections and stereo matching
+diagnostics, including frames with no valid stereo match. `observations.ndjson`
+stores selected camera-frame and field-frame ball points, and `targets.ndjson`
+stores each published `RawTarget`.
 
 ## Verification Plan
 

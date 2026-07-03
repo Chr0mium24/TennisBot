@@ -37,6 +37,14 @@ ros2 launch tennisbot_headless_vision headless_vision.launch.py
 ros2 launch target_manager target_manager.launch.py
 ```
 
+Or start the same chain through the Bun runtime launcher:
+
+```bash
+bun scripts/headless.ts run
+bun scripts/headless.ts run --record --session test01 --tile
+bun scripts/headless.ts task --task-id 42 --session catch42 --tile
+```
+
 Start the local stereo coordinate GUI:
 
 ```bash
@@ -85,6 +93,10 @@ After the stereo package verifies and the camera rig is mounted:
    is available.
 5. Launch `target_manager` and confirm `/target/managed` before enabling
    chassis planner behavior.
+6. For evidence capture, prefer `bun scripts/headless.ts run --record` or
+   `bun scripts/headless.ts task --task-id <id> --session <name>` so the video,
+   chassis state, YOLO detections, selected observations, and raw targets share
+   one timestamped session directory.
 
 ## Local Stereo GUI Order
 

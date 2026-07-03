@@ -55,6 +55,9 @@ headless_vision:
     track_max_points: 24
     min_track_points: 3
     new_task_gap_s: 0.40
+    initial_task_id: 1
+    single_task_mode: false
+    single_task_shutdown_on_complete: true
 
     # RawTarget carries the x/y point and remaining time. Default is the
     # catching plane at field_z=0.6.
@@ -65,3 +68,13 @@ headless_vision:
     min_sigma_m: 0.05
     max_abs_target_x: 15.0
     max_abs_target_y: 8.0
+
+    runtime_log_enabled: false
+    runtime_log_root: runs/headless
+    runtime_log_session: ""
+    runtime_log_video: true
+    runtime_log_chassis: true
+    runtime_log_yolo: true
+    runtime_log_targets: true
+    runtime_log_events: true
+    runtime_log_video_fourcc: mp4v

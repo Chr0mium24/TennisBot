@@ -44,6 +44,26 @@ ros2 launch tennisbot_headless_vision headless_vision.launch.py
 ros2 launch target_manager target_manager.launch.py
 ```
 
+也可以用 Bun 主链路入口同时启动 headless 和 target manager：
+
+```bash
+bun scripts/headless.ts run
+bun scripts/headless.ts run --record --session test01 --tile
+bun scripts/headless.ts task --task-id 42 --session catch42 --tile
+bun scripts/headless.ts run --dry-run --record --devices /dev/video0,/dev/video2
+```
+
+`run --record` 和 `task` 会默认写入 `runs/headless/<session>/`：
+
+- `session.json`
+- `left.mp4`、`right.mp4`
+- `frames.ndjson`
+- `chassis.ndjson`
+- `detections.ndjson`
+- `observations.ndjson`
+- `targets.ndjson`
+- `events.ndjson`
+
 查看接口和话题：
 
 ```bash

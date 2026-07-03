@@ -38,7 +38,7 @@ cartesian_yaw = field_yaw + pi / 2
 The headless vision runtime should convert observations into the
 field/interface frame as soon as camera-frame points are transformed through
 the chassis pose. Trajectory fitting, catch-plane or landing prediction,
-stability checks, and `/vision/target_prediction` publishing should all use
+stability checks, and `/target/raw` publishing should all use
 the field/interface frame.
 
 Only converting at the final publish boundary is not enough because it leaves

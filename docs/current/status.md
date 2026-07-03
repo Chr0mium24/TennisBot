@@ -13,8 +13,7 @@ vision runtime. The main tracked paths are now:
 - `tools/stereo` for local 4K stereo YOLO coordinate display;
 - `packages/core` and `packages/contracts` for TypeScript artifact/geometry
   helpers and shared contracts;
-- `src` for ROS2 interface packages, the optional TennisBot vision adapter, and the
-  headless vision runtime.
+- `src` for ROS2 interface packages and the headless vision runtime.
 
 ## Ready Now
 
@@ -22,7 +21,9 @@ The ROS package path now includes:
 
 - `tennisbot_headless_vision` consuming `/robot/chassis_state` and real stereo
   camera frames, then publishing `target_msgs/RawTarget` on `/target/raw`;
-- `target_manager` consuming `/target/raw` and publishing `/target/managed`.
+- `target_manager` consuming `/target/raw` and publishing `/target/managed`;
+- `scripts/headless.ts` for logged runtime launches and single-task runs with
+  caller-specified `task_id`.
 
 The current quick camera-device tool is:
 
@@ -121,6 +122,13 @@ colcon build --base-paths src --packages-select \
 source install/setup.bash
 ros2 launch tennisbot_headless_vision headless_vision.launch.py
 ros2 launch target_manager target_manager.launch.py
+```
+
+Logged or single-task run:
+
+```bash
+bun scripts/headless.ts run --record --session test01 --tile
+bun scripts/headless.ts task --task-id 42 --session catch42 --tile
 ```
 
 Inspect runtime topics:

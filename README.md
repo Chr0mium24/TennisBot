@@ -14,7 +14,7 @@ workflow.
 | --- | --- |
 | `packages/contracts` | Shared TypeScript data contracts |
 | `packages/core` | Artifact validation, stereo pairing, triangulation helpers |
-| `src` | ROS2 target interface, optional vision adapter, and headless vision runtime packages |
+| `src` | ROS2 target interface and headless vision runtime packages |
 | `tools/calibration` | Fixed DFOptix ChArUco OpenCV mono/stereo capture GUI |
 | `tools/yolo` | Standalone YOLO runtime model package tooling |
 | `tools/stereo` | Local OpenCV stereo recorder, coordinate GUI, and replay tooling |
@@ -40,6 +40,14 @@ the workspace is sourced:
 ```bash
 ros2 launch tennisbot_headless_vision headless_vision.launch.py
 ros2 launch target_manager target_manager.launch.py
+```
+
+Or use the Bun runtime launcher:
+
+```bash
+bun scripts/headless.ts run
+bun scripts/headless.ts run --record --session test01 --tile
+bun scripts/headless.ts task --task-id 42 --session catch42 --tile
 ```
 
 Inspect the runtime topics:
