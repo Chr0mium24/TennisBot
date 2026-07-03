@@ -83,22 +83,15 @@
     .layout {
       height: calc(100% - 56px);
       display: grid;
-      grid-template-columns: 320px minmax(0, 1fr) 320px;
+      grid-template-columns: 320px minmax(0, 1fr);
       min-width: 0;
     }
 
-    .sidebar,
-    .controls {
+    .sidebar {
       min-height: 0;
       overflow: auto;
       border-right: 1px solid #d8ddd4;
       background: #fbfcf8;
-    }
-
-    .controls {
-      border-right: 0;
-      border-left: 1px solid #d8ddd4;
-      padding: 14px;
     }
 
     .list-item {
@@ -170,6 +163,7 @@
       background: #20251f;
       image-rendering: auto;
       box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+      touch-action: none;
     }
 
     .preview-strip {
@@ -211,46 +205,9 @@
       max-height: 140px;
     }
 
-    .field {
-      display: grid;
-      grid-template-columns: 96px 1fr 72px;
-      gap: 8px;
-      align-items: center;
-      margin: 0 0 12px;
-    }
-
-    .field label {
-      color: #4d5851;
-      font-weight: 650;
-    }
-
-    .field input[type="range"] {
-      width: 100%;
-    }
-
-    .field input[type="number"] {
-      width: 72px;
-      height: 32px;
-      border: 1px solid #cbd3cb;
-      border-radius: 6px;
-      padding: 0 8px;
-      background: #fff;
-    }
-
-    .control-actions {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-top: 14px;
-    }
-
     @media (max-width: 920px) {
       .layout {
         grid-template-columns: 220px minmax(0, 1fr);
-      }
-
-      .controls {
-        display: none;
       }
     }
   </style>
@@ -261,6 +218,7 @@
     <button class="button" id="previous">Prev</button>
     <button class="button" id="next">Next</button>
     <button class="button" id="reset">Reset</button>
+    <button class="button" id="reload">Reload</button>
     <button class="button primary" id="save">Save</button>
     <button class="button primary" id="approve">Approve</button>
     <button class="button danger" id="reject">Reject</button>
@@ -279,46 +237,12 @@
         <div class="preview dark"><img id="previewDark" alt="sprite preview on dark background"></div>
       </div>
     </main>
-
-    <aside class="controls">
-      <div class="field">
-        <label for="centerX">Center X</label>
-        <input id="centerX" type="range" min="0" max="100" step="0.5">
-        <input id="centerXNum" type="number" step="0.5">
-      </div>
-      <div class="field">
-        <label for="centerY">Center Y</label>
-        <input id="centerY" type="range" min="0" max="100" step="0.5">
-        <input id="centerYNum" type="number" step="0.5">
-      </div>
-      <div class="field">
-        <label for="radiusX">Radius X</label>
-        <input id="radiusX" type="range" min="1" max="100" step="0.5">
-        <input id="radiusXNum" type="number" step="0.5">
-      </div>
-      <div class="field">
-        <label for="radiusY">Radius Y</label>
-        <input id="radiusY" type="range" min="1" max="100" step="0.5">
-        <input id="radiusYNum" type="number" step="0.5">
-      </div>
-      <div class="field">
-        <label for="rotation">Rotation</label>
-        <input id="rotation" type="range" min="-45" max="45" step="0.5">
-        <input id="rotationNum" type="number" step="0.5">
-      </div>
-      <div class="field">
-        <label for="feather">Feather</label>
-        <input id="feather" type="range" min="0" max="32" step="1">
-        <input id="featherNum" type="number" step="1">
-      </div>
-      <div class="control-actions">
-        <button class="button" id="fit">Fit View</button>
-        <button class="button" id="reload">Reload</button>
-      </div>
-    </aside>
   </div>
 
   <script>
+    const ELLIPSE_FIT_POINTS = 5;
+    const FIT_POINT_PHASES = Array.from({ length: ELLIPSE_FIT_POINTS }, (_, index) => (index / ELLIPSE_FIT_POINTS) * Math.PI * 2);
+
     const state = {
       sprites: [],
       index: -1,
@@ -326,6 +250,8 @@
       cropImage: new Image(),
       defaults: null,
       mask: null,
+      fitPoints: [],
+      interaction: null,
     };
 
     const elements = {
@@ -338,20 +264,10 @@
       save: document.getElementById("save"),
       approve: document.getElementById("approve"),
       reject: document.getElementById("reject"),
-      fit: document.getElementById("fit"),
       reload: document.getElementById("reload"),
       previewLight: document.getElementById("previewLight"),
       previewDark: document.getElementById("previewDark"),
     };
-
-    const fields = [
-      ["center_x", "centerX", "centerXNum"],
-      ["center_y", "centerY", "centerYNum"],
-      ["radius_x", "radiusX", "radiusXNum"],
-      ["radius_y", "radiusY", "radiusYNum"],
-      ["rotation_deg", "rotation", "rotationNum"],
-      ["feather_px", "feather", "featherNum"],
-    ];
 
     function setStatus(text) {
       elements.status.textContent = text;
@@ -402,9 +318,10 @@
       const id = state.sprites[index].id;
       const sprite = await requestJson(`/api/sprites/${encodeURIComponent(id)}`);
       state.current = sprite;
-      state.mask = { ...sprite.mask };
+      state.mask = normalizeMask(sprite.mask, sprite.crop);
       state.defaults = defaultMask(sprite);
-      syncControls(sprite.crop.width, sprite.crop.height);
+      state.fitPoints = maskToFitPoints(state.mask);
+      state.interaction = null;
       elements.previewLight.src = `${sprite.urls.sprite}?t=${Date.now()}`;
       elements.previewDark.src = elements.previewLight.src;
       state.cropImage = new Image();
@@ -412,6 +329,15 @@
       state.cropImage.src = `${sprite.urls.crop}?t=${Date.now()}`;
       renderList();
       setStatus(`${state.index + 1}/${state.sprites.length} ${sprite.id}`);
+    }
+
+    function finiteNumber(value, fallback) {
+      const number = Number(value);
+      return Number.isFinite(number) ? number : fallback;
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
     }
 
     function defaultMask(sprite) {
@@ -425,36 +351,156 @@
       };
     }
 
-    function syncControls(width, height) {
-      const limits = {
-        center_x: [0, width],
-        center_y: [0, height],
-        radius_x: [1, width],
-        radius_y: [1, height],
-        rotation_deg: [-45, 45],
-        feather_px: [0, 32],
+    function normalizeMask(mask, crop) {
+      const fallback = defaultMask({ crop, mask: mask || {} });
+      const width = Math.max(1, crop.width);
+      const height = Math.max(1, crop.height);
+      return {
+        center_x: clamp(finiteNumber(mask?.center_x, fallback.center_x), 0, width),
+        center_y: clamp(finiteNumber(mask?.center_y, fallback.center_y), 0, height),
+        radius_x: Math.max(1, finiteNumber(mask?.radius_x, fallback.radius_x)),
+        radius_y: Math.max(1, finiteNumber(mask?.radius_y, fallback.radius_y)),
+        rotation_deg: normalizeRotationDeg(finiteNumber(mask?.rotation_deg, fallback.rotation_deg)),
+        feather_px: Math.max(0, Math.round(finiteNumber(mask?.feather_px, fallback.feather_px))),
       };
-      for (const [key, rangeId, numberId] of fields) {
-        const range = document.getElementById(rangeId);
-        const number = document.getElementById(numberId);
-        range.min = limits[key][0];
-        range.max = limits[key][1];
-        number.min = limits[key][0];
-        number.max = limits[key][1];
-        range.value = state.mask[key];
-        number.value = state.mask[key];
-      }
-      drawCanvas();
     }
 
-    function updateField(key, value) {
-      state.mask[key] = Number(value);
-      for (const [fieldKey, rangeId, numberId] of fields) {
-        if (fieldKey !== key) continue;
-        document.getElementById(rangeId).value = state.mask[key];
-        document.getElementById(numberId).value = state.mask[key];
+    function normalizeRotationDeg(degrees) {
+      const normalized = ((((degrees + 180) % 360) + 360) % 360) - 180;
+      return normalized === -180 ? 180 : normalized;
+    }
+
+    function rotatePoint(x, y, angle) {
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      return [x * cos - y * sin, x * sin + y * cos];
+    }
+
+    function clonePoints(points) {
+      return points.map((point) => [point[0], point[1]]);
+    }
+
+    function clampPoint(point) {
+      const width = state.current?.crop.width ?? elements.canvas.width;
+      const height = state.current?.crop.height ?? elements.canvas.height;
+      return [clamp(point[0], 0, width), clamp(point[1], 0, height)];
+    }
+
+    function maskToFitPoints(mask) {
+      const angle = (mask.rotation_deg * Math.PI) / 180;
+      return FIT_POINT_PHASES.map((theta) => {
+        const [dx, dy] = rotatePoint(Math.cos(theta) * mask.radius_x, Math.sin(theta) * mask.radius_y, angle);
+        return clampPoint([mask.center_x + dx, mask.center_y + dy]);
+      });
+    }
+
+    function solveLinearSystem(matrix, values) {
+      const size = values.length;
+      const rows = matrix.map((row, index) => [...row, values[index]]);
+      for (let col = 0; col < size; col += 1) {
+        let pivot = col;
+        for (let row = col + 1; row < size; row += 1) {
+          if (Math.abs(rows[row][col]) > Math.abs(rows[pivot][col])) pivot = row;
+        }
+        if (Math.abs(rows[pivot][col]) < 1e-10) return null;
+        if (pivot !== col) [rows[pivot], rows[col]] = [rows[col], rows[pivot]];
+
+        const pivotValue = rows[col][col];
+        for (let cell = col; cell <= size; cell += 1) rows[col][cell] /= pivotValue;
+
+        for (let row = 0; row < size; row += 1) {
+          if (row === col) continue;
+          const factor = rows[row][col];
+          for (let cell = col; cell <= size; cell += 1) rows[row][cell] -= factor * rows[col][cell];
+        }
       }
+
+      return rows.map((row) => row[size]);
+    }
+
+    function fitEllipseFromBoundaryPoints(points, crop) {
+      if (points.length !== ELLIPSE_FIT_POINTS || crop.width <= 0 || crop.height <= 0) return null;
+      const meanX = points.reduce((sum, point) => sum + point[0], 0) / points.length;
+      const meanY = points.reduce((sum, point) => sum + point[1], 0) / points.length;
+      const matrix = points.map(([x, y]) => {
+        const u = x - meanX;
+        const v = y - meanY;
+        return [u * u, u * v, v * v, u, v];
+      });
+      const coeffs = solveLinearSystem(matrix, Array(ELLIPSE_FIT_POINTS).fill(1));
+      if (!coeffs) return null;
+
+      const [a, b, c, d, e] = coeffs;
+      const q = b / 2;
+      const det = a * c - q * q;
+      if (!(a > 0 && c > 0 && det > 1e-12)) return null;
+
+      const centerLocalX = (q * e - c * d) / (2 * det);
+      const centerLocalY = (q * d - a * e) / (2 * det);
+      const centerValue =
+        a * centerLocalX * centerLocalX +
+        2 * q * centerLocalX * centerLocalY +
+        c * centerLocalY * centerLocalY +
+        d * centerLocalX +
+        e * centerLocalY;
+      const radiusScale = 1 - centerValue;
+      if (!(radiusScale > 0)) return null;
+
+      const trace = a + c;
+      const disc = Math.sqrt(Math.max(0, (a - c) ** 2 + 4 * q * q));
+      const lambdaSmall = (trace - disc) / 2;
+      const lambdaLarge = (trace + disc) / 2;
+      if (!(lambdaSmall > 0 && lambdaLarge > 0)) return null;
+
+      let vectorX = q;
+      let vectorY = lambdaSmall - a;
+      if (Math.hypot(vectorX, vectorY) < 1e-9) {
+        vectorX = a <= c ? 1 : 0;
+        vectorY = a <= c ? 0 : 1;
+      }
+
+      const centerX = meanX + centerLocalX;
+      const centerY = meanY + centerLocalY;
+      const radiusX = Math.sqrt(radiusScale / lambdaSmall);
+      const radiusY = Math.sqrt(radiusScale / lambdaLarge);
+      const maxReasonableRadius = Math.max(crop.width, crop.height) * 2;
+      if (
+        !Number.isFinite(centerX) ||
+        !Number.isFinite(centerY) ||
+        !Number.isFinite(radiusX) ||
+        !Number.isFinite(radiusY) ||
+        centerX < 0 ||
+        centerX > crop.width ||
+        centerY < 0 ||
+        centerY > crop.height ||
+        radiusX < 1 ||
+        radiusY < 1 ||
+        radiusX > maxReasonableRadius ||
+        radiusY > maxReasonableRadius
+      ) {
+        return null;
+      }
+
+      return {
+        center_x: centerX,
+        center_y: centerY,
+        radius_x: radiusX,
+        radius_y: radiusY,
+        rotation_deg: normalizeRotationDeg((Math.atan2(vectorY, vectorX) * 180) / Math.PI),
+      };
+    }
+
+    function applyFitPoints(points) {
+      if (!state.current) return false;
+      const ellipse = fitEllipseFromBoundaryPoints(points, state.current.crop);
+      if (!ellipse) {
+        setStatus("Ellipse fit failed");
+        return false;
+      }
+      state.fitPoints = points;
+      state.mask = { ...state.mask, ...ellipse };
       drawCanvas();
+      return true;
     }
 
     function drawCanvas() {
@@ -468,6 +514,13 @@
       canvas.height = state.current.crop.height;
       context.clearRect(0, 0, canvas.width, canvas.height);
       context.drawImage(state.cropImage, 0, 0);
+      drawMaskOverlay(context);
+      drawFitPointHandles(context);
+    }
+
+    function drawMaskOverlay(context) {
+      if (!state.mask) return;
+      const canvas = elements.canvas;
       context.save();
       context.translate(state.mask.center_x, state.mask.center_y);
       context.rotate((state.mask.rotation_deg * Math.PI) / 180);
@@ -479,6 +532,140 @@
       context.fill();
       context.stroke();
       context.restore();
+    }
+
+    function handleRadius() {
+      if (!state.current) return 6;
+      return Math.max(4, Math.min(7, Math.min(state.current.crop.width, state.current.crop.height) / 24));
+    }
+
+    function handleHitRadius() {
+      return handleRadius() + 8;
+    }
+
+    function drawHandle(context, point, active) {
+      const radius = handleRadius();
+      context.beginPath();
+      context.arc(point[0], point[1], active ? radius + 2 : radius, 0, Math.PI * 2);
+      context.fillStyle = active ? "#fff3cc" : "#fff";
+      context.strokeStyle = "rgba(5, 150, 105, 0.98)";
+      context.lineWidth = 2;
+      context.fill();
+      context.stroke();
+    }
+
+    function drawFitPointHandles(context) {
+      for (const [index, point] of state.fitPoints.entries()) {
+        drawHandle(context, point, state.interaction?.type === "fit-point" && state.interaction.pointIndex === index);
+      }
+    }
+
+    function canvasPoint(event) {
+      const rect = elements.canvas.getBoundingClientRect();
+      const scaleX = elements.canvas.width / Math.max(1, rect.width);
+      const scaleY = elements.canvas.height / Math.max(1, rect.height);
+      return [(event.clientX - rect.left) * scaleX, (event.clientY - rect.top) * scaleY];
+    }
+
+    function hitFitPoint(x, y) {
+      let best = null;
+      const hitRadius = handleHitRadius();
+      state.fitPoints.forEach((point, index) => {
+        const distance = Math.hypot(x - point[0], y - point[1]);
+        if (distance <= hitRadius && (!best || distance < best.distance)) {
+          best = { index, distance };
+        }
+      });
+      return best?.index ?? -1;
+    }
+
+    function pointInEllipse(x, y) {
+      if (!state.mask) return false;
+      const angle = (state.mask.rotation_deg * Math.PI) / 180;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const dx = x - state.mask.center_x;
+      const dy = y - state.mask.center_y;
+      const localX = dx * cos + dy * sin;
+      const localY = -dx * sin + dy * cos;
+      return (localX / state.mask.radius_x) ** 2 + (localY / state.mask.radius_y) ** 2 <= 1;
+    }
+
+    function updateCanvasCursor(x, y) {
+      if (!state.current || state.interaction) {
+        elements.canvas.style.cursor = state.interaction ? "grabbing" : "default";
+        return;
+      }
+      if (hitFitPoint(x, y) >= 0) {
+        elements.canvas.style.cursor = "pointer";
+      } else if (pointInEllipse(x, y)) {
+        elements.canvas.style.cursor = "move";
+      } else {
+        elements.canvas.style.cursor = "default";
+      }
+    }
+
+    function moveFitPoints(startPoints, x, y) {
+      const crop = state.current.crop;
+      const dx = x - state.interaction.start[0];
+      const dy = y - state.interaction.start[1];
+      const xs = startPoints.map((point) => point[0]);
+      const ys = startPoints.map((point) => point[1]);
+      const clampedDx = clamp(dx, -Math.min(...xs), crop.width - Math.max(...xs));
+      const clampedDy = clamp(dy, -Math.min(...ys), crop.height - Math.max(...ys));
+      return startPoints.map((point) => [point[0] + clampedDx, point[1] + clampedDy]);
+    }
+
+    function startCanvasInteraction(event) {
+      if (!state.current || !state.cropImage.complete) return;
+      const [x, y] = canvasPoint(event);
+      const pointIndex = hitFitPoint(x, y);
+      if (pointIndex >= 0) {
+        state.interaction = { type: "fit-point", pointIndex, pointerId: event.pointerId };
+      } else if (pointInEllipse(x, y)) {
+        state.interaction = {
+          type: "move",
+          start: [x, y],
+          startFitPoints: clonePoints(state.fitPoints),
+          pointerId: event.pointerId,
+        };
+      } else {
+        updateCanvasCursor(x, y);
+        return;
+      }
+      elements.canvas.setPointerCapture(event.pointerId);
+      updateCanvasCursor(x, y);
+      event.preventDefault();
+    }
+
+    function updateCanvasInteraction(event) {
+      const [x, y] = canvasPoint(event);
+      if (!state.interaction) {
+        updateCanvasCursor(x, y);
+        return;
+      }
+
+      if (state.interaction.type === "fit-point") {
+        const points = clonePoints(state.fitPoints);
+        points[state.interaction.pointIndex] = clampPoint([x, y]);
+        applyFitPoints(points);
+      } else if (state.interaction.type === "move") {
+        applyFitPoints(moveFitPoints(state.interaction.startFitPoints, x, y));
+      }
+      event.preventDefault();
+    }
+
+    function stopCanvasInteraction(event) {
+      if (!state.interaction || state.interaction.pointerId !== event.pointerId) return;
+      try {
+        elements.canvas.releasePointerCapture(event.pointerId);
+      } catch {
+        // Pointer capture may already be released by the browser.
+      }
+      state.interaction = null;
+      const [x, y] = canvasPoint(event);
+      updateCanvasCursor(x, y);
+      drawCanvas();
     }
 
     async function saveMask() {
@@ -497,8 +684,10 @@
         body: JSON.stringify(payload),
       });
       state.current = result.sprite;
+      state.mask = normalizeMask(state.current.mask, state.current.crop);
       elements.previewLight.src = `${state.current.urls.sprite}?t=${Date.now()}`;
       elements.previewDark.src = elements.previewLight.src;
+      drawCanvas();
       setStatus(`Saved ${state.current.id}`);
     }
 
@@ -510,25 +699,27 @@
       await loadSprites();
     }
 
-    for (const [key, rangeId, numberId] of fields) {
-      const range = document.getElementById(rangeId);
-      const number = document.getElementById(numberId);
-      range.addEventListener("input", () => updateField(key, range.value));
-      number.addEventListener("input", () => updateField(key, number.value));
-    }
-
     elements.previous.addEventListener("click", () => selectSprite(state.index - 1));
     elements.next.addEventListener("click", () => selectSprite(state.index + 1));
     elements.reset.addEventListener("click", () => {
       if (!state.defaults) return;
-      state.mask = { ...state.defaults };
-      syncControls(state.current.crop.width, state.current.crop.height);
+      state.mask = normalizeMask(state.defaults, state.current.crop);
+      state.fitPoints = maskToFitPoints(state.mask);
+      state.interaction = null;
+      drawCanvas();
     });
     elements.save.addEventListener("click", () => saveMask().catch((error) => setStatus(error.message)));
     elements.approve.addEventListener("click", () => review("approve").catch((error) => setStatus(error.message)));
     elements.reject.addEventListener("click", () => review("reject").catch((error) => setStatus(error.message)));
-    elements.fit.addEventListener("click", drawCanvas);
     elements.reload.addEventListener("click", () => loadSprites().catch((error) => setStatus(error.message)));
+
+    elements.canvas.addEventListener("pointerdown", startCanvasInteraction);
+    elements.canvas.addEventListener("pointermove", updateCanvasInteraction);
+    elements.canvas.addEventListener("pointerup", stopCanvasInteraction);
+    elements.canvas.addEventListener("pointercancel", stopCanvasInteraction);
+    elements.canvas.addEventListener("pointerleave", (event) => {
+      if (!state.interaction) updateCanvasCursor(...canvasPoint(event));
+    });
 
     window.addEventListener("keydown", (event) => {
       if (event.key === "ArrowLeft") selectSprite(state.index - 1);
