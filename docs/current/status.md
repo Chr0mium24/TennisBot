@@ -58,6 +58,8 @@ implemented code path still needs hardware or ROS/Gazebo validation. The main
 remaining gaps are:
 
 - measure and configure fixed chassis-to-camera extrinsics;
+- provide chassis yaw in `/robot/chassis_state`; see
+  [Chassis Pose Input Gap](chassis_pose_input_gap.md);
 - use ROS clock for image capture stamps and chassis pose timestamps;
 - verify real camera observations transform into field/interface coordinates
   before trajectory fitting;

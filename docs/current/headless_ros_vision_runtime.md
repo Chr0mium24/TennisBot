@@ -54,6 +54,9 @@ ROS/Gazebo/chassis backend
   -> headless vision ROS node pose buffer
 ```
 
+The current no-yaw behavior and acceptable fallback options are tracked in
+[Chassis Pose Input Gap](chassis_pose_input_gap.md).
+
 ## Required Changes
 
 ### 1. Replace Live3D as the Main Runtime Path
