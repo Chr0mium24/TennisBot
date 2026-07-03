@@ -21,8 +21,8 @@ alpha mask.
 Expose augmentation through both the Python tool and the root Bun wrapper:
 
 ```bash
-uv run tennisbot-yolo augment copy-paste --config tools/yolo/configs/copy_paste.toml
-bun scripts/yolo.ts augment copy-paste --config tools/yolo/configs/copy_paste.toml
+uv run tennisbot-yolo augment copy-paste --config tools/yolo/configs/augmentation.toml
+bun scripts/yolo.ts augment copy-paste --config tools/yolo/configs/augmentation.toml
 ```
 
 The command should write a new generated dataset. It must not overwrite the
@@ -30,12 +30,17 @@ source dataset.
 
 ## Configuration File
 
-Use a config file for repeatability instead of many loose command-line flags.
-TOML is preferred because it is readable and easy to edit.
+Use a shared augmentation config file for repeatability instead of many loose
+command-line flags. Do not name the config after only one strategy, because the
+same config namespace should be able to hold future augmentation modes. TOML is
+preferred because it is readable and easy to edit.
 
 Example:
 
 ```toml
+[augmentation]
+pipeline = "copy_paste"
+
 [inputs]
 dataset_root = "tools/yolo/yolo/dataset"
 sprites_root = "tools/yolo/yolo/runs/sprites/approved"
