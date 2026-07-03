@@ -119,8 +119,8 @@ function buildVisionRuntimeCommand(options: Options): string[] {
   return [
     "ros2",
     "run",
-    "tennisbot_headless_vision",
-    "headless_vision_node",
+    "tennisbot_vision_runtime",
+    "vision_runtime_node",
     "--ros-args",
     ...params,
   ];
@@ -281,19 +281,19 @@ function shellQuote(value: string): string {
 
 function printUsage(): void {
   console.log(`用法:
-  bun scripts/headless.ts run [options]
-  bun scripts/headless.ts task --task-id <id> [options]
+  bun scripts/vision-runtime.ts run [options]
+  bun scripts/vision-runtime.ts task --task-id <id> [options]
 
 主链路入口:
   run   启动 vision runtime，可选启动外部 target_manager，可选记录运行日志
   task  用指定 task_id 启动单次任务，默认开启日志，任务结束后 vision runtime 节点退出
 
 常用命令:
-  bun scripts/headless.ts run
-  bun scripts/headless.ts run --record --session test01 --tile
-  bun scripts/headless.ts task --task-id 42 --session catch42 --tile
-  bun scripts/headless.ts task --task-id 42 --no-video
-  bun scripts/headless.ts run --dry-run --record --devices /dev/video0,/dev/video2
+  bun scripts/vision-runtime.ts run
+  bun scripts/vision-runtime.ts run --record --session test01 --tile
+  bun scripts/vision-runtime.ts task --task-id 42 --session catch42 --tile
+  bun scripts/vision-runtime.ts task --task-id 42 --no-video
+  bun scripts/vision-runtime.ts run --dry-run --record --devices /dev/video0,/dev/video2
 
 选项:
   --record / --no-record              开关 runs/vision-runtime 日志

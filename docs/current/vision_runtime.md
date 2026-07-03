@@ -11,15 +11,15 @@ camera and real chassis validation.
 Already available:
 
 - `packages/core` has tested TypeScript stereo geometry helpers.
-- `src/tennisbot_headless_vision` has the active Python trajectory predictor.
+- `src/tennisbot_vision_runtime` has the active Python trajectory predictor.
 - `tools/stereo` has tested OpenCV stereo detection, matching, triangulation,
   and local recording paths.
 - external `target_msgs` and `target_manager` are provided by the sourced
   control workspace.
-- `src/tennisbot_headless_vision` owns the first stereo camera,
+- `src/tennisbot_vision_runtime` owns the first stereo camera,
   field-frame transform, trajectory fit, and direct `/target/raw` publishing
   path.
-- `scripts/headless.ts` launches the main chain with optional timestamped
+- `scripts/vision-runtime.ts` launches the main chain with optional timestamped
   runtime logging and single-task mode.
 
 Not yet available:
@@ -69,7 +69,7 @@ target topics.
 Current migration state:
 
 1. Live3D code and launcher are removed from the active tree.
-2. `tennisbot_headless_vision` provides the vision runtime main chain, consumes
+2. `tennisbot_vision_runtime` provides the vision runtime main chain, consumes
    `/robot/chassis_position`, and publishes `/target/raw`.
 3. Hardware validation remains required before claiming the real catch loop is
    complete.
@@ -293,8 +293,8 @@ left/right camera frames
 Enable logging from the Bun launcher:
 
 ```bash
-bun scripts/headless.ts run --record --session test01 --tile
-bun scripts/headless.ts task --task-id 42 --session catch42 --tile
+bun scripts/vision-runtime.ts run --record --session test01 --tile
+bun scripts/vision-runtime.ts task --task-id 42 --session catch42 --tile
 ```
 
 The session directory is `runs/vision-runtime/<session>/` and contains:

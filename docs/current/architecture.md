@@ -121,7 +121,7 @@ Owns TypeScript artifact validation and stereo geometry helpers:
 
 It has no browser UI, OpenCV GUI, camera device access, dataset management, or
 training code. The active ROS trajectory predictor lives in
-`src/tennisbot_headless_vision`.
+`src/tennisbot_vision_runtime`.
 
 ### `src`
 
@@ -129,7 +129,7 @@ Owns tracked vision runtime integration:
 
 - external `target_msgs` and `target_manager` come from the sourced control
   workspace (`/home/cr/tennis_robot_ws/install`);
-- `src/tennisbot_headless_vision`: stereo vision runtime that
+- `src/tennisbot_vision_runtime`: stereo vision runtime that
   consumes camera frames plus `/robot/chassis_position` and publishes
   `/target/raw`, with optional timestamped runtime logging.
 
@@ -154,8 +154,8 @@ observations and recent `/robot/chassis_position` samples.
 2. tools/calibration solves mono/stereo calibration packages under artifacts/calibration/...
 3. tools/yolo creates or verifies artifacts/models/tennis_ball_yolo
 4. tools/stereo can run the local OpenCV 4K stereo coordinate GUI
-5. tennisbot_headless_vision consumes `/robot/chassis_position`
-6. tennisbot_headless_vision reads two camera streams
+5. tennisbot_vision_runtime consumes `/robot/chassis_position`
+6. tennisbot_vision_runtime reads two camera streams
 7. the node runs YOLO, stereo pairing, triangulation, field-frame transforms,
    and trajectory prediction
 8. the node publishes `/target/raw`
@@ -202,17 +202,17 @@ Build and launch the ROS runtime:
 ```bash
 source /opt/ros/humble/setup.bash
 source /home/cr/tennis_robot_ws/install/setup.bash
-colcon build --base-paths src --packages-select tennisbot_headless_vision --symlink-install
+colcon build --base-paths src --packages-select tennisbot_vision_runtime --symlink-install
 source install/setup.bash
-ros2 launch tennisbot_headless_vision headless_vision.launch.py
+ros2 launch tennisbot_vision_runtime vision_runtime.launch.py
 ros2 launch target_manager target_manager.launch.py
 ```
 
 One-shot or logged runtime launcher:
 
 ```bash
-bun scripts/headless.ts run --record --session test01 --tile
-bun scripts/headless.ts task --task-id 42 --session catch42 --tile
+bun scripts/vision-runtime.ts run --record --session test01 --tile
+bun scripts/vision-runtime.ts task --task-id 42 --session catch42 --tile
 ```
 
 Start the local OpenCV stereo-coordinate GUI:

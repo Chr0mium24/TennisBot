@@ -13,8 +13,8 @@
   底盘 / 仿真 / 控制相关 ROS 包
 
 /home/cr/Codes/TennisBot
-  src/tennisbot_headless_vision
-  scripts/headless.ts
+  src/tennisbot_vision_runtime
+  scripts/vision-runtime.ts
   tools/calibration
   tools/stereo
   tools/yolo
@@ -23,7 +23,7 @@
 ```
 
 `target_manager` 不在 TennisBot 仓库里构建。TennisBot 只构建并运行
-`tennisbot_headless_vision`，它发布 `/target/raw`；外部 `target_manager`
+`tennisbot_vision_runtime`，它发布 `/target/raw`；外部 `target_manager`
 订阅 `/target/raw`，再发布 `/target/managed` 给规划/状态机。
 
 主链路数据流：
@@ -32,10 +32,10 @@
 /robot/chassis_state
   -> chassis_position_publisher
   -> /robot/chassis_position
-  -> tennisbot_headless_vision
+  -> tennisbot_vision_runtime
 
 双目相机
-  -> tennisbot_headless_vision
+  -> tennisbot_vision_runtime
   -> /target/raw
   -> target_manager
   -> /target/managed
@@ -103,7 +103,7 @@ cd /home/cr/Codes/TennisBot
 source /opt/ros/humble/setup.bash
 source /home/cr/tennis_robot_ws/install/setup.bash
 
-colcon build --base-paths src --packages-select tennisbot_headless_vision --symlink-install
+colcon build --base-paths src --packages-select tennisbot_vision_runtime --symlink-install
 source install/setup.bash
 ```
 
@@ -117,7 +117,7 @@ source install/setup.bash
 
 ```bash
 cd /home/cr/Codes/TennisBot
-bun scripts/headless.ts run --record --session test01 --tile
+bun scripts/vision-runtime.ts run --record --session test01 --tile
 ```
 
 Bun 入口默认会在它启动的 ROS 子进程里自动执行：
@@ -137,14 +137,14 @@ source /home/cr/Codes/TennisBot/install/setup.bash
 ROS_SETUP=/opt/ros/humble/setup.bash \
 TENNISBOT_CONTROL_SETUP=/home/cr/tennis_robot_ws/install/setup.bash \
 TENNISBOT_LOCAL_SETUP=/home/cr/Codes/TennisBot/install/setup.bash \
-bun scripts/headless.ts run --record --session test01 --tile
+bun scripts/vision-runtime.ts run --record --session test01 --tile
 ```
 
 也可以在命令行上控制：
 
 ```bash
-bun scripts/headless.ts run --no-auto-source
-bun scripts/headless.ts run --clear-setup-files \
+bun scripts/vision-runtime.ts run --no-auto-source
+bun scripts/vision-runtime.ts run --clear-setup-files \
   --setup-file /opt/ros/humble/setup.bash \
   --setup-file /home/cr/tennis_robot_ws/install/setup.bash \
   --setup-file /home/cr/Codes/TennisBot/install/setup.bash
@@ -165,7 +165,7 @@ source install/setup.bash
 然后确认 ROS 包和话题接口：
 
 ```bash
-ros2 pkg list | grep -E 'target_msgs|target_manager|tennisbot_headless_vision'
+ros2 pkg list | grep -E 'target_msgs|target_manager|tennisbot_vision_runtime'
 ros2 interface show target_msgs/msg/ChassisPosition
 ros2 interface show target_msgs/msg/RawTarget
 ros2 interface show target_msgs/msg/ManagedTarget
@@ -202,14 +202,14 @@ ros2 topic echo /robot/chassis_position
 ### 4. dry-run 看 Bun 会启动什么
 
 ```bash
-bun scripts/headless.ts run --dry-run --record --devices /dev/video0,/dev/video2 --session dryrun
+bun scripts/vision-runtime.ts run --dry-run --record --devices /dev/video0,/dev/video2 --session dryrun
 ```
 
 正常会打印两条命令：
 
 ```text
 bash -lc 'source /opt/ros/humble/setup.bash && source /home/cr/tennis_robot_ws/install/setup.bash && source /home/cr/Codes/TennisBot/install/setup.bash && exec ros2 launch target_manager target_manager.launch.py'
-bash -lc 'source /opt/ros/humble/setup.bash && source /home/cr/tennis_robot_ws/install/setup.bash && source /home/cr/Codes/TennisBot/install/setup.bash && exec ros2 run tennisbot_headless_vision headless_vision_node --ros-args ...'
+bash -lc 'source /opt/ros/humble/setup.bash && source /home/cr/tennis_robot_ws/install/setup.bash && source /home/cr/Codes/TennisBot/install/setup.bash && exec ros2 run tennisbot_vision_runtime vision_runtime_node --ros-args ...'
 ```
 
 第一条来自外部控制工作区，第二条来自 TennisBot。
@@ -220,20 +220,20 @@ bash -lc 'source /opt/ros/humble/setup.bash && source /home/cr/tennis_robot_ws/i
 再手动 source：
 
 ```bash
-bun scripts/headless.ts run --record --session test01 --tile
+bun scripts/vision-runtime.ts run --record --session test01 --tile
 ```
 
 常用变体：
 
 ```bash
 # 不分块 YOLO，使用配置默认值
-bun scripts/headless.ts run --record --session test01
+bun scripts/vision-runtime.ts run --record --session test01
 
 # 指定双目设备
-bun scripts/headless.ts run --record --session test01 --devices /dev/video0,/dev/video2
+bun scripts/vision-runtime.ts run --record --session test01 --devices /dev/video0,/dev/video2
 
 # target_manager 已经在别的终端启动时，只启动视觉节点
-bun scripts/headless.ts run --record --session test01 --no-manager
+bun scripts/vision-runtime.ts run --record --session test01 --no-manager
 ```
 
 ## 单次 task 触发
@@ -242,13 +242,13 @@ bun scripts/headless.ts run --record --session test01 --no-manager
 并在任务完成后让视觉运行时节点退出：
 
 ```bash
-bun scripts/headless.ts task --task-id 42 --session catch42 --tile
+bun scripts/vision-runtime.ts task --task-id 42 --session catch42 --tile
 ```
 
 如果只想记录文本数据，不录双路视频：
 
 ```bash
-bun scripts/headless.ts task --task-id 42 --session catch42 --no-video
+bun scripts/vision-runtime.ts task --task-id 42 --session catch42 --no-video
 ```
 
 ## 日志和录像在哪里
@@ -299,7 +299,7 @@ source /opt/ros/humble/setup.bash
 source /home/cr/tennis_robot_ws/install/setup.bash
 source install/setup.bash
 
-ros2 launch tennisbot_headless_vision headless_vision.launch.py
+ros2 launch tennisbot_vision_runtime vision_runtime.launch.py
 ```
 
 Bun 入口只是把这两个进程按统一参数启动，并把日志参数、task 参数、设备参数
@@ -357,7 +357,7 @@ source /home/cr/tennis_robot_ws/install/setup.bash
 ros2 pkg list | grep -E 'target_msgs|target_manager'
 ```
 
-如果是通过 `bun scripts/headless.ts run` 启动时报错，先确认 Bun 自动 source
+如果是通过 `bun scripts/vision-runtime.ts run` 启动时报错，先确认 Bun 自动 source
 用到的 setup 文件存在：
 
 ```bash
@@ -382,7 +382,7 @@ test -f /home/cr/Codes/TennisBot/install/setup.bash
 ros2 topic hz /robot/chassis_position
 ls artifacts/calibration/stereo_cam1_cam2
 ls artifacts/models/tennis_ball_yolo/model.pt
-bun scripts/headless.ts run --dry-run --record --devices /dev/video0,/dev/video2
+bun scripts/vision-runtime.ts run --dry-run --record --devices /dev/video0,/dev/video2
 ```
 
 视觉节点只有在有近期底盘位置、双目相机帧、YOLO 检测和有效双目匹配时才发布
@@ -411,10 +411,10 @@ ros2 topic echo /target/managed
 ## 推荐验收命令
 
 ```bash
-uv run -- python -m compileall -q src/tennisbot_headless_vision
-PYTHONPATH=src/tennisbot_headless_vision uv run python -m unittest discover -s src/tennisbot_headless_vision/tests -v
-bun scripts/headless.ts --help
-bun scripts/headless.ts run --dry-run --record --devices /dev/video0,/dev/video2 --session dryrun
+uv run -- python -m compileall -q src/tennisbot_vision_runtime
+PYTHONPATH=src/tennisbot_vision_runtime uv run python -m unittest discover -s src/tennisbot_vision_runtime/tests -v
+bun scripts/vision-runtime.ts --help
+bun scripts/vision-runtime.ts run --dry-run --record --devices /dev/video0,/dev/video2 --session dryrun
 ```
 
 真实验收还需要真实底盘链路提供 `/robot/chassis_position`，并确认

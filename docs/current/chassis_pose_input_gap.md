@@ -18,11 +18,11 @@ yaw
 
 Current behavior:
 
-- `tennisbot_headless_vision` subscribes to `/robot/chassis_position` as
+- `tennisbot_vision_runtime` subscribes to `/robot/chassis_position` as
   `target_msgs/ChassisPosition`;
 - the internal pose sample timestamp comes from `ChassisPosition.publish_stamp`;
 - if `x`, `y`, or `yaw` is non-finite, the vision runtime node drops the sample;
-- without recent `/robot/chassis_position`, `tennisbot_headless_vision` waits
+- without recent `/robot/chassis_position`, `tennisbot_vision_runtime` waits
   and does not publish `/target/raw`.
 
 Expected `/robot/chassis_position` layout today:
@@ -67,23 +67,23 @@ Current boundary:
 
 - `target_msgs/ChassisPosition` must already carry `x/y/yaw` in the
   field/interface frame;
-- `tennisbot_headless_vision` copies `/robot/chassis_position` into its
+- `tennisbot_vision_runtime` copies `/robot/chassis_position` into its
   internal pose buffer without Cartesian conversion;
 - trajectory fitting, logging, and `/target/raw` publishing use
   field/interface coordinates.
 
 ## Relevant Files
 
-- `src/tennisbot_headless_vision/tennisbot_headless_vision/headless_vision_node.py`
+- `src/tennisbot_vision_runtime/tennisbot_vision_runtime/vision_runtime_node.py`
   - reads `/robot/chassis_position`;
   - requires `x`, `y`, and `yaw`;
   - timestamps the internal pose sample from `publish_stamp`;
   - waits for recent chassis position;
   - publishes `/target/raw` only after real camera observation and recent pose
     are available.
-- `src/tennisbot_headless_vision/tennisbot_headless_vision/geometry.py`
+- `src/tennisbot_vision_runtime/tennisbot_vision_runtime/geometry.py`
   - transforms camera/chassis points into field/interface coordinates.
-- `src/tennisbot_headless_vision/tennisbot_headless_vision/trajectory.py`
+- `src/tennisbot_vision_runtime/tennisbot_vision_runtime/trajectory.py`
   - fits the trajectory and predicts the configured target plane.
 
 ## Options

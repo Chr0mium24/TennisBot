@@ -11,7 +11,7 @@ tools. The target real runtime is the vision runtime path documented in
 1. `tools/calibration` OpenCV GUI for fixed DFOptix ChArUco mono/stereo capture.
 2. `tools/yolo` for pure YOLO detection and runtime model packages.
 3. `tools/stereo` for local OpenCV 4K stereo YOLO coordinate display.
-4. `src/tennisbot_headless_vision` for the vision runtime camera-to-target
+4. `src/tennisbot_vision_runtime` for the vision runtime camera-to-target
    runtime path.
 
 The real catch loop still requires real chassis pose and control links. Local
@@ -24,7 +24,7 @@ From the repository root:
 ```bash
 source /opt/ros/humble/setup.bash
 source /home/cr/tennis_robot_ws/install/setup.bash
-colcon build --base-paths src --packages-select tennisbot_headless_vision --symlink-install
+colcon build --base-paths src --packages-select tennisbot_vision_runtime --symlink-install
 source install/setup.bash
 ```
 
@@ -32,16 +32,16 @@ Start the vision runtime node and external target manager in separate
 terminals:
 
 ```bash
-ros2 launch tennisbot_headless_vision headless_vision.launch.py
+ros2 launch tennisbot_vision_runtime vision_runtime.launch.py
 ros2 launch target_manager target_manager.launch.py
 ```
 
 Or start the same chain through the Bun runtime launcher:
 
 ```bash
-bun scripts/headless.ts run
-bun scripts/headless.ts run --record --session test01 --tile
-bun scripts/headless.ts task --task-id 42 --session catch42 --tile
+bun scripts/vision-runtime.ts run
+bun scripts/vision-runtime.ts run --record --session test01 --tile
+bun scripts/vision-runtime.ts task --task-id 42 --session catch42 --tile
 ```
 
 Start the local stereo coordinate GUI:
@@ -81,16 +81,16 @@ Use the mainline OpenCV GUI in order:
 After the stereo package verifies and the camera rig is mounted:
 
 1. Measure and set `camera_translation_m` and `camera_rotation_rpy_rad` in
-   `src/tennisbot_headless_vision/config/headless_vision.yaml`.
+   `src/tennisbot_vision_runtime/config/vision_runtime.yaml`.
 2. Confirm the interface bridge is publishing `/robot/chassis_position`
    as `target_msgs/ChassisPosition` in the field/interface frame.
-3. Launch `tennisbot_headless_vision` and confirm it publishes `/target/raw`
+3. Launch `tennisbot_vision_runtime` and confirm it publishes `/target/raw`
    only when a real ball is detected in both cameras and recent chassis
    position is available.
 4. Launch external `target_manager` from the sourced control workspace and
    confirm `/target/managed` before enabling chassis planner behavior.
-5. For evidence capture, prefer `bun scripts/headless.ts run --record` or
-   `bun scripts/headless.ts task --task-id <id> --session <name>` so the video,
+5. For evidence capture, prefer `bun scripts/vision-runtime.ts run --record` or
+   `bun scripts/vision-runtime.ts task --task-id <id> --session <name>` so the video,
    chassis position, YOLO detections, selected observations, and raw targets
    share one timestamped session directory.
 

@@ -1,4 +1,4 @@
-headless_vision:
+vision_runtime:
   ros__parameters:
     chassis_position_topic: /robot/chassis_position
     raw_target_topic: /target/raw

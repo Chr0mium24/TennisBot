@@ -29,7 +29,7 @@ workspace that provides `target_msgs` and `target_manager`:
 ```bash
 source /opt/ros/humble/setup.bash
 source /home/cr/tennis_robot_ws/install/setup.bash
-colcon build --base-paths src --packages-select tennisbot_headless_vision --symlink-install
+colcon build --base-paths src --packages-select tennisbot_vision_runtime --symlink-install
 source install/setup.bash
 ```
 
@@ -37,7 +37,7 @@ Start the vision runtime and the external target manager in separate
 terminals after both workspaces are sourced:
 
 ```bash
-ros2 launch tennisbot_headless_vision headless_vision.launch.py
+ros2 launch tennisbot_vision_runtime vision_runtime.launch.py
 ros2 launch target_manager target_manager.launch.py
 ```
 
@@ -46,9 +46,9 @@ and this repository's `install/setup.bash` before starting ROS child
 processes:
 
 ```bash
-bun scripts/headless.ts run
-bun scripts/headless.ts run --record --session test01 --tile
-bun scripts/headless.ts task --task-id 42 --session catch42 --tile
+bun scripts/vision-runtime.ts run
+bun scripts/vision-runtime.ts run --record --session test01 --tile
+bun scripts/vision-runtime.ts task --task-id 42 --session catch42 --tile
 ```
 
 Inspect the runtime topics:

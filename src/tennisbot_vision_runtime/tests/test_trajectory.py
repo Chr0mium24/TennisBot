@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from tennisbot_headless_vision.trajectory import BallObservation, predict_target
+from tennisbot_vision_runtime.trajectory import BallObservation, predict_target
 
 
 class TrajectoryParityTest(unittest.TestCase):

@@ -36,9 +36,9 @@ def finite_float(value: object, *, name: str) -> float:
     return result
 
 
-class HeadlessVisionNode(Node):
+class VisionRuntimeNode(Node):
     def __init__(self) -> None:
-        super().__init__("headless_vision")
+        super().__init__("vision_runtime")
 
         self.declare_parameter("chassis_position_topic", "/robot/chassis_position")
         self.declare_parameter("raw_target_topic", "/target/raw")
@@ -526,7 +526,7 @@ class RuntimeRunLogger:
             self._files["events"] = self._open_ndjson("events.ndjson")
 
     @classmethod
-    def from_node(cls, node: HeadlessVisionNode) -> RuntimeRunLogger:
+    def from_node(cls, node: VisionRuntimeNode) -> RuntimeRunLogger:
         enabled = bool(node.get_parameter("runtime_log_enabled").value)
         root = Path(str(node.get_parameter("runtime_log_root").value)).expanduser()
         session = str(node.get_parameter("runtime_log_session").value).strip()
@@ -780,7 +780,7 @@ class CameraRuntime:
         self.height = height
 
     @classmethod
-    def from_node(cls, node: HeadlessVisionNode) -> CameraRuntime:
+    def from_node(cls, node: VisionRuntimeNode) -> CameraRuntime:
         stereo_tool_path = Path(str(node.get_parameter("stereo_tool_python_path").value)).expanduser()
         if stereo_tool_path and stereo_tool_path.is_dir():
             resolved = str(stereo_tool_path.resolve())
@@ -960,7 +960,7 @@ def open_capture(
 
 def main(args=None) -> None:
     rclpy.init(args=args)
-    node = HeadlessVisionNode()
+    node = VisionRuntimeNode()
     try:
         rclpy.spin(node)
     except (KeyboardInterrupt, ExternalShutdownException, RCLError):

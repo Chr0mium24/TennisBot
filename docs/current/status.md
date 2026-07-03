@@ -19,14 +19,14 @@ runtime. The main tracked paths are now:
 
 The runtime package path now includes:
 
-- `tennisbot_headless_vision` consuming `/robot/chassis_position` and real
+- `tennisbot_vision_runtime` consuming `/robot/chassis_position` and real
   stereo camera frames, then publishing `target_msgs/RawTarget` on
   `/target/raw`;
 - external `target_msgs` and `target_manager` from the sourced
   `/home/cr/tennis_robot_ws` control workspace;
 - external `target_manager` consuming `/target/raw` and publishing
   `/target/managed`;
-- `scripts/headless.ts` for logged runtime launches and single-task runs with
+- `scripts/vision-runtime.ts` for logged runtime launches and single-task runs with
   caller-specified `task_id`.
 
 The current quick camera-device tool is:
@@ -120,17 +120,17 @@ Build and run the vision runtime chain:
 ```bash
 source /opt/ros/humble/setup.bash
 source /home/cr/tennis_robot_ws/install/setup.bash
-colcon build --base-paths src --packages-select tennisbot_headless_vision --symlink-install
+colcon build --base-paths src --packages-select tennisbot_vision_runtime --symlink-install
 source install/setup.bash
-ros2 launch tennisbot_headless_vision headless_vision.launch.py
+ros2 launch tennisbot_vision_runtime vision_runtime.launch.py
 ros2 launch target_manager target_manager.launch.py
 ```
 
 Logged or single-task run:
 
 ```bash
-bun scripts/headless.ts run --record --session test01 --tile
-bun scripts/headless.ts task --task-id 42 --session catch42 --tile
+bun scripts/vision-runtime.ts run --record --session test01 --tile
+bun scripts/vision-runtime.ts task --task-id 42 --session catch42 --tile
 ```
 
 Inspect runtime topics:

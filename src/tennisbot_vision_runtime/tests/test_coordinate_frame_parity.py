@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import unittest
 
-from tennisbot_headless_vision.geometry import (
+from tennisbot_vision_runtime.geometry import (
     PoseSample,
     Transform3D,
     apply_transform,
@@ -11,7 +11,7 @@ from tennisbot_headless_vision.geometry import (
     mat_vec_mul,
     rpy_matrix,
 )
-from tennisbot_headless_vision.trajectory import BallObservation, TrajectoryPrediction, predict_target
+from tennisbot_vision_runtime.trajectory import BallObservation, TrajectoryPrediction, predict_target
 
 
 class CoordinateFrameParityTest(unittest.TestCase):

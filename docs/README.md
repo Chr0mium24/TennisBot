@@ -5,7 +5,7 @@
 ## 先读这里
 
 - [当前架构](current/architecture.md)
-- [无前端 ROS 视觉运行目标](current/headless_ros_vision_runtime.md)
+- [Vision Runtime](current/vision_runtime.md)
 - [当前状态](current/status.md)
 - [底盘 pose 输入缺口](current/chassis_pose_input_gap.md)
 - [中文运行说明](current/how_to_run_zh.md)

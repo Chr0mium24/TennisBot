@@ -2,8 +2,8 @@
 
 Date: 2026-07-03
 
-This contract defines the model package consumed by the headless ROS vision
-runtime. The package is produced by `tools/yolo` and stored under
+This contract defines the model package consumed by the vision runtime. The
+package is produced by `tools/yolo` and stored under
 `artifacts/models/`.
 
 ## Package Directory
@@ -25,7 +25,7 @@ artifacts/models/tennis_ball_yolo/
 ```
 
 Only one model file is required at runtime, but a package may include multiple
-formats. The headless ROS vision runtime chooses the first supported format
+formats. The vision runtime chooses the first supported format
 according to its detector configuration.
 
 ## Required Files
@@ -154,7 +154,7 @@ Rules:
 
 Rules:
 
-- `confidence_threshold` is the default startup threshold for the headless
+- `confidence_threshold` is the default startup threshold for the vision
   runtime.
 - Runtime launch parameters may override the threshold, but package defaults
   remain the source of truth for reproducible runs.
@@ -209,7 +209,7 @@ report.
 
 ## Runtime Validation
 
-Before the headless vision runtime starts inference, it should validate:
+Before the vision runtime starts inference, it should validate:
 
 - package directory exists;
 - `package.json`, `labels.json`, `preprocessing.json`, and
@@ -236,4 +236,4 @@ The current `TennisBallDetectorLab` handoff package contains:
 - `package_manifest.json`.
 
 The target contract keeps those data files but renames the runtime entrypoint
-to `package.json` and makes the headless ROS vision runtime the consumer.
+to `package.json` and makes the vision runtime the consumer.

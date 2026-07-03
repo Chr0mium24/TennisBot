@@ -192,7 +192,7 @@ def command_hints(devices: list[dict[str, Any]]) -> list[str]:
     left, right = ok[:2]
     return [
         f"calibration stereo: --left-device {left['device']} --right-device {right['device']}",
-        f"headless vision cameras: left_device={left['device']} right_device={right['device']}",
+        f"vision runtime cameras: left_device={left['device']} right_device={right['device']}",
     ]
 
 
