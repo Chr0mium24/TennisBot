@@ -97,6 +97,32 @@ bun scripts/stereo.ts replay
 页面里用两个进度条选择轨迹时间段，并基于选中点系生成 3D 显示和相机坐标
 预测曲线。时间段不通过命令行参数传入。
 
+## YOLO 标注、抠球审核和增强
+
+详细流程见 [YOLO 标注、抠球审核和数据增强使用说明](yolo_sprite_augmentation_usage.md)。
+
+常用入口：
+
+```bash
+bun scripts/yolo.ts annotate
+bun scripts/yolo.ts sprites extract
+bun scripts/yolo.ts sprites review
+bun scripts/yolo.ts augment copy-paste
+```
+
+对当前 `tools/yolo/0260701` 数据目录进行局域网标注：
+
+```bash
+bun scripts/yolo.ts annotate \
+  --images-root tools/yolo/0260701/images \
+  --labels-root tools/yolo/0260701/labels \
+  --excluded-file tools/yolo/0260701/excluded_images.txt \
+  --host 0.0.0.0 \
+  --port 8765
+```
+
+生成 sprite 候选时默认不覆盖已有候选；只有显式加 `--overwrite` 才会重写。
+
 ## 标定快捷入口
 
 从仓库根目录运行：

@@ -1,5 +1,8 @@
 # TennisBot YOLO 工具
 
+详细中文流程文档见：
+[YOLO 标注、抠球审核和数据增强使用说明](../../docs/current/yolo_sprite_augmentation_usage.md)。
+
 `tools/yolo` 是当前主线网球检测工具入口，包含：
 
 - 标注前端/后端
