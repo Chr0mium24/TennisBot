@@ -24,8 +24,14 @@ contrast = [0.85, 1.15]
 blur_probability = 0.10
 blur_kernel = [3, 5]
 
+[frame]
+rotate_probability = 0.35
+rotate_degrees = [-2.0, 2.0]
+
 [ball]
 scale = [0.6, 1.8]
+stretch_x = [0.9, 1.1]
+stretch_y = [0.9, 1.1]
 brightness = [-35, 35]
 contrast = [0.8, 1.25]
 rotate_degrees = [-8, 8]

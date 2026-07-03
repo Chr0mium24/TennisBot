@@ -123,8 +123,9 @@ uv run --extra augment tennisbot-yolo augment copy-paste
 - `tools/yolo/yolo/runs/copy_paste_aug/manifest.jsonl`
 - `tools/yolo/yolo/runs/copy_paste_aug/report.md`
 
-这个命令不会旋转、倾斜或透视变换原始背景图；已有 bbox 标签会原样复制。
-只有贴上的球会按 alpha mask 重新计算水平 YOLO bbox。验证集不生成合成样本。
+这个命令不会改写原始背景图；生成出的增强图可以按配置做轻微整图旋转来
+模拟摄像头抖动。整图旋转后，已有 bbox 和新贴球 bbox 都会用四角变换
+重新计算水平 YOLO bbox。验证集不生成合成样本。
 
 ## 验证模型包
 

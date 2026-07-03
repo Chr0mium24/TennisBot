@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from tennisbot_yolo.augmentation import copy_paste_augment
+from tennisbot_yolo.augmentation import PixelLabel, copy_paste_augment, rotate_frame_and_labels, transform_sprite
 from tennisbot_yolo.dataset import parse_yolo_label_line, yolo_to_pixel_box
 from tennisbot_yolo.sprites import copy_reviewed_sprite, extract_sprites, load_sprite_metadata
 
@@ -91,8 +91,14 @@ contrast = [1.0, 1.0]
 blur_probability = 0.0
 blur_kernel = [3, 3]
 
+[frame]
+rotate_probability = 1.0
+rotate_degrees = [1.5, 1.5]
+
 [ball]
 scale = [1.0, 1.0]
+stretch_x = [1.0, 1.0]
+stretch_y = [1.0, 1.0]
 brightness = [0, 0]
 contrast = [1.0, 1.0]
 rotate_degrees = [-4, 4]
@@ -124,3 +130,43 @@ avoid_existing_iou = 0.0
     ]
     assert len(manifest_rows) == 2
     assert (label_dir / "background.txt").read_text(encoding="utf-8") == ""
+
+
+def test_transform_sprite_supports_anisotropic_stretch() -> None:
+    np = pytest.importorskip("numpy")
+
+    sprite = np.zeros((10, 20, 4), dtype=np.uint8)
+    resolved = {
+        "ball": {
+            "scale": (1.0, 1.0),
+            "stretch_x": (1.5, 1.5),
+            "stretch_y": (0.5, 0.5),
+            "brightness": (0, 0),
+            "contrast": (1.0, 1.0),
+            "rotate_degrees": (0.0, 0.0),
+            "motion_blur_probability": 0.0,
+            "motion_blur_kernel": (3, 3),
+        }
+    }
+
+    transformed = transform_sprite(sprite, resolved, rng=__import__("random").Random(1), allow_rotation=False)
+
+    assert transformed.shape[0] == 5
+    assert transformed.shape[1] == 30
+
+
+def test_frame_rotation_transforms_labels_to_axis_aligned_boxes() -> None:
+    np = pytest.importorskip("numpy")
+
+    image = np.zeros((100, 120, 3), dtype=np.uint8)
+    label = PixelLabel(0, yolo_to_pixel_box(parse_yolo_label_line("0 0.500000 0.500000 0.200000 0.200000"), 120, 100))
+
+    rotated_image, rotated_labels = rotate_frame_and_labels(image, [label], 2.0)
+
+    assert rotated_image.shape == image.shape
+    assert len(rotated_labels) == 1
+    rotated_box = rotated_labels[0].box
+    assert rotated_box.width > label.box.width
+    assert rotated_box.height > label.box.height
+    assert 0 <= rotated_box.x1 < rotated_box.x2 <= 120
+    assert 0 <= rotated_box.y1 < rotated_box.y2 <= 100

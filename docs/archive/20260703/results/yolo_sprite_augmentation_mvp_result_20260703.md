@@ -64,3 +64,12 @@ Results:
   training dataset.
 - Train and validate in a separate experiment before claiming detector quality
   changes.
+
+## 2026-07-03 Stretch/Rotation Update
+
+- Added slight anisotropic ball sprite stretch through
+  `ball.stretch_x/stretch_y`.
+- Added generated-frame rotation through `frame.rotate_probability` and
+  `frame.rotate_degrees`.
+- Whole-frame rotation rotates all generated labels and rewrites them as
+  standard horizontal YOLO bboxes.

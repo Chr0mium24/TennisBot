@@ -14,7 +14,8 @@
 - `sprites extract` 默认不会覆盖已编辑候选，只有加 `--overwrite` 才会重写。
 - `approved/` 和 `rejected/` 目录不会被 `sprites extract` 修改。
 - 增强输出写到 `tools/yolo/yolo/runs/`，不覆盖原始图片和标签。
-- 原始背景图不做旋转、倾斜、透视或剪切；贴上去的球 bbox 从最终 alpha mask 重新计算。
+- 原始数据文件不被改写；生成增强图时可以对整张输出图做轻微旋转，并会重算全部 bbox。
+- 增强输出仍然使用普通水平 YOLO bbox，不写旋转框。
 
 ## 当前 0260701 数据集流程
 
@@ -154,6 +155,27 @@ jpeg_quality = 92
 
 其它参数可以先保持默认。
 
+常用增强参数：
+
+```toml
+[frame]
+rotate_probability = 0.35
+rotate_degrees = [-2.0, 2.0]
+
+[ball]
+scale = [0.6, 1.8]
+stretch_x = [0.9, 1.1]
+stretch_y = [0.9, 1.1]
+rotate_degrees = [-8, 8]
+```
+
+说明：
+
+- `frame.rotate_degrees` 是整张生成图的轻微旋转，用来模拟相机滚转/抖动。
+- 整图旋转后，所有原始 bbox 和新贴球 bbox 都会用四角变换重新取水平外接框。
+- `ball.stretch_x/stretch_y` 是球 sprite 的轻微拉伸，模拟运动拖影和成像变形。
+- 这些参数不要开太大；整图旋转过大会让水平 bbox 明显变松。
+
 ### 5. 生成增强数据集
 
 确认 `approved/` 里已经有审核通过的 sprite 后运行：
@@ -180,7 +202,7 @@ tools/yolo/yolo/runs/copy_paste_aug_0260701/
 说明：
 
 - `val.txt` 为空，第一版不生成合成验证集。
-- 如果背景图已有原始 bbox label，会原样复制原 label，再追加贴上去的球 bbox。
+- 如果背景图已有原始 bbox label，会先载入原 label；若整图旋转启用，则原 label 也会被旋转重算。
 - 如果背景图是空 label 或未标注图，会只写入贴上去的球 bbox。
 - 贴上去的球 bbox 根据最终 alpha mask 水平外接框生成，不沿用原 bbox。
 

@@ -47,6 +47,12 @@ class SpriteRecord:
 
 
 @dataclass(frozen=True)
+class PixelLabel:
+    class_id: int
+    box: PixelBox
+
+
+@dataclass(frozen=True)
 class AugmentationResult:
     output_root: Path
     generated: int
@@ -130,8 +136,14 @@ def resolve_config(config_path: Path) -> dict[str, Any]:
             "blur_probability": _section_float(config, "background", "blur_probability", 0.1),
             "blur_kernel": _int_range(config, "background", "blur_kernel", (3, 5)),
         },
+        "frame": {
+            "rotate_probability": _section_float(config, "frame", "rotate_probability", 0.35),
+            "rotate_degrees": _range(config, "frame", "rotate_degrees", (-2.0, 2.0)),
+        },
         "ball": {
             "scale": _range(config, "ball", "scale", (0.6, 1.8)),
+            "stretch_x": _range(config, "ball", "stretch_x", (0.9, 1.1)),
+            "stretch_y": _range(config, "ball", "stretch_y", (0.9, 1.1)),
             "brightness": _int_range(config, "ball", "brightness", (-35, 35)),
             "contrast": _range(config, "ball", "contrast", (0.8, 1.25)),
             "rotate_degrees": _range(config, "ball", "rotate_degrees", (-8, 8)),
@@ -167,13 +179,17 @@ def collect_backgrounds(resolved: dict[str, Any]) -> list[BackgroundRecord]:
         parsed_labels = read_yolo_labels(label_path)
         if label_lines and not resolved["selection"]["allow_labeled_backgrounds"]:
             continue
+        pixel_labels = [
+            PixelLabel(label.class_id, yolo_to_pixel_box(label, image_width, image_height))
+            for label in parsed_labels
+        ]
         records.append(
             BackgroundRecord(
                 image_rel_path=rel_path,
                 image_path=image_path,
                 label_path=label_path,
                 labels=label_lines,
-                boxes=[yolo_to_pixel_box(label, image_width, image_height) for label in parsed_labels],
+                boxes=[label.box for label in pixel_labels],
                 is_negative=len(label_lines) == 0,
             )
         )
@@ -218,8 +234,10 @@ def adjust_brightness_contrast(image: Any, alpha: float, beta: int) -> Any:
 def transform_sprite(sprite: Any, resolved: dict[str, Any], rng: random.Random, *, allow_rotation: bool) -> Any:
     cv2, _ = require_cv2_numpy()
     scale = random_range(rng, resolved["ball"]["scale"])
-    new_width = max(1, int(round(sprite.shape[1] * scale)))
-    new_height = max(1, int(round(sprite.shape[0] * scale)))
+    stretch_x = random_range(rng, resolved["ball"]["stretch_x"])
+    stretch_y = random_range(rng, resolved["ball"]["stretch_y"])
+    new_width = max(1, int(round(sprite.shape[1] * scale * stretch_x)))
+    new_height = max(1, int(round(sprite.shape[0] * scale * stretch_y)))
     sprite = cv2.resize(sprite, (new_width, new_height), interpolation=cv2.INTER_AREA if scale < 1 else cv2.INTER_LINEAR)
 
     bgr = sprite[:, :, :3]
@@ -242,8 +260,19 @@ def transform_sprite(sprite: Any, resolved: dict[str, Any], rng: random.Random, 
     return sprite
 
 
+def labels_from_yolo_lines(label_lines: list[str], image_width: int, image_height: int) -> list[PixelLabel]:
+    from .dataset import parse_yolo_label_line
+
+    labels: list[PixelLabel] = []
+    for line in label_lines:
+        label = parse_yolo_label_line(line)
+        if label is not None:
+            labels.append(PixelLabel(label.class_id, yolo_to_pixel_box(label, image_width, image_height)))
+    return labels
+
+
 def rotate_rgba(image: Any, degrees: float) -> Any:
-    cv2, np = require_cv2_numpy()
+    cv2, _ = require_cv2_numpy()
     height, width = image.shape[:2]
     center = (width * 0.5, height * 0.5)
     matrix = cv2.getRotationMatrix2D(center, degrees, 1.0)
@@ -261,6 +290,47 @@ def motion_blur_rgba(image: Any, kernel_size: int) -> Any:
     kernel = np.zeros((kernel_size, kernel_size), dtype=np.float32)
     kernel[kernel_size // 2, :] = 1.0 / kernel_size
     return cv2.filter2D(image, -1, kernel)
+
+
+def rotate_frame_and_labels(image: Any, labels: list[PixelLabel], degrees: float) -> tuple[Any, list[PixelLabel]]:
+    cv2, _ = require_cv2_numpy()
+    height, width = image.shape[:2]
+    center = ((width - 1) * 0.5, (height - 1) * 0.5)
+    matrix = cv2.getRotationMatrix2D(center, degrees, 1.0)
+    rotated_image = cv2.warpAffine(
+        image,
+        matrix,
+        (width, height),
+        flags=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_REFLECT_101,
+    )
+    rotated_labels: list[PixelLabel] = []
+    for label in labels:
+        rotated_box = rotate_box(label.box, matrix, width, height)
+        if rotated_box is not None:
+            rotated_labels.append(PixelLabel(label.class_id, rotated_box))
+    return rotated_image, rotated_labels
+
+
+def rotate_box(box: PixelBox, matrix: Any, image_width: int, image_height: int) -> PixelBox | None:
+    _, np = require_cv2_numpy()
+    corners = np.array(
+        [
+            [box.x1, box.y1, 1.0],
+            [box.x2, box.y1, 1.0],
+            [box.x2, box.y2, 1.0],
+            [box.x1, box.y2, 1.0],
+        ],
+        dtype=np.float32,
+    )
+    rotated = corners @ matrix.T
+    x1 = max(0.0, float(rotated[:, 0].min()))
+    y1 = max(0.0, float(rotated[:, 1].min()))
+    x2 = min(float(image_width), float(rotated[:, 0].max()))
+    y2 = min(float(image_height), float(rotated[:, 1].max()))
+    if x2 <= x1 or y2 <= y1:
+        return None
+    return PixelBox(x1=x1, y1=y1, x2=x2, y2=y2)
 
 
 def alpha_bbox(alpha: Any, threshold: int) -> PixelBox | None:
@@ -423,8 +493,8 @@ def copy_paste_augment(config_path: Path = DEFAULT_AUGMENT_CONFIG) -> Augmentati
             background = cv2.GaussianBlur(background, (kernel, kernel), 0)
 
         image_height, image_width = background.shape[:2]
-        output_labels = list(background_record.labels)
-        existing_boxes = list(background_record.boxes)
+        output_pixel_labels = labels_from_yolo_lines(background_record.labels, image_width, image_height)
+        existing_boxes = [label.box for label in output_pixel_labels]
         pasted: list[dict[str, Any]] = []
         paste_count = random_int_range(rng, resolved["selection"]["paste_per_image"])
         for _ in range(paste_count):
@@ -453,8 +523,8 @@ def copy_paste_augment(config_path: Path = DEFAULT_AUGMENT_CONFIG) -> Augmentati
                 skipped += 1
                 continue
             existing_boxes.append(bbox)
+            output_pixel_labels.append(PixelLabel(0, bbox))
             yolo_box = pixel_to_yolo_box(bbox, image_width, image_height, class_id=0)
-            output_labels.append(format_yolo_box(yolo_box))
             pasted.append(
                 {
                     "sprite_id": sprite_record.sprite_id,
@@ -475,6 +545,17 @@ def copy_paste_augment(config_path: Path = DEFAULT_AUGMENT_CONFIG) -> Augmentati
             skipped += 1
             continue
 
+        frame_rotation_degrees = 0.0
+        if rng.random() < resolved["frame"]["rotate_probability"]:
+            frame_rotation_degrees = random_range(rng, resolved["frame"]["rotate_degrees"])
+            if abs(frame_rotation_degrees) > 1e-6:
+                background, output_pixel_labels = rotate_frame_and_labels(
+                    background,
+                    output_pixel_labels,
+                    frame_rotation_degrees,
+                )
+                image_height, image_width = background.shape[:2]
+
         suffix = ".jpg" if resolved["output"]["image_format"] in {"jpg", "jpeg"} else ".png"
         output_stem = f"aug_{generated:06d}"
         output_image = images_dir / f"{output_stem}{suffix}"
@@ -484,6 +565,10 @@ def copy_paste_augment(config_path: Path = DEFAULT_AUGMENT_CONFIG) -> Augmentati
             params = [int(cv2.IMWRITE_JPEG_QUALITY), int(resolved["output"]["jpeg_quality"])]
         if not cv2.imwrite(str(output_image), background, params):
             raise RuntimeError(f"could not write generated image: {output_image}")
+        output_labels = [
+            format_yolo_box(pixel_to_yolo_box(label.box, image_width, image_height, class_id=label.class_id))
+            for label in output_pixel_labels
+        ]
         output_label.write_text("\n".join(output_labels) + "\n", encoding="utf-8")
         train_images.append(output_image.resolve().as_posix())
         manifest_rows.append(
@@ -493,6 +578,7 @@ def copy_paste_augment(config_path: Path = DEFAULT_AUGMENT_CONFIG) -> Augmentati
                 "source_label": background_record.label_path.as_posix(),
                 "output_image": output_image.as_posix(),
                 "output_label": output_label.as_posix(),
+                "frame_rotation_degrees": frame_rotation_degrees,
                 "pasted": pasted,
             }
         )
