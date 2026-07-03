@@ -92,7 +92,8 @@ test -f artifacts/models/tennis_ball_yolo/model.pt && echo model_ok
 
 ### 4. 构建 TennisBot 里的 ROS 包
 
-每次打开新终端都要按顺序 source。构建时也一样：
+构建阶段仍然要按顺序 source，因为 `colcon build` 需要先知道 ROS 和外部
+`target_msgs` 在哪里：
 
 ```bash
 cd /home/cr/Codes/TennisBot
@@ -109,7 +110,47 @@ source install/setup.bash
 
 ## 每次开机后的最短运行命令
 
-### 1. 进入仓库并 source 环境
+### 1. 直接用 Bun 启动
+
+```bash
+cd /home/cr/Codes/TennisBot
+bun scripts/headless.ts run --record --session test01 --tile
+```
+
+Bun 入口默认会在它启动的 ROS 子进程里自动执行：
+
+```bash
+source /opt/ros/humble/setup.bash
+source /home/cr/tennis_robot_ws/install/setup.bash
+source /home/cr/Codes/TennisBot/install/setup.bash
+```
+
+所以运行主链路时，当前终端可以不手动 source。这个自动 source 只作用于 Bun
+启动的子进程，不会把你的当前终端变成 ROS 环境。
+
+默认 setup 路径可以用环境变量覆盖：
+
+```bash
+ROS_SETUP=/opt/ros/humble/setup.bash \
+TENNISBOT_CONTROL_SETUP=/home/cr/tennis_robot_ws/install/setup.bash \
+TENNISBOT_LOCAL_SETUP=/home/cr/Codes/TennisBot/install/setup.bash \
+bun scripts/headless.ts run --record --session test01 --tile
+```
+
+也可以在命令行上控制：
+
+```bash
+bun scripts/headless.ts run --no-auto-source
+bun scripts/headless.ts run --clear-setup-files \
+  --setup-file /opt/ros/humble/setup.bash \
+  --setup-file /home/cr/tennis_robot_ws/install/setup.bash \
+  --setup-file /home/cr/Codes/TennisBot/install/setup.bash
+```
+
+### 2. 手动查看 ROS 状态前先 source 当前终端
+
+如果你要自己敲 `ros2 pkg list`、`ros2 topic list`、`ros2 node list`，当前
+终端仍然要 source：
 
 ```bash
 cd /home/cr/Codes/TennisBot
@@ -118,7 +159,7 @@ source /home/cr/tennis_robot_ws/install/setup.bash
 source install/setup.bash
 ```
 
-### 2. 先确认 ROS 包和话题接口
+然后确认 ROS 包和话题接口：
 
 ```bash
 ros2 pkg list | grep -E 'target_msgs|target_manager|tennisbot_headless_vision'
@@ -155,15 +196,16 @@ bun scripts/headless.ts run --dry-run --record --devices /dev/video0,/dev/video2
 正常会打印两条命令：
 
 ```text
-ros2 launch target_manager target_manager.launch.py
-ros2 run tennisbot_headless_vision headless_vision_node --ros-args ...
+bash -lc 'source /opt/ros/humble/setup.bash && source /home/cr/tennis_robot_ws/install/setup.bash && source /home/cr/Codes/TennisBot/install/setup.bash && exec ros2 launch target_manager target_manager.launch.py'
+bash -lc 'source /opt/ros/humble/setup.bash && source /home/cr/tennis_robot_ws/install/setup.bash && source /home/cr/Codes/TennisBot/install/setup.bash && exec ros2 run tennisbot_headless_vision headless_vision_node --ros-args ...'
 ```
 
 第一条来自外部控制工作区，第二条来自 TennisBot。
 
 ### 5. 真实启动主链路
 
-默认会同时启动外部 `target_manager` 和本仓库的 headless 视觉节点：
+默认会同时启动外部 `target_manager` 和本仓库的 headless 视觉节点。这里不需要
+再手动 source：
 
 ```bash
 bun scripts/headless.ts run --record --session test01 --tile
@@ -292,7 +334,8 @@ bun scripts/stereo.ts gui --tile
 
 ### 找不到 `target_msgs` 或 `target_manager`
 
-原因通常是没有先 source 控制工作区：
+如果是手动执行 `ros2 ...` 命令时报错，原因通常是当前终端没有 source 控制
+工作区：
 
 ```bash
 source /opt/ros/humble/setup.bash
@@ -304,6 +347,18 @@ source /home/cr/tennis_robot_ws/install/setup.bash
 ```bash
 ros2 pkg list | grep -E 'target_msgs|target_manager'
 ```
+
+如果是通过 `bun scripts/headless.ts run` 启动时报错，先确认 Bun 自动 source
+用到的 setup 文件存在：
+
+```bash
+test -f /opt/ros/humble/setup.bash
+test -f /home/cr/tennis_robot_ws/install/setup.bash
+test -f /home/cr/Codes/TennisBot/install/setup.bash
+```
+
+新电脑路径不同的话，用 `TENNISBOT_CONTROL_SETUP` 和
+`TENNISBOT_LOCAL_SETUP` 覆盖默认路径。
 
 ### `colcon build` 找不到 `target_msgs`
 

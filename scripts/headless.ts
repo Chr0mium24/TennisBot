@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
 
+import { resolve } from "node:path";
+
 type ForwardedSignal = "SIGINT" | "SIGTERM";
 
 type Options = {
@@ -17,6 +19,8 @@ type Options = {
   yoloLog: boolean;
   targetLog: boolean;
   eventLog: boolean;
+  autoSource: boolean;
+  setupFiles: string[];
   tile?: boolean;
   devices?: string;
   leftDevice?: string;
@@ -30,6 +34,7 @@ type Options = {
   extraParams: string[];
 };
 
+const repoRoot = resolve(import.meta.dirname, "..");
 const argv = Bun.argv.slice(2);
 
 if (argv.length === 0 || argv[0] === "--help" || argv[0] === "-h") {
@@ -48,8 +53,9 @@ try {
 }
 
 async function run(options: Options): Promise<number> {
-  const headless = buildHeadlessCommand(options);
-  const manager = buildManagerCommand(options);
+  const headless = wrapRosCommand(buildHeadlessCommand(options), options);
+  const managerCommand = buildManagerCommand(options);
+  const manager = managerCommand === undefined ? undefined : wrapRosCommand(managerCommand, options);
 
   if (options.dryRun) {
     if (manager !== undefined) console.log(displayCommand(manager));
@@ -147,6 +153,8 @@ function parseOptions(args: string[]): Options {
     yoloLog: true,
     targetLog: true,
     eventLog: true,
+    autoSource: true,
+    setupFiles: defaultSetupFiles(),
     extraParams: [],
   };
 
@@ -171,6 +179,10 @@ function parseOptions(args: string[]): Options {
     else if (arg === "--no-yolo-log") options.yoloLog = false;
     else if (arg === "--no-target-log") options.targetLog = false;
     else if (arg === "--no-event-log") options.eventLog = false;
+    else if (arg === "--auto-source") options.autoSource = true;
+    else if (arg === "--no-auto-source") options.autoSource = false;
+    else if (arg === "--clear-setup-files") options.setupFiles = [];
+    else if (arg === "--setup-file") options.setupFiles.push(takeValue(args, ++index, arg));
     else if (arg === "--task-id") options.taskId = takeValue(args, ++index, arg);
     else if (arg === "--log-root") options.logRoot = takeValue(args, ++index, arg);
     else if (arg === "--session") options.session = takeValue(args, ++index, arg);
@@ -191,6 +203,23 @@ function parseOptions(args: string[]): Options {
     throw new Error("task command requires --task-id");
   }
   return options;
+}
+
+function defaultSetupFiles(): string[] {
+  return [
+    process.env.ROS_SETUP ?? "/opt/ros/humble/setup.bash",
+    process.env.TENNISBOT_CONTROL_SETUP ?? "/home/cr/tennis_robot_ws/install/setup.bash",
+    process.env.TENNISBOT_LOCAL_SETUP ?? resolve(repoRoot, "install/setup.bash"),
+  ];
+}
+
+function wrapRosCommand(command: string[], options: Options): string[] {
+  if (!options.autoSource) return command;
+  const sourcePrefix = options.setupFiles
+    .filter((item) => item.trim().length > 0)
+    .map((item) => `source ${shellQuote(item)} && `)
+    .join("");
+  return ["bash", "-lc", `${sourcePrefix}exec ${command.map(shellQuote).join(" ")}`];
 }
 
 function addParam(params: string[], name: string, value: string): void {
@@ -219,6 +248,7 @@ function parseDevices(value: string): [string, string] {
 
 function spawn(command: string[]): ReturnType<typeof Bun.spawn> {
   return Bun.spawn(command, {
+    cwd: repoRoot,
     env: process.env,
     stdin: "inherit",
     stdout: "inherit",
@@ -248,11 +278,11 @@ function terminate(proc: ReturnType<typeof Bun.spawn>, signal: ForwardedSignal =
 }
 
 function displayCommand(command: string[]): string {
-  return command.map(quote).join(" ");
+  return command.map(shellQuote).join(" ");
 }
 
-function quote(value: string): string {
-  return /^[A-Za-z0-9_./:=,-]+$/.test(value) ? value : JSON.stringify(value);
+function shellQuote(value: string): string {
+  return /^[A-Za-z0-9_./:=,-]+$/.test(value) ? value : `'${value.replace(/'/g, "'\\''")}'`;
 }
 
 function printUsage(): void {
@@ -283,12 +313,16 @@ function printUsage(): void {
   --single-task / --continuous        单任务或连续任务模式
   --with-manager / --no-manager       是否同时启动外部 target_manager，默认启动
   --use-sim-time                      给 headless 和外部 target_manager 使用 sim time
+  --auto-source / --no-auto-source    是否自动 source ROS/control/local setup，默认开启
+  --setup-file <path>                 追加一个 setup.bash，可重复
+  --clear-setup-files                 清空默认 setup 列表，配合 --setup-file 使用
   --tile / --no-tile                  覆盖 YOLO tiled 推理
   --devices <left,right>              覆盖双目设备
   --param <name:=value>               透传 ROS 参数，可重复
 
 说明:
-  运行前需要先 source ROS 和包含 target_msgs/target_manager 的控制工作区，再 source 本仓库 install。
+  运行阶段默认自动 source ROS、控制工作区和本仓库 install；构建阶段仍需 source 后 colcon build。
+  默认 setup 可用 ROS_SETUP、TENNISBOT_CONTROL_SETUP、TENNISBOT_LOCAL_SETUP 环境变量覆盖。
   日志目录包含 session.json、left.mp4、right.mp4、frames.ndjson、chassis.ndjson、
   detections.ndjson、observations.ndjson、targets.ndjson 和 events.ndjson。
 `);

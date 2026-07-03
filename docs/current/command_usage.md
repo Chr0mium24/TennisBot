@@ -43,7 +43,9 @@ ros2 launch tennisbot_headless_vision headless_vision.launch.py
 ros2 launch target_manager target_manager.launch.py
 ```
 
-也可以用 Bun 主链路入口同时启动 headless 和外部 target manager：
+也可以用 Bun 主链路入口同时启动 headless 和外部 target manager。运行阶段
+Bun 默认会在子进程里自动 source ROS、控制工作区和本仓库
+`install/setup.bash`，所以启动主链路时不需要在当前终端手动 source：
 
 ```bash
 bun scripts/headless.ts run
@@ -51,6 +53,9 @@ bun scripts/headless.ts run --record --session test01 --tile
 bun scripts/headless.ts task --task-id 42 --session catch42 --tile
 bun scripts/headless.ts run --dry-run --record --devices /dev/video0,/dev/video2
 ```
+
+如果要手动执行 `ros2 topic list`、`ros2 node list` 这类诊断命令，当前终端
+仍然需要按上面的顺序 source；Bun 的自动 source 只作用于它启动的子进程。
 
 `run --record` 和 `task` 会默认写入 `runs/headless/<session>/`：
 

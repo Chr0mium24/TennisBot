@@ -41,7 +41,9 @@ ros2 launch tennisbot_headless_vision headless_vision.launch.py
 ros2 launch target_manager target_manager.launch.py
 ```
 
-Or use the Bun runtime launcher:
+Or use the Bun runtime launcher. It auto-sources ROS, the control workspace,
+and this repository's `install/setup.bash` before starting ROS child
+processes:
 
 ```bash
 bun scripts/headless.ts run
