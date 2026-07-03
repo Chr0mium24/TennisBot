@@ -42,6 +42,9 @@ def test_extract_sprites_and_copy_paste_augment(tmp_path: Path) -> None:
     cv2.imwrite(str(image_dir / "background.jpg"), background)
     (label_dir / "background.txt").write_text("", encoding="utf-8")
 
+    unlabeled_background = np.full((80, 120, 3), 120, dtype=np.uint8)
+    cv2.imwrite(str(image_dir / "unlabeled.jpg"), unlabeled_background)
+
     sprites_root = tmp_path / "sprites"
     result = extract_sprites(
         images_root=images_root,
@@ -83,7 +86,18 @@ jpeg_quality = 90
 [selection]
 allow_labeled_backgrounds = true
 prefer_negative_backgrounds = true
+require_label_file_backgrounds = true
 paste_per_image = [1, 1]
+
+[negative_augmentation]
+count = 1
+
+[originals]
+include = true
+
+[split]
+val_ratio = 0.2
+seed = 7
 
 [background]
 brightness = [0, 0]
@@ -113,13 +127,17 @@ avoid_existing_iou = 0.0
 
     aug_result = copy_paste_augment(config)
 
-    assert aug_result.generated == 2
+    assert aug_result.generated == 3
     assert (output_root / "data.yaml").is_file()
     assert (output_root / "report.md").read_text(encoding="utf-8").startswith("# YOLO Copy-Paste")
     label_files = sorted((output_root / "labels").glob("*.txt"))
-    assert len(label_files) == 2
+    assert len(label_files) == 3
+    assert sum(1 for label_path in label_files if not label_path.read_text(encoding="utf-8").strip()) == 1
     for label_path in label_files:
-        payload = label_path.read_text(encoding="utf-8").strip().split()
+        text = label_path.read_text(encoding="utf-8").strip()
+        if not text:
+            continue
+        payload = text.split()
         assert payload[0] == "0"
         values = [float(value) for value in payload[1:]]
         assert all(0.0 <= value <= 1.0 for value in values)
@@ -128,7 +146,15 @@ avoid_existing_iou = 0.0
         for line in (output_root / "manifest.jsonl").read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
-    assert len(manifest_rows) == 2
+    assert len(manifest_rows) == 3
+    assert {row["kind"] for row in manifest_rows} == {"copy_paste", "negative_augmentation"}
+    assert all(row["source_background"] != "cam1/unlabeled.jpg" for row in manifest_rows)
+    train_rows = [line for line in (output_root / "train.txt").read_text(encoding="utf-8").splitlines() if line]
+    val_rows = [line for line in (output_root / "val.txt").read_text(encoding="utf-8").splitlines() if line]
+    assert len(train_rows) + len(val_rows) == 5
+    assert any(line.endswith("ball.jpg") for line in train_rows + val_rows)
+    assert any(line.endswith("background.jpg") for line in train_rows + val_rows)
+    assert all(not line.endswith("unlabeled.jpg") for line in train_rows + val_rows)
     assert (label_dir / "background.txt").read_text(encoding="utf-8") == ""
 
 

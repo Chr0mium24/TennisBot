@@ -34,6 +34,7 @@ class BackgroundRecord:
     image_rel_path: str
     image_path: Path
     label_path: Path
+    has_label_file: bool
     labels: list[str]
     boxes: list[PixelBox]
     is_negative: bool
@@ -128,7 +129,18 @@ def resolve_config(config_path: Path) -> dict[str, Any]:
         "selection": {
             "allow_labeled_backgrounds": _section_bool(config, "selection", "allow_labeled_backgrounds", True),
             "prefer_negative_backgrounds": _section_bool(config, "selection", "prefer_negative_backgrounds", True),
+            "require_label_file_backgrounds": _section_bool(config, "selection", "require_label_file_backgrounds", False),
             "paste_per_image": _int_range(config, "selection", "paste_per_image", (1, 1)),
+        },
+        "negative_augmentation": {
+            "count": _section_int(config, "negative_augmentation", "count", 0),
+        },
+        "originals": {
+            "include": _section_bool(config, "originals", "include", False),
+        },
+        "split": {
+            "val_ratio": _section_float(config, "split", "val_ratio", 0.0),
+            "seed": _section_int(config, "split", "seed", _section_int(config, "output", "seed", 42)),
         },
         "background": {
             "brightness": _int_range(config, "background", "brightness", (-25, 25)),
@@ -156,6 +168,10 @@ def resolve_config(config_path: Path) -> dict[str, Any]:
     }
     if resolved["output"]["count"] < 1:
         raise ValueError("output.count must be >= 1")
+    if resolved["negative_augmentation"]["count"] < 0:
+        raise ValueError("negative_augmentation.count must be >= 0")
+    if not 0.0 <= resolved["split"]["val_ratio"] < 0.5:
+        raise ValueError("split.val_ratio must be >= 0 and < 0.5")
     return resolved
 
 
@@ -168,17 +184,20 @@ def collect_backgrounds(resolved: dict[str, Any]) -> list[BackgroundRecord]:
     for rel_path in iter_image_paths(images_root):
         if rel_path in excluded:
             continue
+        label_path = label_path_for_image(labels_root, rel_path)
+        has_label_file = label_path.is_file()
+        if resolved["selection"]["require_label_file_backgrounds"] and not has_label_file:
+            continue
+        label_text = label_path.read_text(encoding="utf-8") if has_label_file else ""
+        label_lines = [line for line in label_text.splitlines() if line.strip()]
+        if label_lines and not resolved["selection"]["allow_labeled_backgrounds"]:
+            continue
         image_path = safe_relative_path(images_root, rel_path, IMAGE_SUFFIXES)
         image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
         if image is None:
             continue
         image_height, image_width = image.shape[:2]
-        label_path = label_path_for_image(labels_root, rel_path)
-        label_text = label_path.read_text(encoding="utf-8") if label_path.is_file() else ""
-        label_lines = [line for line in label_text.splitlines() if line.strip()]
         parsed_labels = read_yolo_labels(label_path)
-        if label_lines and not resolved["selection"]["allow_labeled_backgrounds"]:
-            continue
         pixel_labels = [
             PixelLabel(label.class_id, yolo_to_pixel_box(label, image_width, image_height))
             for label in parsed_labels
@@ -188,6 +207,7 @@ def collect_backgrounds(resolved: dict[str, Any]) -> list[BackgroundRecord]:
                 image_rel_path=rel_path,
                 image_path=image_path,
                 label_path=label_path,
+                has_label_file=has_label_file,
                 labels=label_lines,
                 boxes=[label.box for label in pixel_labels],
                 is_negative=len(label_lines) == 0,
@@ -229,6 +249,33 @@ def odd_kernel(value: int) -> int:
 def adjust_brightness_contrast(image: Any, alpha: float, beta: int) -> Any:
     cv2, _ = require_cv2_numpy()
     return cv2.convertScaleAbs(image, alpha=float(alpha), beta=int(beta))
+
+
+def augment_background_frame(background: Any, resolved: dict[str, Any], rng: random.Random) -> Any:
+    cv2, _ = require_cv2_numpy()
+    background = adjust_brightness_contrast(
+        background,
+        random_range(rng, resolved["background"]["contrast"]),
+        random_int_range(rng, resolved["background"]["brightness"]),
+    )
+    if rng.random() < resolved["background"]["blur_probability"]:
+        kernel = odd_kernel(random_int_range(rng, resolved["background"]["blur_kernel"]))
+        background = cv2.GaussianBlur(background, (kernel, kernel), 0)
+    return background
+
+
+def maybe_rotate_frame(
+    frame: Any,
+    labels: list[PixelLabel],
+    resolved: dict[str, Any],
+    rng: random.Random,
+) -> tuple[Any, list[PixelLabel], float]:
+    degrees = 0.0
+    if rng.random() < resolved["frame"]["rotate_probability"]:
+        degrees = random_range(rng, resolved["frame"]["rotate_degrees"])
+        if abs(degrees) > 1e-6:
+            frame, labels = rotate_frame_and_labels(frame, labels, degrees)
+    return frame, labels, degrees
 
 
 def transform_sprite(sprite: Any, resolved: dict[str, Any], rng: random.Random, *, allow_rotation: bool) -> Any:
@@ -448,6 +495,55 @@ def write_data_yaml(output_root: Path, train_txt: Path, val_txt: Path) -> None:
     (output_root / "data.yaml").write_text(text, encoding="utf-8")
 
 
+def collect_labeled_original_images(resolved: dict[str, Any]) -> list[str]:
+    images_root = Path(resolved["inputs"]["images_root"]).resolve()
+    labels_root = Path(resolved["inputs"]["labels_root"]).resolve()
+    excluded = read_excluded_paths(Path(resolved["inputs"]["excluded_file"]))
+    images: list[str] = []
+    for rel_path in iter_image_paths(images_root):
+        if rel_path in excluded:
+            continue
+        label_path = label_path_for_image(labels_root, rel_path)
+        if not label_path.is_file():
+            continue
+        image_path = safe_relative_path(images_root, rel_path, IMAGE_SUFFIXES)
+        images.append(image_path.resolve().as_posix())
+    return images
+
+
+def write_augmented_sample(
+    image: Any,
+    labels: list[PixelLabel],
+    image_path: Path,
+    label_path: Path,
+    *,
+    jpeg_quality: int,
+) -> None:
+    cv2, _ = require_cv2_numpy()
+    image_height, image_width = image.shape[:2]
+    image_path.parent.mkdir(parents=True, exist_ok=True)
+    label_path.parent.mkdir(parents=True, exist_ok=True)
+    params: list[int] = []
+    if image_path.suffix.lower() in {".jpg", ".jpeg"}:
+        params = [int(cv2.IMWRITE_JPEG_QUALITY), int(jpeg_quality)]
+    if not cv2.imwrite(str(image_path), image, params):
+        raise RuntimeError(f"could not write generated image: {image_path}")
+    output_labels = [
+        format_yolo_box(pixel_to_yolo_box(label.box, image_width, image_height, class_id=label.class_id))
+        for label in labels
+    ]
+    label_path.write_text("\n".join(output_labels) + ("\n" if output_labels else ""), encoding="utf-8")
+
+
+def split_images(images: list[str], val_ratio: float, seed: int) -> tuple[list[str], list[str]]:
+    if not images or val_ratio <= 0.0 or len(images) < 2:
+        return images, []
+    shuffled = list(images)
+    random.Random(seed).shuffle(shuffled)
+    val_count = max(1, round(len(shuffled) * val_ratio))
+    return shuffled[:-val_count], shuffled[-val_count:]
+
+
 def copy_paste_augment(config_path: Path = DEFAULT_AUGMENT_CONFIG) -> AugmentationResult:
     cv2, _ = require_cv2_numpy()
     resolved = resolve_config(config_path)
@@ -474,23 +570,16 @@ def copy_paste_augment(config_path: Path = DEFAULT_AUGMENT_CONFIG) -> Augmentati
     train_txt = output_root / "train.txt"
     val_txt = output_root / "val.txt"
     manifest_rows: list[dict[str, Any]] = []
-    train_images: list[str] = []
+    split_candidates: list[str] = []
     skipped = 0
-    generated = 0
+    generated_positive = 0
     for index in range(resolved["output"]["count"]):
         background_record = rng.choice(preferred_backgrounds)
         background = cv2.imread(str(background_record.image_path), cv2.IMREAD_COLOR)
         if background is None:
             skipped += 1
             continue
-        background = adjust_brightness_contrast(
-            background,
-            random_range(rng, resolved["background"]["contrast"]),
-            random_int_range(rng, resolved["background"]["brightness"]),
-        )
-        if rng.random() < resolved["background"]["blur_probability"]:
-            kernel = odd_kernel(random_int_range(rng, resolved["background"]["blur_kernel"]))
-            background = cv2.GaussianBlur(background, (kernel, kernel), 0)
+        background = augment_background_frame(background, resolved, rng)
 
         image_height, image_width = background.shape[:2]
         output_pixel_labels = labels_from_yolo_lines(background_record.labels, image_width, image_height)
@@ -545,35 +634,24 @@ def copy_paste_augment(config_path: Path = DEFAULT_AUGMENT_CONFIG) -> Augmentati
             skipped += 1
             continue
 
-        frame_rotation_degrees = 0.0
-        if rng.random() < resolved["frame"]["rotate_probability"]:
-            frame_rotation_degrees = random_range(rng, resolved["frame"]["rotate_degrees"])
-            if abs(frame_rotation_degrees) > 1e-6:
-                background, output_pixel_labels = rotate_frame_and_labels(
-                    background,
-                    output_pixel_labels,
-                    frame_rotation_degrees,
-                )
-                image_height, image_width = background.shape[:2]
+        background, output_pixel_labels, frame_rotation_degrees = maybe_rotate_frame(background, output_pixel_labels, resolved, rng)
 
         suffix = ".jpg" if resolved["output"]["image_format"] in {"jpg", "jpeg"} else ".png"
-        output_stem = f"aug_{generated:06d}"
+        output_stem = f"aug_{generated_positive:06d}"
         output_image = images_dir / f"{output_stem}{suffix}"
         output_label = labels_dir / f"{output_stem}.txt"
-        params: list[int] = []
-        if suffix == ".jpg":
-            params = [int(cv2.IMWRITE_JPEG_QUALITY), int(resolved["output"]["jpeg_quality"])]
-        if not cv2.imwrite(str(output_image), background, params):
-            raise RuntimeError(f"could not write generated image: {output_image}")
-        output_labels = [
-            format_yolo_box(pixel_to_yolo_box(label.box, image_width, image_height, class_id=label.class_id))
-            for label in output_pixel_labels
-        ]
-        output_label.write_text("\n".join(output_labels) + "\n", encoding="utf-8")
-        train_images.append(output_image.resolve().as_posix())
+        write_augmented_sample(
+            background,
+            output_pixel_labels,
+            output_image,
+            output_label,
+            jpeg_quality=resolved["output"]["jpeg_quality"],
+        )
+        split_candidates.append(output_image.resolve().as_posix())
         manifest_rows.append(
             {
-                "index": generated,
+                "kind": "copy_paste",
+                "index": generated_positive,
                 "source_background": background_record.image_rel_path,
                 "source_label": background_record.label_path.as_posix(),
                 "output_image": output_image.as_posix(),
@@ -582,31 +660,84 @@ def copy_paste_augment(config_path: Path = DEFAULT_AUGMENT_CONFIG) -> Augmentati
                 "pasted": pasted,
             }
         )
-        generated += 1
+        generated_positive += 1
+
+    generated_negative = 0
+    requested_negatives = resolved["negative_augmentation"]["count"]
+    if requested_negatives:
+        if not negative_backgrounds:
+            raise RuntimeError("negative_augmentation.count is set but no labeled negative backgrounds were found")
+        suffix = ".jpg" if resolved["output"]["image_format"] in {"jpg", "jpeg"} else ".png"
+        for _ in range(requested_negatives):
+            background_record = rng.choice(negative_backgrounds)
+            background = cv2.imread(str(background_record.image_path), cv2.IMREAD_COLOR)
+            if background is None:
+                skipped += 1
+                continue
+            background = augment_background_frame(background, resolved, rng)
+            output_pixel_labels: list[PixelLabel] = []
+            background, output_pixel_labels, frame_rotation_degrees = maybe_rotate_frame(background, output_pixel_labels, resolved, rng)
+            output_stem = f"neg_{generated_negative:06d}"
+            output_image = images_dir / f"{output_stem}{suffix}"
+            output_label = labels_dir / f"{output_stem}.txt"
+            write_augmented_sample(
+                background,
+                output_pixel_labels,
+                output_image,
+                output_label,
+                jpeg_quality=resolved["output"]["jpeg_quality"],
+            )
+            split_candidates.append(output_image.resolve().as_posix())
+            manifest_rows.append(
+                {
+                    "kind": "negative_augmentation",
+                    "index": generated_negative,
+                    "source_background": background_record.image_rel_path,
+                    "source_label": background_record.label_path.as_posix(),
+                    "output_image": output_image.as_posix(),
+                    "output_label": output_label.as_posix(),
+                    "frame_rotation_degrees": frame_rotation_degrees,
+                    "pasted": [],
+                }
+            )
+            generated_negative += 1
+
+    original_images = collect_labeled_original_images(resolved) if resolved["originals"]["include"] else []
+    train_images, val_images = split_images(
+        split_candidates + original_images,
+        resolved["split"]["val_ratio"],
+        resolved["split"]["seed"],
+    )
 
     manifest_path.write_text("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in manifest_rows), encoding="utf-8")
     train_txt.write_text("\n".join(train_images) + ("\n" if train_images else ""), encoding="utf-8")
-    val_txt.write_text("", encoding="utf-8")
+    val_txt.write_text("\n".join(val_images) + ("\n" if val_images else ""), encoding="utf-8")
     write_data_yaml(output_root, train_txt, val_txt)
     write_resolved_config(output_root / "config.resolved.toml", resolved)
     report_path = output_root / "report.md"
+    generated_total = generated_positive + generated_negative
     report_path.write_text(
         "\n".join(
             [
                 "# YOLO Copy-Paste Augmentation Report",
                 "",
-                f"- Generated images: {generated}",
+                f"- Generated images: {generated_total}",
+                f"- Generated copy-paste positives: {generated_positive}",
+                f"- Generated augmented negatives: {generated_negative}",
+                f"- Original labeled images in split: {len(original_images)}",
+                f"- Train images: {len(train_images)}",
+                f"- Validation images: {len(val_images)}",
                 f"- Skipped samples/events: {skipped}",
                 f"- Backgrounds: {len(backgrounds)}",
                 f"- Negative backgrounds: {len(negative_backgrounds)}",
                 f"- Approved sprites: {len(sprites)}",
-                "- Synthetic validation images: 0",
+                f"- Require label file backgrounds: {resolved['selection']['require_label_file_backgrounds']}",
                 "",
             ]
         ),
         encoding="utf-8",
     )
-    return AugmentationResult(output_root=output_root, generated=generated, skipped=skipped, manifest=manifest_path, report=report_path)
+    return AugmentationResult(output_root=output_root, generated=generated_total, skipped=skipped, manifest=manifest_path, report=report_path)
 
 
 def cmd_copy_paste(args: argparse.Namespace) -> int:
