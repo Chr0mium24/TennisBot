@@ -310,9 +310,9 @@ uv run tennisbot-yolo annotate
 
 默认值：
 
-- 图片目录：`tools/yolo/yolo/dataset/images`
-- 标签目录：`tools/yolo/yolo/dataset/labels`
-- 排除列表：`tools/yolo/yolo/dataset/excluded_images.txt`
+- 图片目录：`tools/yolo/workspace/dataset/images`
+- 标签目录：`tools/yolo/workspace/dataset/labels`
+- 排除列表：`tools/yolo/workspace/dataset/excluded_images.txt`
 - 地址：`127.0.0.1:8765`
 
 指定端口：

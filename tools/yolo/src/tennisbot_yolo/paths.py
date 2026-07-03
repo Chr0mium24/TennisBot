@@ -1,0 +1,15 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+
+TOOL_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = TOOL_ROOT.parents[1]
+
+DEFAULT_WORKSPACE_ROOT = TOOL_ROOT / "workspace"
+DEFAULT_DATASET_ROOT = DEFAULT_WORKSPACE_ROOT / "dataset"
+DEFAULT_IMAGES_ROOT = DEFAULT_DATASET_ROOT / "images"
+DEFAULT_LABELS_ROOT = DEFAULT_DATASET_ROOT / "labels"
+DEFAULT_EXCLUDED_FILE = DEFAULT_DATASET_ROOT / "excluded_images.txt"
+DEFAULT_RUNS_ROOT = DEFAULT_WORKSPACE_ROOT / "runs"
+DEFAULT_SPRITES_ROOT = DEFAULT_RUNS_ROOT / "sprites"

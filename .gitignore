@@ -24,4 +24,4 @@ artifacts/calibration/*
 !artifacts/calibration/stereo_cam1_cam2/
 !artifacts/calibration/stereo_cam1_cam2/**
 desperate/
-tools/yolo/dataset/
+tools/yolo/workspace/dataset/

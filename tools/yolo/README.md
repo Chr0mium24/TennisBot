@@ -51,9 +51,9 @@ uv run tennisbot-yolo annotate
 
 默认值：
 
-- `--images-root tools/yolo/yolo/dataset/images`
-- `--labels-root tools/yolo/yolo/dataset/labels`
-- `--excluded-file tools/yolo/yolo/dataset/excluded_images.txt`
+- `--images-root tools/yolo/workspace/dataset/images`
+- `--labels-root tools/yolo/workspace/dataset/labels`
+- `--excluded-file tools/yolo/workspace/dataset/excluded_images.txt`
 - `--host 127.0.0.1`
 - `--port 8765`
 
@@ -82,10 +82,10 @@ uv run --extra augment tennisbot-yolo sprites extract
 
 默认值：
 
-- `--images-root tools/yolo/yolo/dataset/images`
-- `--labels-root tools/yolo/yolo/dataset/labels`
-- `--excluded-file tools/yolo/yolo/dataset/excluded_images.txt`
-- `--output-root tools/yolo/yolo/runs/sprites`
+- `--images-root tools/yolo/workspace/dataset/images`
+- `--labels-root tools/yolo/workspace/dataset/labels`
+- `--excluded-file tools/yolo/workspace/dataset/excluded_images.txt`
+- `--output-root tools/yolo/workspace/runs/sprites`
 
 打开审核页面：
 
@@ -99,8 +99,8 @@ bun scripts/yolo.ts sprites review
 http://127.0.0.1:8766
 ```
 
-审核通过的 sprite 会复制到 `tools/yolo/yolo/runs/sprites/approved/`，
-拒绝的 sprite 会复制到 `tools/yolo/yolo/runs/sprites/rejected/`。
+审核通过的 sprite 会复制到 `tools/yolo/workspace/runs/sprites/approved/`，
+拒绝的 sprite 会复制到 `tools/yolo/workspace/runs/sprites/rejected/`。
 
 ## Copy-Paste 数据增强
 
@@ -118,10 +118,10 @@ uv run --extra augment tennisbot-yolo augment copy-paste
 
 默认输出：
 
-- `tools/yolo/yolo/runs/copy_paste_aug/images`
-- `tools/yolo/yolo/runs/copy_paste_aug/labels`
-- `tools/yolo/yolo/runs/copy_paste_aug/manifest.jsonl`
-- `tools/yolo/yolo/runs/copy_paste_aug/report.md`
+- `tools/yolo/workspace/runs/copy_paste_aug/images`
+- `tools/yolo/workspace/runs/copy_paste_aug/labels`
+- `tools/yolo/workspace/runs/copy_paste_aug/manifest.jsonl`
+- `tools/yolo/workspace/runs/copy_paste_aug/report.md`
 
 这个命令不会改写原始背景图；生成出的增强图可以按配置做轻微整图旋转来
 模拟摄像头抖动。整图旋转后，已有 bbox 和新贴球 bbox 都会用四角变换

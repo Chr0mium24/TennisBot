@@ -2,12 +2,12 @@
 pipeline = "copy_paste"
 
 [inputs]
-dataset_root = "tools/yolo/yolo/dataset"
-sprites_root = "tools/yolo/yolo/runs/sprites/approved"
-excluded_file = "tools/yolo/yolo/dataset/excluded_images.txt"
+dataset_root = "tools/yolo/workspace/dataset"
+sprites_root = "tools/yolo/workspace/runs/sprites/approved"
+excluded_file = "tools/yolo/workspace/dataset/excluded_images.txt"
 
 [output]
-root = "tools/yolo/yolo/runs/copy_paste_aug"
+root = "tools/yolo/workspace/runs/copy_paste_aug"
 count = 1000
 seed = 42
 image_format = "jpg"

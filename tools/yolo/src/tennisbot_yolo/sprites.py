@@ -24,14 +24,9 @@ from .dataset import (
     yolo_to_pixel_box,
 )
 from .io import write_json
+from .paths import DEFAULT_DATASET_ROOT, DEFAULT_EXCLUDED_FILE, DEFAULT_IMAGES_ROOT, DEFAULT_LABELS_ROOT, DEFAULT_SPRITES_ROOT, TOOL_ROOT
 
 
-TOOL_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_DATASET_ROOT = TOOL_ROOT / "yolo" / "dataset"
-DEFAULT_IMAGES_ROOT = DEFAULT_DATASET_ROOT / "images"
-DEFAULT_LABELS_ROOT = DEFAULT_DATASET_ROOT / "labels"
-DEFAULT_EXCLUDED_FILE = DEFAULT_DATASET_ROOT / "excluded_images.txt"
-DEFAULT_SPRITES_ROOT = TOOL_ROOT / "yolo" / "runs" / "sprites"
 DEFAULT_REVIEW_INDEX = TOOL_ROOT / "web" / "yolo-sprite-review" / "index.html"
 SAFE_ID_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 

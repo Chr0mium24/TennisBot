@@ -13,7 +13,7 @@
 - 抠球审核页只编辑 ellipse/alpha mask，不改原始 bbox label。
 - `sprites extract` 默认不会覆盖已编辑候选，只有加 `--overwrite` 才会重写。
 - `approved/` 和 `rejected/` 目录不会被 `sprites extract` 修改。
-- 增强输出写到 `tools/yolo/yolo/runs/`，不覆盖原始图片和标签。
+- 增强输出写到 `tools/yolo/workspace/runs/`，不覆盖原始图片和标签。
 - 原始数据文件不被改写；生成增强图时可以对整张输出图做轻微旋转，并会重算全部 bbox。
 - 增强输出仍然使用普通水平 YOLO bbox，不写旋转框。
 
@@ -76,8 +76,8 @@ bun scripts/yolo.ts sprites extract \
 默认输出：
 
 ```text
-tools/yolo/yolo/runs/sprites/candidates/
-tools/yolo/yolo/runs/sprites/manifest.jsonl
+tools/yolo/workspace/runs/sprites/candidates/
+tools/yolo/workspace/runs/sprites/manifest.jsonl
 ```
 
 不要加 `--overwrite`，这样已经生成并编辑过的候选不会被重写。
@@ -113,13 +113,13 @@ http://<机器IP>:8766
 审核通过输出：
 
 ```text
-tools/yolo/yolo/runs/sprites/approved/
+tools/yolo/workspace/runs/sprites/approved/
 ```
 
 拒绝输出：
 
 ```text
-tools/yolo/yolo/runs/sprites/rejected/
+tools/yolo/workspace/runs/sprites/rejected/
 ```
 
 ### 4. 准备 0260701 的增强配置
@@ -127,26 +127,26 @@ tools/yolo/yolo/runs/sprites/rejected/
 默认配置 `tools/yolo/configs/augmentation.toml` 面向默认 dataset：
 
 ```text
-tools/yolo/yolo/dataset
+tools/yolo/workspace/dataset
 ```
 
 如果要对 `0260701` 直接做增强，建议把临时配置放到 ignored 的 runs 目录：
 
 ```bash
-mkdir -p tools/yolo/yolo/runs
-cp tools/yolo/configs/augmentation.toml tools/yolo/yolo/runs/augmentation.0260701.toml
+mkdir -p tools/yolo/workspace/runs
+cp tools/yolo/configs/augmentation.toml tools/yolo/workspace/runs/augmentation.0260701.toml
 ```
 
-把 `tools/yolo/yolo/runs/augmentation.0260701.toml` 里的输入和输出改成：
+把 `tools/yolo/workspace/runs/augmentation.0260701.toml` 里的输入和输出改成：
 
 ```toml
 [inputs]
 dataset_root = "tools/yolo/0260701"
-sprites_root = "tools/yolo/yolo/runs/sprites/approved"
+sprites_root = "tools/yolo/workspace/runs/sprites/approved"
 excluded_file = "tools/yolo/0260701/excluded_images.txt"
 
 [output]
-root = "tools/yolo/yolo/runs/copy_paste_aug_0260701"
+root = "tools/yolo/workspace/runs/copy_paste_aug_0260701"
 count = 1000
 seed = 42
 image_format = "jpg"
@@ -183,13 +183,13 @@ rotate_degrees = [-180, 180]
 
 ```bash
 bun scripts/yolo.ts augment copy-paste \
-  --config tools/yolo/yolo/runs/augmentation.0260701.toml
+  --config tools/yolo/workspace/runs/augmentation.0260701.toml
 ```
 
 输出目录：
 
 ```text
-tools/yolo/yolo/runs/copy_paste_aug_0260701/
+tools/yolo/workspace/runs/copy_paste_aug_0260701/
   data.yaml
   train.txt
   val.txt
@@ -225,24 +225,24 @@ find tools/yolo/0260701/labels -type f -name '*.txt' \
 查看候选 sprite：
 
 ```bash
-find tools/yolo/yolo/runs/sprites/candidates -maxdepth 1 -type f | sort
+find tools/yolo/workspace/runs/sprites/candidates -maxdepth 1 -type f | sort
 ```
 
 查看审核通过 sprite：
 
 ```bash
-find tools/yolo/yolo/runs/sprites/approved -maxdepth 1 -type f | sort
+find tools/yolo/workspace/runs/sprites/approved -maxdepth 1 -type f | sort
 ```
 
 查看增强结果报告：
 
 ```bash
-sed -n '1,120p' tools/yolo/yolo/runs/copy_paste_aug_0260701/report.md
+sed -n '1,120p' tools/yolo/workspace/runs/copy_paste_aug_0260701/report.md
 ```
 
 ## 注意事项
 
 - `tools/yolo/0260701/` 是本地数据目录，当前未纳入 Git。
-- `tools/yolo/yolo/runs/` 是生成输出目录，已被 `tools/yolo/.gitignore` 忽略。
+- `tools/yolo/workspace/runs/` 是生成输出目录，已被 `tools/yolo/.gitignore` 忽略。
 - 不要把合成数据直接当验证集用；验证必须保留真实未增强样本。
 - 只有训练和验证实验完成后，才能声明模型效果提升。

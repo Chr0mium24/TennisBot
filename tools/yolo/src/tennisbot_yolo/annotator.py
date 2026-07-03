@@ -9,21 +9,24 @@ import re
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Iterable
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from .dataset import (
+    IMAGE_SUFFIXES,
+    iter_image_paths,
+    label_path_for_image,
+    normalize_dataset_rel_path,
+    read_excluded_paths,
+    safe_relative_path,
+)
+from .paths import DEFAULT_EXCLUDED_FILE, DEFAULT_IMAGES_ROOT, DEFAULT_LABELS_ROOT, TOOL_ROOT
 
-IMAGE_SUFFIXES = {".bmp", ".jpeg", ".jpg", ".png", ".webp"}
 FRAME_NAME_RE = re.compile(r"^(?P<video>.+)_(?P<camera>cam\d+)_frame_(?P<frame>\d+)$")
-REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_IMAGES_ROOT = REPO_ROOT / "yolo" / "dataset" / "images"
-DEFAULT_LABELS_ROOT = REPO_ROOT / "yolo" / "dataset" / "labels"
-DEFAULT_EXCLUDED_FILE = REPO_ROOT / "yolo" / "dataset" / "excluded_images.txt"
-DEFAULT_INDEX_FILE = REPO_ROOT / "web" / "yolo-annotator" / "index.html"
+DEFAULT_INDEX_FILE = TOOL_ROOT / "web" / "yolo-annotator" / "index.html"
 
 
 class LabelPayload(BaseModel):
@@ -45,17 +48,6 @@ class ImageRecord:
 LabelStatus = str
 
 
-def iter_image_paths(root: Path) -> list[str]:
-    if not root.exists():
-        return []
-    images = [
-        path.relative_to(root).as_posix()
-        for path in root.rglob("*")
-        if path.is_file() and not path.is_symlink() and path.suffix.lower() in IMAGE_SUFFIXES
-    ]
-    return sorted(images)
-
-
 def parse_image_path(image_path: str) -> ImageRecord:
     rel_path = PurePosixPath(image_path)
     match = FRAME_NAME_RE.match(rel_path.stem)
@@ -73,11 +65,6 @@ def parse_image_path(image_path: str) -> ImageRecord:
     return ImageRecord(path=image_path, video=video, camera=camera, frame=None)
 
 
-def label_path_for_image(labels_root: Path, image_path: str) -> Path:
-    label_rel = PurePosixPath(image_path).with_suffix(".txt")
-    return labels_root / Path(*label_rel.parts)
-
-
 def label_status_from_text(text: str) -> LabelStatus:
     return "ball" if text.strip() else "empty"
 
@@ -86,27 +73,6 @@ def label_status_for_path(path: Path) -> LabelStatus:
     if not path.is_file():
         return "unlabeled"
     return label_status_from_text(path.read_text(encoding="utf-8"))
-
-
-def normalize_dataset_rel_path(path: str) -> str:
-    if path.startswith(("/", "\\")):
-        raise ValueError("path must be relative")
-    parts = PurePosixPath(path).parts
-    if not parts or any(part in {"", ".", ".."} or "\x00" in part for part in parts):
-        raise ValueError("path contains an unsafe segment")
-    return PurePosixPath(*parts).as_posix()
-
-
-def read_excluded_paths(path: Path | None) -> set[str]:
-    if path is None or not path.is_file():
-        return set()
-    excluded: set[str] = set()
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#"):
-            continue
-        excluded.add(normalize_dataset_rel_path(line))
-    return excluded
 
 
 def write_excluded_paths(path: Path, excluded: set[str]) -> None:
@@ -199,26 +165,6 @@ def build_video_summaries(
                 stats["ball"] = int(stats["ball"]) + 1
                 video["ball"] = int(video["ball"]) + 1
     return [videos[key] for key in sorted(videos)]
-
-
-def safe_relative_path(root: Path, raw_path: str, allowed_suffixes: Iterable[str] | None = None) -> Path:
-    if raw_path.startswith(("/", "\\")):
-        raise ValueError("path must be relative")
-
-    parts = PurePosixPath(raw_path).parts
-    if not parts or any(part in {"", ".", ".."} or "\x00" in part for part in parts):
-        raise ValueError("path contains an unsafe segment")
-
-    root = root.resolve()
-    candidate = (root / Path(*parts)).resolve()
-    if candidate != root and root not in candidate.parents:
-        raise ValueError("path escapes the root directory")
-
-    suffixes = {suffix.lower() for suffix in allowed_suffixes or ()}
-    if suffixes and candidate.suffix.lower() not in suffixes:
-        raise ValueError(f"unsupported file suffix: {candidate.suffix}")
-
-    return candidate
 
 
 def atomic_write_text(path: Path, text: str) -> int:
@@ -356,6 +302,19 @@ def create_app(
     return app
 
 
+def serve_annotator(
+    *,
+    images_root: Path = DEFAULT_IMAGES_ROOT,
+    labels_root: Path = DEFAULT_LABELS_ROOT,
+    excluded_file: Path = DEFAULT_EXCLUDED_FILE,
+    index_file: Path = DEFAULT_INDEX_FILE,
+    host: str = "127.0.0.1",
+    port: int = 8765,
+) -> None:
+    app = create_app(images_root, labels_root, index_file, excluded_file)
+    uvicorn.run(app, host=host, port=port)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Serve the local YOLO annotation backend.")
     parser.add_argument("--images", type=Path, default=DEFAULT_IMAGES_ROOT, help="image root directory")
@@ -368,8 +327,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    app = create_app(args.images, args.labels, DEFAULT_INDEX_FILE, args.excluded)
-    uvicorn.run(app, host=args.host, port=args.port)
+    serve_annotator(images_root=args.images, labels_root=args.labels, excluded_file=args.excluded, host=args.host, port=args.port)
 
 
 if __name__ == "__main__":

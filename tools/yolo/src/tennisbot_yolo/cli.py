@@ -1,23 +1,18 @@
 from __future__ import annotations
 
 import argparse
-import subprocess
 import sys
 from pathlib import Path
 
+from .annotator import serve_annotator
 from .augmentation import add_augment_parser
 from .detect_gui import add_detect_gui_parser
 from .package import PackageVerificationError, create_model_package, verify_model_package
+from .paths import DEFAULT_EXCLUDED_FILE, DEFAULT_IMAGES_ROOT, DEFAULT_LABELS_ROOT, REPO_ROOT
 from .sprites import add_sprites_parser
 
 
-TOOL_ROOT = Path(__file__).resolve().parents[2]
-REPO_ROOT = TOOL_ROOT.parents[1]
-DEFAULT_IMAGES_ROOT = TOOL_ROOT / "yolo" / "dataset" / "images"
-DEFAULT_LABELS_ROOT = TOOL_ROOT / "yolo" / "dataset" / "labels"
-DEFAULT_EXCLUDED_FILE = TOOL_ROOT / "yolo" / "dataset" / "excluded_images.txt"
 DEFAULT_MODEL_PACKAGE = REPO_ROOT / "artifacts" / "models" / "tennis_ball_yolo"
-ANNOTATOR_SCRIPT = TOOL_ROOT / "yolo" / "scripts" / "serve_annotator.py"
 
 
 def resolve_cli_path(path: Path) -> Path:
@@ -25,21 +20,14 @@ def resolve_cli_path(path: Path) -> Path:
 
 
 def cmd_annotate(args: argparse.Namespace) -> int:
-    command = [
-        sys.executable,
-        str(ANNOTATOR_SCRIPT),
-        "--images",
-        str(resolve_cli_path(args.images_root)),
-        "--labels",
-        str(resolve_cli_path(args.labels_root)),
-        "--excluded",
-        str(resolve_cli_path(args.excluded_file)),
-        "--host",
-        args.host,
-        "--port",
-        str(args.port),
-    ]
-    return subprocess.call(command, cwd=TOOL_ROOT)
+    serve_annotator(
+        images_root=resolve_cli_path(args.images_root),
+        labels_root=resolve_cli_path(args.labels_root),
+        excluded_file=resolve_cli_path(args.excluded_file),
+        host=args.host,
+        port=args.port,
+    )
+    return 0
 
 
 def cmd_package_create(args: argparse.Namespace) -> int:

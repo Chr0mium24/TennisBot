@@ -21,12 +21,12 @@ from .dataset import (
     safe_relative_path,
     yolo_to_pixel_box,
 )
-from .sprites import TOOL_ROOT, require_cv2_numpy
+from .paths import DEFAULT_DATASET_ROOT, DEFAULT_RUNS_ROOT, DEFAULT_SPRITES_ROOT, REPO_ROOT, TOOL_ROOT
+from .sprites import require_cv2_numpy
 
 
 DEFAULT_AUGMENT_CONFIG = TOOL_ROOT / "configs" / "augmentation.toml"
-DEFAULT_OUTPUT_ROOT = TOOL_ROOT / "yolo" / "runs" / "copy_paste_aug"
-REPO_ROOT = TOOL_ROOT.parents[1]
+DEFAULT_OUTPUT_ROOT = DEFAULT_RUNS_ROOT / "copy_paste_aug"
 
 
 @dataclass(frozen=True)
@@ -108,14 +108,14 @@ def resolve_config(config_path: Path) -> dict[str, Any]:
     if pipeline != "copy_paste":
         raise ValueError(f"unsupported augmentation pipeline: {pipeline!r}")
 
-    dataset_root = _section_path(config, "inputs", "dataset_root", TOOL_ROOT / "yolo" / "dataset")
+    dataset_root = _section_path(config, "inputs", "dataset_root", DEFAULT_DATASET_ROOT)
     resolved = {
         "augmentation": {"pipeline": pipeline},
         "inputs": {
             "dataset_root": dataset_root,
             "images_root": dataset_root / "images",
             "labels_root": dataset_root / "labels",
-            "sprites_root": _section_path(config, "inputs", "sprites_root", TOOL_ROOT / "yolo" / "runs" / "sprites" / "approved"),
+            "sprites_root": _section_path(config, "inputs", "sprites_root", DEFAULT_SPRITES_ROOT / "approved"),
             "excluded_file": _section_path(config, "inputs", "excluded_file", dataset_root / "excluded_images.txt"),
         },
         "output": {

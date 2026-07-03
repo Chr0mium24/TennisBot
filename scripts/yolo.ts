@@ -79,15 +79,15 @@ function printUsage(): void {
   bun scripts/yolo.ts augment copy-paste [options]
 
 启动 YOLO 标注前端/后端。默认值:
-  图片目录   tools/yolo/yolo/dataset/images
-  标签目录   tools/yolo/yolo/dataset/labels
-  排除列表   tools/yolo/yolo/dataset/excluded_images.txt
+  图片目录   tools/yolo/workspace/dataset/images
+  标签目录   tools/yolo/workspace/dataset/labels
+  排除列表   tools/yolo/workspace/dataset/excluded_images.txt
   地址       http://127.0.0.1:8765
 
 常用命令:
   bun scripts/yolo.ts annotate
   bun scripts/yolo.ts annotate --port 8766
-  bun scripts/yolo.ts annotate --images-root tools/yolo/yolo/dataset/images --labels-root tools/yolo/yolo/dataset/labels
+  bun scripts/yolo.ts annotate --images-root tools/yolo/workspace/dataset/images --labels-root tools/yolo/workspace/dataset/labels
   bun scripts/yolo.ts sprites extract
   bun scripts/yolo.ts sprites review
   bun scripts/yolo.ts augment copy-paste --config tools/yolo/configs/augmentation.toml
