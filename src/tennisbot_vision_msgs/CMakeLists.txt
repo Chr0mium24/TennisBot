@@ -7,6 +7,7 @@ find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/ChassisPosition.msg"
+  "msg/ChassisPose.msg"
   "msg/TargetPrediction.msg"
   DEPENDENCIES builtin_interfaces
 )

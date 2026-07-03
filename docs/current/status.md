@@ -13,17 +13,18 @@ vision runtime. The main tracked paths are now:
 - `tools/stereo` for local 4K stereo YOLO coordinate display;
 - `packages/core` and `packages/contracts` for runtime algorithms and shared
   contracts;
-- `src` for ROS2 interface packages and the TennisBot vision adapter;
-- `apps/live3d` as a temporary/reference browser camera, YOLO, and 3D display
-  path, not the target real runtime.
+- `src` for ROS2 interface packages, the TennisBot vision adapter, and the
+  headless vision runtime.
 
 ## Ready Now
 
-The local launcher has reported the browser surface ready:
+The ROS package path now includes:
 
-```text
-ready  Live3D           http://127.0.0.1:5178/
-```
+- `tennisbot_vision_msgs/msg/ChassisPose` for timestamped `x/y/z/roll/pitch/yaw`;
+- `tennisbot_interface_adapter` forwarding `/robot/chassis_state` to
+  `/vision/chassis_pose`;
+- `tennisbot_headless_vision` consuming `/vision/chassis_pose` and real stereo
+  camera frames, then publishing `/vision/target_prediction`.
 
 The current quick camera-device tool is:
 
@@ -34,7 +35,7 @@ bun scripts/calib.ts preview
 ```
 
 It prints average brightness for two USB cameras and can open a live preview
-with shutter and brightness controls before calibration or Live3D runs.
+with shutter and brightness controls before calibration or headless vision runs.
 
 ## Important Gaps
 
@@ -51,22 +52,16 @@ baseline_m=0.1650
 `tools/calibration` now mainlines the capture GUI, ChArUco mono solve, ChArUco
 stereo solve, and runtime calibration package export.
 
-Live3D loads stereo calibration artifacts, but it does not know the camera rig's
-pose relative to the tennis court. Current 3D output is camera-frame geometry,
-not court coordinates.
-
 The target real runtime is documented in
-[Headless ROS Vision Runtime Target](headless_ros_vision_runtime.md). The main
+[Headless ROS Vision Runtime Target](headless_ros_vision_runtime.md). The
+implemented code path still needs hardware or ROS/Gazebo validation. The main
 remaining gaps are:
 
-- add a headless ROS vision node;
-- consume chassis pose with at least `x`, `y`, `yaw`, and `stamp`;
-- configure fixed chassis-to-camera extrinsics;
+- measure and configure fixed chassis-to-camera extrinsics;
 - use ROS clock for image capture stamps and chassis pose timestamps;
-- transform observations into field/interface coordinates before trajectory
-  fitting;
-- publish `/vision/target_prediction` and verify the adapter chain to
-  `/target/raw` and `/target/managed`.
+- verify real camera observations transform into field/interface coordinates
+  before trajectory fitting;
+- verify the adapter chain to `/target/raw` and `/target/managed`.
 
 ## Next Commands
 
@@ -115,12 +110,23 @@ bun scripts/calib.ts mono cam2
 bun scripts/calib.ts stereo
 ```
 
-Start or check Live3D:
+Build and run the headless ROS chain:
 
 ```bash
-bun scripts/live3d.ts
-bun scripts/live3d.ts --status
+source /opt/ros/humble/setup.bash
+colcon build --base-paths src --packages-select \
+  target_msgs target_manager tennisbot_vision_msgs \
+  tennisbot_interface_adapter tennisbot_headless_vision
+source install/setup.bash
+ros2 launch tennisbot_interface_adapter interface_adapter.launch.py
+ros2 launch tennisbot_headless_vision headless_vision.launch.py
 ```
 
-Open Live3D and observe the browser readiness gates through camera startup,
-left/right detections, stereo 3D point, and prediction curve.
+Inspect runtime topics:
+
+```bash
+ros2 topic list -t
+ros2 topic hz /vision/chassis_pose
+ros2 topic hz /vision/target_prediction
+ros2 topic echo /target/raw
+```

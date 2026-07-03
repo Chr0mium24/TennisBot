@@ -5,24 +5,21 @@ Date: 2026-07-03
 ## Current Shape
 
 TennisBot is a local-machine-first workspace. The active tracked code lives in
-top-level `apps/`, `packages/`, `scripts/`, `src/`, and `tools/`.
+top-level `packages/`, `scripts/`, `src/`, and `tools/`.
 
 ```text
 TennisBot/
-  apps/
-    live3d/          browser USB stereo camera runtime, temporary/reference UI
   packages/
     contracts/       shared TypeScript data contracts
     core/            artifact loaders, stereo pairing, triangulation, prediction
   src/
     interface/       imported ROS2 target interface packages
-    tennisbot_*      repository-owned ROS2 vision interface adapter packages
+    tennisbot_*      repository-owned ROS2 vision messages, adapter, runtime
   tools/
     calibration/     fixed DFOptix ChArUco OpenCV capture GUI
     yolo/            annotation, YOLO package, pure detection GUI
     stereo/          raw stereo recorder and local stereo coordinate GUI
   scripts/
-    live3d.ts        single root launcher/status check for Live3D
     yolo.ts          root launcher for the YOLO annotation frontend/backend
     stereo.ts        root launcher for stereo record/preview/replay
   artifacts/         ignored local runtime artifacts
@@ -76,7 +73,7 @@ The annotation and model-package paths use the default `uv sync` environment and
 do not require Torch, CUDA, or Ultralytics. `detect-gui` is isolated behind the
 optional `detect` extra.
 
-It does not own stereo geometry, calibration, camera/world transforms, Live3D
+It does not own stereo geometry, calibration, camera/world transforms, runtime
 state, or trajectory prediction.
 
 Current commands:
@@ -135,38 +132,25 @@ Owns tracked ROS2 interface integration:
   target predictions before planner/state-machine consumption;
 - `src/tennisbot_vision_msgs`: repository-owned vision-side ROS messages;
 - `src/tennisbot_interface_adapter`: event-driven bridge between vision-side
-  topics and the imported external interface.
+  topics and the imported external interface;
+- `src/tennisbot_headless_vision`: headless ROS stereo vision runtime that
+  consumes camera frames plus chassis pose and publishes
+  `/vision/target_prediction`.
 
-The nominal vision target and chassis-position paths are 30 Hz. The managed
-target output remains at most 10 Hz by design.
+The nominal vision target, chassis-position, and chassis-pose paths are 30 Hz.
+The managed target output remains at most 10 Hz by design.
 
 ### Target Headless ROS Runtime
 
-The intended real runtime is a headless ROS vision node, not a frontend. The
-target design is documented in
+The real runtime is a headless ROS vision node, not a frontend. The runtime
+design is documented in
 [Headless ROS Vision Runtime Target](headless_ros_vision_runtime.md).
 
-The node should consume stereo camera frames and timestamped chassis pose,
-transform triangulated ball points into the field/interface frame, fit the
-trajectory, and publish `/vision/target_prediction`. The adapter then forwards
-that data to `/target/raw`.
-
-### `apps/live3d`
-
-Owns the browser runtime/reference UI:
-
-- opens two browser USB camera streams;
-- loads YOLO and calibration artifacts from `/artifacts/...`;
-- runs browser ONNX YOLO inference when a compatible package is present;
-- overlays detections;
-- feeds left/right detections to `packages/core`;
-- renders the camera-frame 3D point, trail, prediction curve, and landing point;
-- exposes `window.__tennisbotLive3dSnapshot` for local runtime inspection.
-
-Current limitation: Live3D can load stereo calibration artifacts, but it does
-not know the physical camera pose relative to a tennis court. Its 3D output
-should be treated as camera-frame geometry until a court/world transform is
-measured and applied. It is not the target real closed-loop runtime.
+The node consumes stereo camera frames and timestamped chassis pose, transforms
+triangulated ball points into the field/interface frame, fits the trajectory,
+and publishes `/vision/target_prediction`. The adapter then forwards that data
+to `/target/raw`. It publishes nothing without real camera observations and a
+recent chassis pose.
 
 ## Runtime Flow
 
@@ -175,12 +159,13 @@ measured and applied. It is not the target real closed-loop runtime.
 2. tools/calibration solves mono/stereo calibration packages under artifacts/calibration/...
 3. tools/yolo creates or verifies artifacts/models/tennis_ball_yolo
 4. tools/stereo can run the local OpenCV 4K stereo coordinate GUI
-5. the future headless ROS vision node reads two camera streams
-6. the node runs YOLO, stereo pairing, triangulation, field-frame transforms,
+5. tennisbot_interface_adapter publishes `/vision/chassis_pose` from chassis state
+6. tennisbot_headless_vision reads two camera streams
+7. the node runs YOLO, stereo pairing, triangulation, field-frame transforms,
    and trajectory prediction
-7. the node publishes `/vision/target_prediction`
-8. `tennisbot_interface_adapter` forwards to `/target/raw`
-9. `target_manager` publishes `/target/managed` for the planner/state machine
+8. the node publishes `/vision/target_prediction`
+9. `tennisbot_interface_adapter` forwards to `/target/raw`
+10. `target_manager` publishes `/target/managed` for the planner/state machine
 ```
 
 ## Current Validation State
@@ -197,12 +182,10 @@ baseline_m=0.164989
 
 The epipolar metric is computed after undistorting points and evaluating the
 essential-matrix constraint in normalized coordinates, converted back to pixels
-by average focal length. The remaining physical gap is court/world pose: current
-3D output is in the left camera frame.
-
-Live3D exposes browser readiness gates for local reference operation, but the
-remaining runtime gap is the headless ROS vision node described in
-[Headless ROS Vision Runtime Target](headless_ros_vision_runtime.md).
+by average focal length. The remaining physical gap is the measured
+chassis-to-camera extrinsic and full ROS/Gazebo or real chassis validation. The
+headless node includes a configurable `T_chassis_camera`, but the default
+translation is only a placeholder until measured on the mounted rig.
 
 ## Main Commands
 
@@ -214,11 +197,16 @@ bun scripts/calib.ts brightness --devices /dev/video0,/dev/video2
 bun scripts/calib.ts preview
 ```
 
-Start the local browser runtime:
+Build and launch the ROS runtime:
 
 ```bash
-bun scripts/live3d.ts
-bun scripts/live3d.ts --status
+source /opt/ros/humble/setup.bash
+colcon build --base-paths src --packages-select \
+  target_msgs target_manager tennisbot_vision_msgs \
+  tennisbot_interface_adapter tennisbot_headless_vision
+source install/setup.bash
+ros2 launch tennisbot_interface_adapter interface_adapter.launch.py
+ros2 launch tennisbot_headless_vision headless_vision.launch.py
 ```
 
 Start the local OpenCV stereo-coordinate GUI:
@@ -235,20 +223,19 @@ cd packages/contracts && bun test && bun run typecheck
 cd packages/core && bun test && bun run typecheck
 ```
 
-Verify Live3D:
+Inspect ROS interfaces and topics:
 
 ```bash
-cd apps/live3d
-bun test
-bun run typecheck
-bun run build
+ros2 interface show tennisbot_vision_msgs/msg/ChassisPose
+ros2 interface show tennisbot_vision_msgs/msg/TargetPrediction
+ros2 topic list -t
+ros2 topic echo /vision/chassis_pose
+ros2 topic echo /vision/target_prediction
 ```
 
 ## Remaining Engineering Work
 
 - Recalibrate after the cameras are mounted in their real physical positions.
-- Add timestamped chassis pose with yaw for chassis-mounted cameras.
-- Add configured `T_chassis_camera` extrinsics.
-- Build the headless ROS vision node that publishes `/vision/target_prediction`.
+- Measure and configure the real `T_chassis_camera` extrinsics.
 - Verify `/vision/target_prediction` -> `/target/raw` -> `/target/managed`
   with ROS/Gazebo or real chassis pose and control links.

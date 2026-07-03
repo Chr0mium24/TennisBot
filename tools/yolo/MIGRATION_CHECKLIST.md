@@ -11,7 +11,7 @@ This checklist is for a later migration wave. Do not perform these moves while
   `TennisBallDetectorLab/yolo/dataset/`.
 - The lead confirms whether `TennisBallDetectorLab` remains a nested Git
   checkout, becomes ordinary tracked files, or is replaced by copied source.
-- `apps/live3d` has a documented model package loader target.
+- the headless ROS vision runtime has a documented model package loader target.
 - `artifacts/models/` is ignored and ready for generated package outputs.
 - A small fixture package is approved if tests need one; do not commit real
   `.pt`, `.onnx`, `.rknn`, or large datasets.
@@ -62,8 +62,8 @@ coordinates artifact handling:
 - Preserve RKNN export dependency pins until RKNN-Toolkit2 compatibility is
   retested.
 - Keep current HSV and realtime stereo GUI behavior out of `tools/yolo` unless
-  it is explicitly split into runtime diagnostics; the real live app belongs
-  under `apps/live3d`.
+  it is explicitly split into runtime diagnostics; the real runtime belongs
+  under `src/tennisbot_headless_vision`.
 
 ## Acceptance Gates
 
@@ -73,7 +73,7 @@ coordinates artifact handling:
 - `uv run tennisbot-yolo validate-dataset --allow-missing-images` works on a
   checkout without local images.
 - `uv run tennisbot-yolo package --output-dir artifacts/models/tennis_ball_yolo`
-  produces a package that `apps/live3d` can validate without importing tool
-  internals.
+  produces a package that the headless ROS vision runtime can validate without
+  importing tool internals.
 - No dataset labels, generated runs, or large model artifacts are modified by
   the migration commit.

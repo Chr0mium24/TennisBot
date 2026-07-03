@@ -4,8 +4,9 @@ Date: 2026-07-03
 
 ## Status
 
-This document describes the target runtime architecture. It is not fully
-implemented yet.
+This document describes the target runtime architecture and the first headless
+ROS implementation path. The code path exists, but it still needs real camera
+and ROS/Gazebo or chassis validation.
 
 Already available:
 
@@ -15,22 +16,22 @@ Already available:
 - `src/interface/target_msgs` defines the imported external ROS interface.
 - `src/tennisbot_interface_adapter` bridges vision-side topics to the external
   interface topics.
+- `src/tennisbot_vision_msgs/msg/ChassisPose` defines the vision-side full
+  chassis pose input.
+- `src/tennisbot_headless_vision` owns the first headless stereo camera,
+  field-frame transform, trajectory fit, and `/vision/target_prediction`
+  publishing path.
 
 Not yet available:
 
-- A production headless ROS vision node that captures cameras, runs YOLO,
-  triangulates the ball, transforms it through chassis pose, predicts the
-  target, and publishes `/vision/target_prediction`.
-- A complete chassis pose input for a chassis-mounted camera. The current
-  imported `target_msgs/ChassisPosition` provides only `x` and `y`; the vision
-  algorithm needs at least `x`, `y`, `yaw`, and `stamp`.
 - A checked runtime configuration for the fixed camera pose on the chassis.
+- Real hardware or ROS/Gazebo validation that `/vision/target_prediction`
+  reaches `/target/raw` and `/target/managed` with correct timing.
 
 ## Runtime Goal
 
 The real runtime should be one headless algorithm path, not a browser frontend.
-Live3D can remain temporarily as reference code or a local visualization aid,
-but it should not be the real operating path.
+The active tree no longer contains the old Live3D frontend path.
 
 Target high-level flow:
 
@@ -57,16 +58,17 @@ ROS/Gazebo/chassis backend
 
 ### 1. Replace Live3D as the Main Runtime Path
 
-The real runtime should not depend on `apps/live3d`. The replacement is a
+The real runtime does not depend on `apps/live3d`. The replacement is a
 headless ROS node that can run unattended with cameras and ROS topics.
 
-Recommended migration order:
+Current migration state:
 
-1. Build the headless ROS node while leaving Live3D in place.
-2. Verify the headless node publishes valid `/vision/target_prediction`.
-3. Verify the ROS chain reaches `/target/raw` and `/target/managed`.
-4. Remove or retire Live3D code and docs after the headless path is the
-   verified operating path.
+1. Live3D code and launcher are removed from the active tree.
+2. `tennisbot_headless_vision` provides the headless ROS main chain.
+3. `tennisbot_interface_adapter` provides `/vision/chassis_pose` from chassis
+   state and forwards `/vision/target_prediction` to `/target/raw`.
+4. Hardware validation remains required before claiming the real catch loop is
+   complete.
 
 ### 2. Add the Headless Vision Node
 
@@ -321,6 +323,7 @@ source /opt/ros/humble/setup.bash
 source install/setup.bash
 ros2 pkg list
 ros2 topic list -t
+ros2 interface show tennisbot_vision_msgs/msg/ChassisPose
 ros2 interface show tennisbot_vision_msgs/msg/TargetPrediction
 ros2 interface show target_msgs/msg/RawTarget
 ```

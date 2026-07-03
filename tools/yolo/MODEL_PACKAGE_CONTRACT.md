@@ -1,9 +1,10 @@
 # YOLO Model Package Contract
 
-Date: 2026-06-28
+Date: 2026-07-03
 
-This contract defines the model package consumed by `apps/live3d`. The package
-is produced by `tools/yolo` and stored under `artifacts/models/`.
+This contract defines the model package consumed by the headless ROS vision
+runtime. The package is produced by `tools/yolo` and stored under
+`artifacts/models/`.
 
 ## Package Directory
 
@@ -24,8 +25,8 @@ artifacts/models/tennis_ball_yolo/
 ```
 
 Only one model file is required at runtime, but a package may include multiple
-formats. `apps/live3d` chooses the first supported format according to its
-runtime adapter configuration.
+formats. The headless ROS vision runtime chooses the first supported format
+according to its detector configuration.
 
 ## Required Files
 
@@ -103,7 +104,7 @@ migration, `tools/yolo package` should either write both `package.json` and
 Rules:
 
 - Class id `0` is `tennis_ball`.
-- The live app may reject packages with missing or renamed class `0` until
+- The runtime may reject packages with missing or renamed class `0` until
   multi-class support is explicitly added.
 
 ### `preprocessing.json`
@@ -153,9 +154,10 @@ Rules:
 
 Rules:
 
-- `confidence_threshold` is the default startup threshold for `apps/live3d`.
-- `apps/live3d` may expose a UI override, but package defaults remain the
-  source of truth for reproducible runs.
+- `confidence_threshold` is the default startup threshold for the headless
+  runtime.
+- Runtime launch parameters may override the threshold, but package defaults
+  remain the source of truth for reproducible runs.
 - The runtime output must be convertible to the shared detection contract:
 
 ```json
@@ -207,7 +209,7 @@ report.
 
 ## Runtime Validation
 
-Before `apps/live3d` starts inference, it should validate:
+Before the headless vision runtime starts inference, it should validate:
 
 - package directory exists;
 - `package.json`, `labels.json`, `preprocessing.json`, and
@@ -234,4 +236,4 @@ The current `TennisBallDetectorLab` handoff package contains:
 - `package_manifest.json`.
 
 The target contract keeps those data files but renames the runtime entrypoint
-to `package.json` and makes `apps/live3d` the consumer.
+to `package.json` and makes the headless ROS vision runtime the consumer.

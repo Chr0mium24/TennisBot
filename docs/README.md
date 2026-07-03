@@ -16,7 +16,7 @@
 
 - [标定工具](../tools/calibration/README.md)
 - [YOLO 工具](../tools/yolo/README.md)
-- [Live3D 前端](../apps/live3d/README.md)
+- [本机双目工具](../tools/stereo/README.md)
 
 ## 报告
 
@@ -34,7 +34,6 @@
 - `results/`
 - `audits/`
 - `calibration/`
-- `live3d/`
 - `migrations/`
 - `probes/`
 - `refactor/`

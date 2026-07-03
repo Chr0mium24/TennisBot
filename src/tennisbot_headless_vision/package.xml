@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>tennisbot_interface_adapter</name>
+  <name>tennisbot_headless_vision</name>
   <version>0.1.0</version>
-  <description>ROS adapter between TennisBot vision topics and the external target interface.</description>
+  <description>Headless ROS stereo vision runtime for TennisBot target prediction.</description>
   <maintainer email="syh@example.com">syh</maintainer>
   <license>TODO</license>
 
@@ -14,8 +14,6 @@
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>rclpy</exec_depend>
-  <exec_depend>std_msgs</exec_depend>
-  <exec_depend>target_msgs</exec_depend>
   <exec_depend>tennisbot_vision_msgs</exec_depend>
 
   <export>

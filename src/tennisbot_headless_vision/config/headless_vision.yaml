@@ -1,0 +1,71 @@
+headless_vision:
+  ros__parameters:
+    chassis_pose_topic: /vision/chassis_pose
+    target_prediction_topic: /vision/target_prediction
+    runtime_rate_hz: 30.0
+    enable_camera: true
+    dry_run: false
+
+    # Runtime stereo tool import path. In the repo workspace this points to the
+    # existing OpenCV stereo code; deployments can override it or install the
+    # package into the ROS environment.
+    stereo_tool_python_path: tools/stereo/src
+
+    left_device: /dev/video0
+    right_device: /dev/video2
+    width: 3840
+    height: 2160
+    fps: 30.0
+    fourcc: MJPG
+    warmup_frames: 5
+
+    calibration_package: artifacts/calibration/stereo_cam1_cam2
+    detector: yolo
+    model_path: artifacts/models/tennis_ball_yolo/model.pt
+    conf: 0.05
+    iou: 0.50
+    imgsz: 1280
+    max_detections: 6
+    yolo_device: ""
+    class_id: 0
+    tile: false
+    tile_width: 2048
+    tile_height: 1216
+    tile_overlap: 160
+
+    hsv_center_roi: 0.60
+    hsv_h_min: 25
+    hsv_h_max: 60
+    hsv_s_min: 45
+    hsv_v_min: 80
+    hsv_min_area: 12.0
+    hsv_max_area: 250000.0
+    hsv_morph_kernel: 3
+
+    max_epipolar_error_px: 6.0
+    min_disparity_px: 1.0
+    max_disparity_px: 1200.0
+    max_depth_m: 12.0
+
+    # Transform from OpenCV camera coordinates to chassis coordinates:
+    # camera x right, y down, z forward -> chassis x forward, y left, z up.
+    # Translation must be measured after the stereo rig is fixed on the chassis.
+    camera_translation_m: [0.0, 0.0, 0.0]
+    camera_rotation_rpy_rad: [-1.5707963267948966, 0.0, -1.5707963267948966]
+
+    max_pose_age_s: 0.10
+    pose_buffer_size: 90
+    track_max_age_s: 0.60
+    track_max_points: 24
+    min_track_points: 3
+    new_task_gap_s: 0.40
+
+    # RawTarget carries the x/y point and remaining time. Default is a catch
+    # plane; use 0.0 if the chassis planner expects ground landing instead.
+    target_plane_z: 0.60
+    gravity_mps2: 9.80665
+    min_predicted_time: 0.03
+    max_predicted_time: 5.0
+    min_sigma_m: 0.05
+    max_abs_target_x: 15.0
+    max_abs_target_y: 8.0

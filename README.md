@@ -2,8 +2,8 @@
 
 Local-machine-first workspace for the TennisBot stereo vision runtime.
 
-The active repository code lives in top-level `apps/`, `packages/`, `scripts/`,
-`src/`, and `tools/`. Local legacy lab code can exist under ignored
+The active repository code lives in top-level `packages/`, `scripts/`, `src/`,
+and `tools/`. Local legacy lab code can exist under ignored
 `desperate/` when present, but it is outside the active runtime path.
 Calibration capture is handled by the mainline `tools/calibration` OpenCV
 workflow.
@@ -12,44 +12,42 @@ workflow.
 
 | Project | Purpose |
 | --- | --- |
-| `apps/live3d` | Browser USB stereo camera UI, ONNX YOLO inference, runtime 3D visualization |
 | `packages/contracts` | Shared TypeScript data contracts |
 | `packages/core` | Artifact validation, stereo pairing, triangulation, trajectory prediction |
-| `src` | ROS2 target interface packages and TennisBot vision adapter packages |
+| `src` | ROS2 target interface, vision adapter, and headless vision runtime packages |
 | `tools/calibration` | Fixed DFOptix ChArUco OpenCV mono/stereo capture GUI |
 | `tools/yolo` | Standalone YOLO runtime model package tooling |
+| `tools/stereo` | Local OpenCV stereo recorder, coordinate GUI, and replay tooling |
 | `artifacts/` | Ignored local runtime outputs for calibration and model packages |
 | `desperate/` | Ignored local-only archive for legacy lab code, not part of the parent Git repository |
 
 ## Common Commands
 
-Start the local operator surfaces:
+Build the ROS interface and headless vision packages:
 
 ```bash
-bun scripts/live3d.ts
+source /opt/ros/humble/setup.bash
+colcon build --base-paths src --packages-select \
+  target_msgs target_manager tennisbot_vision_msgs \
+  tennisbot_interface_adapter tennisbot_headless_vision
+source install/setup.bash
 ```
 
-Check whether they are already serving:
+Start the ROS adapter and headless vision runtime in separate terminals after
+the workspace is sourced:
 
 ```bash
-bun scripts/live3d.ts --status
+ros2 launch tennisbot_interface_adapter interface_adapter.launch.py
+ros2 launch tennisbot_headless_vision headless_vision.launch.py
 ```
 
-Run Live3D:
+Inspect the runtime topics:
 
 ```bash
-cd apps/live3d
-bun install
-bun run dev
-```
-
-Verify Live3D:
-
-```bash
-cd apps/live3d
-bun test
-bun run typecheck
-bun run build
+ros2 topic list -t
+ros2 topic echo /vision/chassis_pose
+ros2 topic echo /vision/target_prediction
+ros2 topic echo /target/raw
 ```
 
 Run camera checks and calibration:
@@ -105,12 +103,12 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 
 ## Git Workflow
 
-For active code in `apps/`, `packages/`, `scripts/`, `src/`, `tools/`, and
+For active code in `packages/`, `scripts/`, `src/`, `tools/`, and
 `docs/`, commit directly in this repository.
 
 Legacy lab code under `desperate/` is ignored local reference material. Do not
-commit it from the parent repository; migrate needed behavior into `apps/`,
-`packages/`, or `tools/` with focused tests and documentation.
+commit it from the parent repository; migrate needed behavior into `packages/`,
+`src/`, or `tools/` with focused tests and documentation.
 
 ## Remote Status
 

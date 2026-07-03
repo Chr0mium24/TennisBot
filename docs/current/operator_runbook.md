@@ -11,32 +11,29 @@ tools. The target real runtime is the headless ROS vision path documented in
 1. `tools/calibration` OpenCV GUI for fixed DFOptix ChArUco mono/stereo capture.
 2. `tools/yolo` for pure YOLO detection and runtime model packages.
 3. `tools/stereo` for local OpenCV 4K stereo YOLO coordinate display.
-4. Live3D as a temporary/reference browser visualization path for two USB
-   camera streams, ONNX YOLO inference, stereo 3D point, and trajectory
-   prediction.
+4. `src/tennisbot_headless_vision` for the ROS headless camera-to-target
+   runtime path.
 
-The board-side runtime and the future headless ROS vision node are not part of
-this local reference flow yet.
+The real catch loop still requires ROS/Gazebo or real chassis pose and control
+links. Local camera tools are diagnostics only.
 
 ## Start Surfaces
 
 From the repository root:
 
 ```bash
-bun scripts/live3d.ts
+source /opt/ros/humble/setup.bash
+colcon build --base-paths src --packages-select \
+  target_msgs target_manager tennisbot_vision_msgs \
+  tennisbot_interface_adapter tennisbot_headless_vision
+source install/setup.bash
 ```
 
-The launcher builds and starts the browser surface when it is not already
-serving:
-
-```text
-Live3D:          http://127.0.0.1:5178/
-```
-
-For a quick status check without starting anything:
+Start the ROS adapter and headless vision node in separate terminals:
 
 ```bash
-bun scripts/live3d.ts --status
+ros2 launch tennisbot_interface_adapter interface_adapter.launch.py
+ros2 launch tennisbot_headless_vision headless_vision.launch.py
 ```
 
 Start the local stereo coordinate GUI:
@@ -44,12 +41,6 @@ Start the local stereo coordinate GUI:
 ```bash
 bun scripts/stereo.ts record
 bun scripts/stereo.ts gui --tile
-```
-
-Observed result on 2026-06-29:
-
-```text
-ready  Live3D           http://127.0.0.1:5178/
 ```
 
 ## Calibration Order
@@ -77,16 +68,24 @@ Use the mainline OpenCV GUI in order:
 5. `bun scripts/calib.ts stereo` for stereo capture, solve, and runtime package
    export under `artifacts/calibration/stereo_cam1_cam2`.
 
-## Live3D Order
+## Headless ROS Order
 
-Open `http://127.0.0.1:5178/` after the stereo package verifies:
+After the stereo package verifies and the camera rig is mounted:
 
-1. Start cameras and confirm the Stereo cameras readiness gate is ready.
-2. Start YOLO backend and put a tennis ball clearly inside both camera views.
-3. Watch the readiness gates progress through left/right detection, stereo 3D
-   point, and prediction curve.
-4. Treat `prediction-ready` in the browser readiness gates as the local runtime
-   target for a visible ball pass.
+1. Measure and set `camera_translation_m` and `camera_rotation_rpy_rad` in
+   `src/tennisbot_headless_vision/config/headless_vision.yaml`.
+2. Confirm `/robot/chassis_state` is publishing
+   `[x_m, y_m, v_mps, phi_rad, yaw_rad, ground_speed_mps]`.
+3. Set `chassis_state_input_frame` in
+   `src/tennisbot_interface_adapter/config/interface_adapter.yaml` to `field`
+   or `cartesian`.
+4. Launch `tennisbot_interface_adapter` and confirm `/vision/chassis_pose` is
+   present at nominal 30 Hz.
+5. Launch `tennisbot_headless_vision` and confirm it publishes
+   `/vision/target_prediction` only when a real ball is detected in both
+   cameras and a recent pose is available.
+6. Confirm `/target/raw` and `/target/managed` before enabling chassis planner
+   behavior.
 
 ## Local Stereo GUI Order
 
@@ -115,5 +114,5 @@ selected trajectory window. Do not pass replay time windows through CLI flags.
 
 ## Current Runtime Evidence
 
-Historical hardware-verifier reports remain under `docs/archive/`, but the
-current operator flow no longer requires a standalone acceptance report.
+Historical browser/runtime reports remain under `docs/archive/`. Current
+runtime evidence should come from ROS topics and logs from the headless chain.
