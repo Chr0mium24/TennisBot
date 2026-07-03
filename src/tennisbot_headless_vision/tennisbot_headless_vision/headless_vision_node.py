@@ -57,7 +57,6 @@ class HeadlessVisionNode(Node):
         self.declare_parameter("fourcc", "MJPG")
         self.declare_parameter("warmup_frames", 5)
         self.declare_parameter("calibration_package", "artifacts/calibration/stereo_cam1_cam2")
-        self.declare_parameter("detector", "yolo")
         self.declare_parameter("model_path", "artifacts/models/tennis_ball_yolo/model.pt")
         self.declare_parameter("conf", 0.05)
         self.declare_parameter("iou", 0.50)
@@ -69,14 +68,6 @@ class HeadlessVisionNode(Node):
         self.declare_parameter("tile_width", 2048)
         self.declare_parameter("tile_height", 1216)
         self.declare_parameter("tile_overlap", 160)
-        self.declare_parameter("hsv_center_roi", 0.60)
-        self.declare_parameter("hsv_h_min", 25)
-        self.declare_parameter("hsv_h_max", 60)
-        self.declare_parameter("hsv_s_min", 45)
-        self.declare_parameter("hsv_v_min", 80)
-        self.declare_parameter("hsv_min_area", 12.0)
-        self.declare_parameter("hsv_max_area", 250000.0)
-        self.declare_parameter("hsv_morph_kernel", 3)
         self.declare_parameter("max_epipolar_error_px", 6.0)
         self.declare_parameter("min_disparity_px", 1.0)
         self.declare_parameter("max_disparity_px", 1200.0)
@@ -356,7 +347,7 @@ class CameraRuntime:
 
         import cv2  # noqa: PLC0415
         from tennisbot_stereo.calibration import RuntimeStereoCalibration  # noqa: PLC0415
-        from tennisbot_stereo.detection import HsvBallDetector, YoloBallDetector  # noqa: PLC0415
+        from tennisbot_stereo.detection import YoloBallDetector  # noqa: PLC0415
         from tennisbot_stereo.matching import StereoBallMatcher  # noqa: PLC0415
 
         width = int(node.get_parameter("width").value)
@@ -394,40 +385,24 @@ class CameraRuntime:
                 name="max_depth_m",
             ),
         )
-        detector_name = str(node.get_parameter("detector").value).strip().lower()
-        if detector_name == "hsv":
-            detector = HsvBallDetector(
-                center_roi=finite_float(node.get_parameter("hsv_center_roi").value, name="hsv_center_roi"),
-                h_min=int(node.get_parameter("hsv_h_min").value),
-                h_max=int(node.get_parameter("hsv_h_max").value),
-                s_min=int(node.get_parameter("hsv_s_min").value),
-                v_min=int(node.get_parameter("hsv_v_min").value),
-                min_area=finite_float(node.get_parameter("hsv_min_area").value, name="hsv_min_area"),
-                max_area=finite_float(node.get_parameter("hsv_max_area").value, name="hsv_max_area"),
-                morph_kernel=int(node.get_parameter("hsv_morph_kernel").value),
-                max_detections=int(node.get_parameter("max_detections").value),
-            )
-        elif detector_name == "yolo":
-            model_path = Path(str(node.get_parameter("model_path").value)).expanduser()
-            if not model_path.is_file():
-                raise FileNotFoundError(model_path)
-            device_value = str(node.get_parameter("yolo_device").value).strip()
-            class_id = int(node.get_parameter("class_id").value)
-            detector = YoloBallDetector(
-                model_path,
-                confidence_threshold=finite_float(node.get_parameter("conf").value, name="conf"),
-                iou_threshold=finite_float(node.get_parameter("iou").value, name="iou"),
-                imgsz=int(node.get_parameter("imgsz").value),
-                max_detections=int(node.get_parameter("max_detections").value),
-                device=device_value or None,
-                class_id=None if class_id < 0 else class_id,
-                tile=bool(node.get_parameter("tile").value),
-                tile_width=int(node.get_parameter("tile_width").value),
-                tile_height=int(node.get_parameter("tile_height").value),
-                tile_overlap=int(node.get_parameter("tile_overlap").value),
-            )
-        else:
-            raise ValueError("detector must be 'yolo' or 'hsv'")
+        model_path = Path(str(node.get_parameter("model_path").value)).expanduser()
+        if not model_path.is_file():
+            raise FileNotFoundError(model_path)
+        device_value = str(node.get_parameter("yolo_device").value).strip()
+        class_id = int(node.get_parameter("class_id").value)
+        detector = YoloBallDetector(
+            model_path,
+            confidence_threshold=finite_float(node.get_parameter("conf").value, name="conf"),
+            iou_threshold=finite_float(node.get_parameter("iou").value, name="iou"),
+            imgsz=int(node.get_parameter("imgsz").value),
+            max_detections=int(node.get_parameter("max_detections").value),
+            device=device_value or None,
+            class_id=None if class_id < 0 else class_id,
+            tile=bool(node.get_parameter("tile").value),
+            tile_width=int(node.get_parameter("tile_width").value),
+            tile_height=int(node.get_parameter("tile_height").value),
+            tile_overlap=int(node.get_parameter("tile_overlap").value),
+        )
 
         left = open_capture(
             cv2,
@@ -457,7 +432,7 @@ class CameraRuntime:
                 width,
                 height,
                 fps,
-                detector_name,
+                "yolo",
             )
         )
         return cls(

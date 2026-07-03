@@ -74,7 +74,6 @@ bun scripts/stereo.ts preview
 bun scripts/stereo.ts gui --tile
 bun scripts/stereo.ts gui --tile --record-run
 bun scripts/stereo.ts gui --dry-run
-bun scripts/stereo.ts gui --detector hsv
 bun scripts/stereo.ts gui --devices /dev/video0,/dev/video2
 bun scripts/stereo.ts replay
 ```

@@ -20,7 +20,6 @@ headless_vision:
     warmup_frames: 5
 
     calibration_package: artifacts/calibration/stereo_cam1_cam2
-    detector: yolo
     model_path: artifacts/models/tennis_ball_yolo/model.pt
     conf: 0.05
     iou: 0.50
@@ -32,15 +31,6 @@ headless_vision:
     tile_width: 2048
     tile_height: 1216
     tile_overlap: 160
-
-    hsv_center_roi: 0.60
-    hsv_h_min: 25
-    hsv_h_max: 60
-    hsv_s_min: 45
-    hsv_v_min: 80
-    hsv_min_area: 12.0
-    hsv_max_area: 250000.0
-    hsv_morph_kernel: 3
 
     max_epipolar_error_px: 6.0
     min_disparity_px: 1.0

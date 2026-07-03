@@ -10,7 +10,7 @@ import cv2
 import numpy as np
 
 from .calibration import RuntimeStereoCalibration
-from .detection import BallDetector, HsvBallDetector, YoloBallDetector
+from .detection import BallDetector, YoloBallDetector
 from .matching import StereoBallMatcher
 from .raw_recording import FrameTimestamp, RawStereoVideoRecorder
 from .recording import StereoRunRecorder
@@ -70,7 +70,6 @@ def add_gui_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--fourcc", default="MJPG", help="相机 FOURCC")
     parser.add_argument("--calibration-package", type=Path, default=DEFAULT_CALIBRATION_PACKAGE, help="双目标定运行时包目录")
     parser.add_argument("--model", type=Path, default=DEFAULT_MODEL, help="Ultralytics YOLO .pt 模型路径")
-    parser.add_argument("--detector", choices=("yolo", "hsv"), default="yolo", help="检测器")
     parser.add_argument("--conf", type=float, default=0.05, help="YOLO 置信度阈值")
     parser.add_argument("--iou", type=float, default=0.5, help="NMS IoU 阈值")
     parser.add_argument("--imgsz", type=int, default=1280, help="YOLO 推理输入尺寸")
@@ -81,14 +80,6 @@ def add_gui_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--tile-width", type=int, default=2048, help="tiled 推理切片宽度")
     parser.add_argument("--tile-height", type=int, default=1216, help="tiled 推理切片高度")
     parser.add_argument("--tile-overlap", type=int, default=160, help="tiled 推理切片重叠")
-    parser.add_argument("--hsv-center-roi", type=float, default=0.6, help="HSV 检测中心 ROI 占比")
-    parser.add_argument("--hsv-h-min", type=int, default=25, help="HSV hue 下界")
-    parser.add_argument("--hsv-h-max", type=int, default=60, help="HSV hue 上界")
-    parser.add_argument("--hsv-s-min", type=int, default=45, help="HSV saturation 下界")
-    parser.add_argument("--hsv-v-min", type=int, default=80, help="HSV value 下界")
-    parser.add_argument("--hsv-min-area", type=float, default=12.0, help="HSV 最小连通域面积")
-    parser.add_argument("--hsv-max-area", type=float, default=250000.0, help="HSV 最大连通域面积")
-    parser.add_argument("--hsv-morph-kernel", type=int, default=3, help="HSV morphology kernel")
     parser.add_argument("--max-epipolar-error-px", type=float, default=6.0, help="最大 rectified y 误差")
     parser.add_argument("--min-disparity-px", type=float, default=1.0, help="最小正 disparity")
     parser.add_argument("--max-disparity-px", type=float, default=1200.0, help="最大正 disparity")
@@ -292,7 +283,7 @@ def validate_args(args: argparse.Namespace, left_device: str, right_device: str,
         raise ValueError("--max-detections must be positive")
     if mode == "run" and not args.calibration_package.is_dir():
         raise FileNotFoundError(args.calibration_package)
-    if mode == "run" and args.detector == "yolo" and not args.model.is_file():
+    if mode == "run" and not args.model.is_file():
         raise FileNotFoundError(args.model)
 
 
@@ -322,18 +313,6 @@ def build_matcher(args: argparse.Namespace, calibration: RuntimeStereoCalibratio
 
 
 def build_detector(args: argparse.Namespace) -> BallDetector:
-    if args.detector == "hsv":
-        return HsvBallDetector(
-            center_roi=args.hsv_center_roi,
-            h_min=args.hsv_h_min,
-            h_max=args.hsv_h_max,
-            s_min=args.hsv_s_min,
-            v_min=args.hsv_v_min,
-            min_area=args.hsv_min_area,
-            max_area=args.hsv_max_area,
-            morph_kernel=args.hsv_morph_kernel,
-            max_detections=args.max_detections,
-        )
     return YoloBallDetector(
         args.model,
         confidence_threshold=args.conf,
@@ -380,8 +359,8 @@ def create_recorder(
                 "fourcc": args.fourcc,
             },
             "detector": {
-                "type": args.detector,
-                "model": str(args.model) if args.detector == "yolo" else None,
+                "type": "yolo",
+                "model": str(args.model),
                 "tile": args.tile,
                 "imgsz": args.imgsz,
             },
@@ -448,7 +427,7 @@ def print_dry_run(args: argparse.Namespace, left_device: str, right_device: str)
     print(f"calibration_package={args.calibration_package}")
     print(f"model={args.model}")
     print(f"capture={args.width}x{args.height}@{args.fps:g} fourcc={args.fourcc}")
-    print(f"detector={args.detector} tile={args.tile} imgsz={args.imgsz}")
+    print(f"detector=yolo tile={args.tile} imgsz={args.imgsz}")
     print(f"limits=epipolar<={args.max_epipolar_error_px:g}px depth<={args.max_depth_m:g}m")
     print(f"record_run={args.record_run} record_root={args.record_root}")
 

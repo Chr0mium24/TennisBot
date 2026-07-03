@@ -100,8 +100,7 @@ After the stereo package verifies:
 3. Run `bun scripts/stereo.ts gui --tile` for YOLO detection on small 4K balls.
 4. Add `--record-run` for long trajectory point/detection recording under
    `runs/stereo`.
-5. Use `--detector hsv` only as a camera/geometry debugging fallback.
-6. Read the right panel as left-camera-frame coordinates: x right, y down,
+5. Read the right panel as left-camera-frame coordinates: x right, y down,
    z forward.
 
 Open the replay frontend:

@@ -90,7 +90,7 @@ uv run --extra detect tennisbot-yolo detect-gui --devices /dev/video0,/dev/video
 Owns the local OpenCV stereo-coordinate GUI:
 
 - opens two USB cameras at 4K MJPG by default;
-- runs YOLO or HSV tennis-ball detection;
+- runs YOLO tennis-ball detection;
 - reads the current runtime stereo calibration package;
 - rectifies detected centers, pairs candidates, triangulates a camera-frame
   3D point, and displays x/y/z/range plus stereo diagnostics.

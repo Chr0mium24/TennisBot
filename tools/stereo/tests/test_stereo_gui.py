@@ -3,11 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import cv2
 import numpy as np
 
 from tennisbot_stereo.calibration import RuntimeStereoCalibration, project_point
-from tennisbot_stereo.detection import HsvBallDetector
 from tennisbot_stereo.matching import StereoBallMatcher
 from tennisbot_stereo.types import BallDetection
 
@@ -55,28 +53,6 @@ def test_matcher_uses_positive_p2_disparity_and_depth_filter(tmp_path: Path) -> 
     assert match.disparity_px == 100
     np.testing.assert_allclose(match.point_3d_m, good_point, atol=1e-9)
     assert matcher.last_diagnostics.rejected_by_depth_count > 0
-
-
-def test_hsv_detector_finds_a_green_ball_blob() -> None:
-    frame = np.zeros((120, 160, 3), dtype=np.uint8)
-    cv2.circle(frame, (80, 60), 8, (0, 255, 120), -1)
-    detector = HsvBallDetector(
-        center_roi=1.0,
-        h_min=25,
-        h_max=75,
-        s_min=40,
-        v_min=40,
-        min_area=20,
-        max_area=1000,
-        morph_kernel=3,
-        max_detections=3,
-    )
-
-    detections = detector.detect_frame(frame)
-
-    assert len(detections) == 1
-    assert detections[0].x == 80
-    assert detections[0].y == 60
 
 
 def detection_from_projection(

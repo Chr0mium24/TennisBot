@@ -104,23 +104,10 @@ async function ensureReplayDependencies(replayCwd: string): Promise<number> {
 }
 
 function detectExtraArgs(args: string[]): string[] {
-  if (args.includes("--dry-run") || detector(args) === "hsv" || args.includes("--help") || args.includes("-h")) {
+  if (args.includes("--dry-run") || args.includes("--help") || args.includes("-h")) {
     return [];
   }
   return ["--extra", "detect"];
-}
-
-function detector(args: string[]): string {
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index];
-    if (arg === "--detector") {
-      return args[index + 1] ?? "yolo";
-    }
-    if (arg.startsWith("--detector=")) {
-      return arg.slice("--detector=".length);
-    }
-  }
-  return "yolo";
 }
 
 async function waitForChild(proc: ReturnType<typeof Bun.spawn>): Promise<number> {
@@ -170,7 +157,6 @@ function printUsage(): void {
   bun scripts/stereo.ts gui --tile
   bun scripts/stereo.ts gui --dry-run
   bun scripts/stereo.ts gui --tile --record-run
-  bun scripts/stereo.ts gui --detector hsv
   bun scripts/stereo.ts gui --devices /dev/video0,/dev/video2
   bun scripts/stereo.ts replay
 
