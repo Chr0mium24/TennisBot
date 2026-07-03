@@ -92,7 +92,7 @@ class HeadlessVisionNode(Node):
         self.declare_parameter("track_max_points", 24)
         self.declare_parameter("min_track_points", 3)
         self.declare_parameter("new_task_gap_s", 0.40)
-        self.declare_parameter("target_plane_z", 0.60)
+        self.declare_parameter("target_plane_z", 0.0)
         self.declare_parameter("gravity_mps2", 9.80665)
         self.declare_parameter("min_predicted_time", 0.03)
         self.declare_parameter("max_predicted_time", 5.0)

@@ -84,7 +84,7 @@ read left/right camera frames
   -> transform chassis-frame point to field/interface frame with timestamped chassis pose
   -> maintain field-frame ball point history
   -> reject outliers and fit projectile trajectory
-  -> predict catch-plane or landing target and remaining time
+  -> predict target-plane point and remaining time
   -> publish tennisbot_vision_msgs/TargetPrediction on /vision/target_prediction
 ```
 
@@ -270,14 +270,16 @@ interface.
 
 ### 8. Confirm Target Semantics
 
-The imported interface currently describes `target_x` and `target_y` as the
-predicted ball position when the ball reaches the catching plane, nominally
-around `z = 0.60 m`.
+The imported interface carries `target_x` and `target_y` as the predicted ball
+position when the ball reaches the configured target plane. The current
+headless runtime default is ground landing:
 
-Before implementation, confirm one of these modes:
+```text
+target_plane_z = 0.0
+```
 
-- catch-plane target: solve trajectory at `field_z = 0.60 m`;
-- ground landing target: solve trajectory at `field_z = 0.0 m`.
+If the chassis planner later expects a racket/catch height instead, set
+`target_plane_z` to that field-frame height.
 
 The current `RawTarget` message does not carry full 3D trajectory samples. It
 carries the target `x/y` and remaining time. The full 3D world/field trajectory
@@ -298,7 +300,7 @@ left/right camera frames
   -> timestamped T_field_chassis
   -> P_field
   -> field-frame trajectory buffer
-  -> catch-plane or landing prediction
+  -> target-plane prediction
   -> /vision/target_prediction
   -> tennisbot_interface_adapter
   -> /target/raw
@@ -352,6 +354,6 @@ real catch-loop verification.
   30 Hz when data is available.
 - The adapter forwards to `/target/raw`.
 - `target_manager` produces `/target/managed` at no more than 10 Hz.
-- The published target uses the confirmed catch-plane or landing semantic.
+- The published target uses the configured target-plane semantic.
 - Logs and diagnostics are in the same field/interface frame as the published
   target.

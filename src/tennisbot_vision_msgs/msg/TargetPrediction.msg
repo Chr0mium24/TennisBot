@@ -11,11 +11,11 @@ uint64 task_id
 # Monotonically increasing frame number within one task.
 uint32 sequence_id
 
-# Predicted ball position when it reaches the catching plane. Unit: metre.
+# Predicted ball position when it reaches the configured target plane. Unit: metre.
 float64 target_x
 float64 target_y
 
-# Remaining time measured from capture_stamp to the catching-plane event.
+# Remaining time measured from capture_stamp to the target-plane event.
 builtin_interfaces/Duration predicted_t_remain
 
 # Vision-provided 1-sigma prediction uncertainty. Unit: metre.

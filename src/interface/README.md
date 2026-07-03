@@ -45,8 +45,8 @@ message:
 - +Y: robot-left direction;
 - unit: metre.
 
-The target is the predicted ball position when it reaches the catching plane,
-nominally about `0.60 m` above the ground.
+The target is the predicted ball position when it reaches the configured target
+plane. The current headless vision default is ground landing at `field_z = 0.0`.
 
 ## ID convention
 
