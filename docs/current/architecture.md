@@ -127,7 +127,7 @@ training code.
 
 Owns tracked ROS2 interface integration:
 
-- `src/interface/target_msgs`: imported external target interface messages;
+- external `target_msgs` from the sourced control workspace (`~/tennis_robot_ws/install`);
 - `src/interface/target_manager`: validates, filters, and rate-limits raw
   target predictions before planner/state-machine consumption;
 - `src/tennisbot_vision_msgs`: repository-owned vision-side ROS messages;
@@ -201,8 +201,9 @@ Build and launch the ROS runtime:
 
 ```bash
 source /opt/ros/humble/setup.bash
+source ~/tennis_robot_ws/install/setup.bash
 colcon build --base-paths src --packages-select \
-  target_msgs target_manager tennisbot_vision_msgs \
+  target_manager tennisbot_vision_msgs \
   tennisbot_interface_adapter tennisbot_headless_vision
 source install/setup.bash
 ros2 launch tennisbot_interface_adapter interface_adapter.launch.py

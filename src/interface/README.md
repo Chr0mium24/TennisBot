@@ -4,8 +4,8 @@ This directory contains the shared vision-to-motion-control interface.
 
 ## Packages
 
-- `target_msgs`: protocol-only package containing the ROS messages.
 - `target_manager`: the single runtime node that consumes raw vision data.
+- `target_msgs`: provided by the sourced control workspace (`~/tennis_robot_ws/install`).
 
 ## Topics
 
@@ -46,7 +46,7 @@ message:
 - unit: metre.
 
 The target is the predicted ball position when it reaches the configured target
-plane. The current headless vision default is ground landing at `field_z = 0.0`.
+plane. The current headless vision default is the catching plane at `field_z = 0.6`.
 
 ## ID convention
 

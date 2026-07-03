@@ -116,8 +116,9 @@ Build and run the headless ROS chain:
 
 ```bash
 source /opt/ros/humble/setup.bash
+source ~/tennis_robot_ws/install/setup.bash
 colcon build --base-paths src --packages-select \
-  target_msgs target_manager tennisbot_vision_msgs \
+  target_manager tennisbot_vision_msgs \
   tennisbot_interface_adapter tennisbot_headless_vision
 source install/setup.bash
 ros2 launch tennisbot_interface_adapter interface_adapter.launch.py

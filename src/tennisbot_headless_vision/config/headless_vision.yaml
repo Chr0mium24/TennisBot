@@ -60,9 +60,9 @@ headless_vision:
     min_track_points: 3
     new_task_gap_s: 0.40
 
-    # RawTarget carries the x/y point and remaining time. Default is ground
-    # landing at field_z=0.0.
-    target_plane_z: 0.0
+    # RawTarget carries the x/y point and remaining time. Default is the
+    # catching plane at field_z=0.6.
+    target_plane_z: 0.6
     gravity_mps2: 9.80665
     min_predicted_time: 0.03
     max_predicted_time: 5.0

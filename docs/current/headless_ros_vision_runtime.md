@@ -13,7 +13,7 @@ Already available:
 - `packages/core` has tested stereo geometry and trajectory prediction modules.
 - `tools/stereo` has tested OpenCV stereo detection, matching, triangulation,
   and local recording paths.
-- `src/interface/target_msgs` defines the imported external ROS interface.
+- external `target_msgs` is provided by the sourced control workspace.
 - `src/tennisbot_interface_adapter` bridges vision-side topics to the external
   interface topics.
 - `src/tennisbot_vision_msgs/msg/ChassisPose` defines the vision-side full
@@ -275,14 +275,14 @@ interface.
 
 The imported interface carries `target_x` and `target_y` as the predicted ball
 position when the ball reaches the configured target plane. The current
-headless runtime default is ground landing:
+headless runtime default is the catching plane:
 
 ```text
-target_plane_z = 0.0
+target_plane_z = 0.6
 ```
 
-If the chassis planner later expects a racket/catch height instead, set
-`target_plane_z` to that field-frame height.
+If the chassis planner later expects ground landing instead, set
+`target_plane_z` back to `0.0`.
 
 The current `RawTarget` message does not carry full 3D trajectory samples. It
 carries the target `x/y` and remaining time. The full 3D world/field trajectory
