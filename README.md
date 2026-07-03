@@ -3,9 +3,10 @@
 Local-machine-first workspace for the TennisBot stereo vision runtime.
 
 The active repository code lives in top-level `apps/`, `packages/`, `scripts/`,
-and `tools/`. Local legacy lab code can exist under ignored `desperate/` when
-present, but it is outside the active runtime path. Calibration capture is
-handled by the mainline `tools/calibration` OpenCV workflow.
+`src/`, and `tools/`. Local legacy lab code can exist under ignored
+`desperate/` when present, but it is outside the active runtime path.
+Calibration capture is handled by the mainline `tools/calibration` OpenCV
+workflow.
 
 ## Projects
 
@@ -96,16 +97,16 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 ## Architecture
 
 - [Current architecture](docs/current/architecture.md)
+- [Headless ROS vision runtime target](docs/current/headless_ros_vision_runtime.md)
 - [Current status](docs/current/status.md)
 - [Command usage](docs/current/command_usage.md)
 - [Operator runbook](docs/current/operator_runbook.md)
 - [Camera devices](docs/current/camera_devices.md)
-- [Live3D hardware acceptance](docs/current/live3d_hardware_acceptance.md)
 
 ## Git Workflow
 
-For active code in `apps/`, `packages/`, `tools/`, and `docs/`, commit directly
-in this repository.
+For active code in `apps/`, `packages/`, `scripts/`, `src/`, `tools/`, and
+`docs/`, commit directly in this repository.
 
 Legacy lab code under `desperate/` is ignored local reference material. Do not
 commit it from the parent repository; migrate needed behavior into `apps/`,

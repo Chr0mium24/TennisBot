@@ -1,10 +1,11 @@
 # TennisBot 文档入口
 
-日期：2026-06-29
+日期：2026-07-03
 
 ## 先读这里
 
 - [当前架构](current/architecture.md)
+- [无前端 ROS 视觉运行目标](current/headless_ros_vision_runtime.md)
 - [当前状态](current/status.md)
 - [命令入口使用说明](current/command_usage.md)
 - [操作员运行手册](current/operator_runbook.md)

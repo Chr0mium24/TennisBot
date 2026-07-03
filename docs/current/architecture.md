@@ -1,16 +1,16 @@
 # TennisBot Current Architecture
 
-Date: 2026-07-01
+Date: 2026-07-03
 
 ## Current Shape
 
 TennisBot is a local-machine-first workspace. The active tracked code lives in
-top-level `apps/`, `packages/`, `tools/`, and `scripts/`.
+top-level `apps/`, `packages/`, `scripts/`, `src/`, and `tools/`.
 
 ```text
 TennisBot/
   apps/
-    live3d/          browser USB stereo camera runtime, YOLO, 3D UI
+    live3d/          browser USB stereo camera runtime, temporary/reference UI
   packages/
     contracts/       shared TypeScript data contracts
     core/            artifact loaders, stereo pairing, triangulation, prediction
@@ -140,9 +140,20 @@ Owns tracked ROS2 interface integration:
 The nominal vision target and chassis-position paths are 30 Hz. The managed
 target output remains at most 10 Hz by design.
 
+### Target Headless ROS Runtime
+
+The intended real runtime is a headless ROS vision node, not a frontend. The
+target design is documented in
+[Headless ROS Vision Runtime Target](headless_ros_vision_runtime.md).
+
+The node should consume stereo camera frames and timestamped chassis pose,
+transform triangulated ball points into the field/interface frame, fit the
+trajectory, and publish `/vision/target_prediction`. The adapter then forwards
+that data to `/target/raw`.
+
 ### `apps/live3d`
 
-Owns the real-machine browser runtime:
+Owns the browser runtime/reference UI:
 
 - opens two browser USB camera streams;
 - loads YOLO and calibration artifacts from `/artifacts/...`;
@@ -155,7 +166,7 @@ Owns the real-machine browser runtime:
 Current limitation: Live3D can load stereo calibration artifacts, but it does
 not know the physical camera pose relative to a tennis court. Its 3D output
 should be treated as camera-frame geometry until a court/world transform is
-measured and applied.
+measured and applied. It is not the target real closed-loop runtime.
 
 ## Runtime Flow
 
@@ -164,11 +175,12 @@ measured and applied.
 2. tools/calibration solves mono/stereo calibration packages under artifacts/calibration/...
 3. tools/yolo creates or verifies artifacts/models/tennis_ball_yolo
 4. tools/stereo can run the local OpenCV 4K stereo coordinate GUI
-5. apps/live3d can load the YOLO and calibration artifacts
-6. the operator starts two USB cameras in the browser
-7. Live3D runs YOLO on left/right frames
-8. packages/core pairs detections, triangulates a 3D point, and predicts motion
-9. Live3D renders detections, 3D trail, prediction curve, and readiness gates
+5. the future headless ROS vision node reads two camera streams
+6. the node runs YOLO, stereo pairing, triangulation, field-frame transforms,
+   and trajectory prediction
+7. the node publishes `/vision/target_prediction`
+8. `tennisbot_interface_adapter` forwards to `/target/raw`
+9. `target_manager` publishes `/target/managed` for the planner/state machine
 ```
 
 ## Current Validation State
@@ -188,7 +200,9 @@ essential-matrix constraint in normalized coordinates, converted back to pixels
 by average focal length. The remaining physical gap is court/world pose: current
 3D output is in the left camera frame.
 
-Live3D exposes browser readiness gates for local operation.
+Live3D exposes browser readiness gates for local reference operation, but the
+remaining runtime gap is the headless ROS vision node described in
+[Headless ROS Vision Runtime Target](headless_ros_vision_runtime.md).
 
 ## Main Commands
 
@@ -233,7 +247,8 @@ bun run build
 ## Remaining Engineering Work
 
 - Recalibrate after the cameras are mounted in their real physical positions.
-- Apply or document the browser-frame scaling, rectification, and camera/world
-  transform rules before claiming court-coordinate 3D correctness.
-- Run Live3D with a visible tennis ball and observe the browser readiness gates
-  through `prediction-ready`.
+- Add timestamped chassis pose with yaw for chassis-mounted cameras.
+- Add configured `T_chassis_camera` extrinsics.
+- Build the headless ROS vision node that publishes `/vision/target_prediction`.
+- Verify `/vision/target_prediction` -> `/target/raw` -> `/target/managed`
+  with ROS/Gazebo or real chassis pose and control links.

@@ -1,18 +1,22 @@
 # Local Runtime Operator Runbook
 
-Date: 2026-07-01
+Date: 2026-07-03
 
 ## Scope
 
-This runbook is the local-machine sequence for the current TennisBot runtime:
+This runbook is the local-machine sequence for the current local reference
+tools. The target real runtime is the headless ROS vision path documented in
+[Headless ROS Vision Runtime Target](headless_ros_vision_runtime.md).
 
 1. `tools/calibration` OpenCV GUI for fixed DFOptix ChArUco mono/stereo capture.
 2. `tools/yolo` for pure YOLO detection and runtime model packages.
 3. `tools/stereo` for local OpenCV 4K stereo YOLO coordinate display.
-4. Live3D for two USB camera streams, ONNX YOLO inference, stereo 3D point,
-   and trajectory prediction.
+4. Live3D as a temporary/reference browser visualization path for two USB
+   camera streams, ONNX YOLO inference, stereo 3D point, and trajectory
+   prediction.
 
-The board-side runtime is not part of this flow.
+The board-side runtime and the future headless ROS vision node are not part of
+this local reference flow yet.
 
 ## Start Surfaces
 

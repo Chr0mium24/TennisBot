@@ -1,10 +1,11 @@
 # TennisBot Current Status
 
-Date: 2026-07-01
+Date: 2026-07-03
 
 ## Current Step
 
-The project is at local operator validation. The main tracked paths are now:
+The project is moving from local operator visualization toward a headless ROS
+vision runtime. The main tracked paths are now:
 
 - `tools/calibration` for the fixed DFOptix ChArUco OpenCV capture GUI;
 - `tools/yolo` for annotation, model package operations, and pure YOLO detect
@@ -12,7 +13,9 @@ The project is at local operator validation. The main tracked paths are now:
 - `tools/stereo` for local 4K stereo YOLO coordinate display;
 - `packages/core` and `packages/contracts` for runtime algorithms and shared
   contracts;
-- `apps/live3d` for browser camera, YOLO, and 3D display.
+- `src` for ROS2 interface packages and the TennisBot vision adapter;
+- `apps/live3d` as a temporary/reference browser camera, YOLO, and 3D display
+  path, not the target real runtime.
 
 ## Ready Now
 
@@ -52,8 +55,18 @@ Live3D loads stereo calibration artifacts, but it does not know the camera rig's
 pose relative to the tennis court. Current 3D output is camera-frame geometry,
 not court coordinates.
 
-Local Live3D operation relies on the browser readiness gates and visual runtime
-state.
+The target real runtime is documented in
+[Headless ROS Vision Runtime Target](headless_ros_vision_runtime.md). The main
+remaining gaps are:
+
+- add a headless ROS vision node;
+- consume chassis pose with at least `x`, `y`, `yaw`, and `stamp`;
+- configure fixed chassis-to-camera extrinsics;
+- use ROS clock for image capture stamps and chassis pose timestamps;
+- transform observations into field/interface coordinates before trajectory
+  fitting;
+- publish `/vision/target_prediction` and verify the adapter chain to
+  `/target/raw` and `/target/managed`.
 
 ## Next Commands
 
