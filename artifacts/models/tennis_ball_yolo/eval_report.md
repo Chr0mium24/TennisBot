@@ -1,12 +1,23 @@
 # Evaluation Report
 
-Static smoke validation against matched labeled TennisBallDetectorLab images.
+YOLO package promoted from the `0260701`-only batch12 training run on 2026-07-03.
 
-- images: 109
-- confidence_threshold: 0.05
-- detected_at_threshold: 109
-- detection_rate_at_threshold: 1.000
-- max_confidence: 0.958428
-- min_confidence: 0.066559
+- Source dataset: `tools/yolo/workspace/runs/copy_paste_aug_0260701_approx5000_20260703`
+- Generated images: 5000
+- Generated copy-paste positives: 4500
+- Generated augmented negatives: 500
+- Original labeled images included in split: 561
+- Train images: 5005
+- Validation images: 556
+- Validation instances: 480
+- Training: 30 epochs, `imgsz=960`, `batch=12`
+- Best weights: `tools/yolo/workspace/runs/training/aug0260701_approx5000_batch12_20260703/weights/best.pt`
 
-This is a static smoke check, not a full mAP validation run.
+Final validation after reloading `best.pt`:
+
+- Precision: 0.919
+- Recall: 0.757
+- mAP50: 0.845
+- mAP50-95: 0.576
+
+Full experiment notes are in `docs/current/yolo_0260701_approx5000_batch12_training_20260703.md`.

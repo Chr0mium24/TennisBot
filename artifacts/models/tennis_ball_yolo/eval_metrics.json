@@ -1,29 +1,35 @@
 {
   "dataset": {
-    "cameras": {
-      "cam1": 109,
-      "cam2": 0
-    },
-    "labels": 109,
-    "negatives": 0,
-    "positives": 109
+    "source": "tools/yolo/workspace/runs/copy_paste_aug_0260701_approx5000_20260703",
+    "source_scope": "0260701 only",
+    "generated_images": 5000,
+    "generated_copy_paste_positives": 4500,
+    "generated_negative_augmentations": 500,
+    "original_labeled_images_in_split": 561,
+    "train_images": 5005,
+    "val_images": 556,
+    "val_instances": 480,
+    "split_non_empty_labels": 4691,
+    "split_empty_labels": 870,
+    "split_missing_labels": 0
   },
   "dry_run": false,
   "inference_ready": true,
   "model": {
-    "map50": null,
-    "map50_95": null,
-    "precision": null,
-    "recall": null
-  },
-  "static_smoke": {
-    "confidence_threshold": 0.05,
-    "detected_at_threshold": 109,
-    "detection_rate_at_threshold": 1.0,
-    "image_count": 109,
-    "max_confidence": 0.9584278464317322,
-    "min_confidence": 0.06655905395746231,
-    "model": "artifacts/model_candidates/finetune_indoor_cam1/best.pt",
-    "source": "TennisBallDetectorLab/yolo/dataset matched labeled images"
+    "base_model": "artifacts/models/tennis_ball_yolo/model.pt",
+    "trained_model": "tools/yolo/workspace/runs/training/aug0260701_approx5000_batch12_20260703/weights/best.pt",
+    "epochs": 30,
+    "imgsz": 960,
+    "batch": 12,
+    "precision": 0.919,
+    "recall": 0.757,
+    "map50": 0.845,
+    "map50_95": 0.576,
+    "best_results_csv_epoch": 28,
+    "best_results_csv_map50_95": 0.57599,
+    "final_epoch_precision": 0.91955,
+    "final_epoch_recall": 0.76875,
+    "final_epoch_map50": 0.84898,
+    "final_epoch_map50_95": 0.57284
   }
 }
