@@ -6,7 +6,7 @@ Date: 2026-07-03
 
 This document describes the target camera-to-target runtime architecture and
 the current implementation path. The code path exists, but it still needs real
-camera and ROS/Gazebo or chassis validation.
+camera and real chassis validation.
 
 Already available:
 
@@ -25,7 +25,7 @@ Already available:
 Not yet available:
 
 - A checked runtime configuration for the fixed camera pose on the chassis.
-- Real hardware or ROS/Gazebo validation that `/target/raw` reaches
+- Real hardware validation that `/target/raw` reaches
   `/target/managed` with correct timing.
 
 ## Runtime Goal
@@ -48,7 +48,7 @@ stereo cameras
 The runtime also consumes chassis pose:
 
 ```text
-ROS/Gazebo/chassis backend
+chassis backend
   -> /robot/chassis_state [x, y, v, phi, yaw, ground_speed]
   -> external chassis_position_publisher
   -> /robot/chassis_position target_msgs/ChassisPosition
@@ -192,9 +192,10 @@ Do not convert only at the `/target/raw` publish boundary. That would leave
 intermediate state, diagnostics, and future decisions in a different frame from
 the interface output.
 
-### 6. Use ROS Clock for All Runtime Timestamps
+### 6. Use One Runtime Clock for All Timestamps
 
-All runtime timestamps must come from the same ROS clock.
+All runtime timestamps must come from the same ROS clock backed by the real
+runtime clock.
 
 For direct OpenCV or camera SDK capture:
 
@@ -211,19 +212,8 @@ For ROS camera topics, use:
 sensor_msgs/Image.header.stamp
 ```
 
-provided that all related nodes use the same `use_sim_time` setting.
-
-Real hardware:
-
-```text
-use_sim_time = false
-```
-
-Gazebo or `/clock` based simulation:
-
-```text
-use_sim_time = true
-```
+provided that the camera publisher, vision runtime, chassis pose publisher, and
+target manager all use the same real runtime clock.
 
 The `RawTarget` time convention depends on this:
 
@@ -358,9 +348,9 @@ ros2 topic echo /target/raw
 ros2 topic echo /target/managed
 ```
 
-Real closed-loop validation must use ROS/Gazebo or real chassis pose and
-control links. A frontend-only or local substitute run cannot be counted as
-real catch-loop verification.
+Real closed-loop validation must use the real chassis pose and control links. A
+frontend-only or local substitute run cannot be counted as real catch-loop
+verification.
 
 ## Acceptance Criteria
 

@@ -57,7 +57,7 @@ stereo solve, and runtime calibration package export.
 
 The target real runtime is documented in
 [Vision Runtime](vision_runtime.md). The implemented code path still needs
-hardware or ROS/Gazebo validation. The main
+hardware validation. The main
 remaining gaps are:
 
 - measure and configure fixed chassis-to-camera extrinsics;

@@ -183,7 +183,7 @@ baseline_m=0.164989
 The epipolar metric is computed after undistorting points and evaluating the
 essential-matrix constraint in normalized coordinates, converted back to pixels
 by average focal length. The remaining physical gap is the measured
-chassis-to-camera extrinsic and full ROS/Gazebo or real chassis validation. The
+chassis-to-camera extrinsic and full real chassis validation. The
 vision runtime node includes a configurable `T_chassis_camera`, but the default
 translation is only a placeholder until measured on the mounted rig.
 
@@ -245,5 +245,5 @@ ros2 topic echo /target/managed
 
 - Recalibrate after the cameras are mounted in their real physical positions.
 - Measure and configure the real `T_chassis_camera` extrinsics.
-- Verify `/target/raw` -> `/target/managed` with ROS/Gazebo or real chassis
-  pose and control links.
+- Verify `/target/raw` -> `/target/managed` with real chassis pose and control
+  links.

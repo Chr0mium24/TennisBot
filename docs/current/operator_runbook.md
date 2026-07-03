@@ -14,8 +14,8 @@ tools. The target real runtime is the vision runtime path documented in
 4. `src/tennisbot_headless_vision` for the vision runtime camera-to-target
    runtime path.
 
-The real catch loop still requires ROS/Gazebo or real chassis pose and control
-links. Local camera tools are diagnostics only.
+The real catch loop still requires real chassis pose and control links. Local
+camera tools are diagnostics only.
 
 ## Start Surfaces
 

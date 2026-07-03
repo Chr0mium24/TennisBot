@@ -11,7 +11,6 @@ type Options = {
   record: boolean;
   taskId?: string;
   singleTask: boolean;
-  useSimTime: boolean;
   logRoot: string;
   session?: string;
   video: boolean;
@@ -86,7 +85,6 @@ async function run(options: Options): Promise<number> {
 
 function buildVisionRuntimeCommand(options: Options): string[] {
   const params: string[] = [];
-  addParam(params, "use_sim_time", boolValue(options.useSimTime));
   addParam(params, "runtime_log_enabled", boolValue(options.record));
   addParam(params, "runtime_log_root", options.logRoot);
   addParam(params, "runtime_log_video", boolValue(options.video));
@@ -130,9 +128,7 @@ function buildVisionRuntimeCommand(options: Options): string[] {
 
 function buildManagerCommand(options: Options): string[] | undefined {
   if (!options.withManager) return undefined;
-  const command = ["ros2", "launch", "target_manager", "target_manager.launch.py"];
-  if (options.useSimTime) command.push("use_sim_time:=true");
-  return command;
+  return ["ros2", "launch", "target_manager", "target_manager.launch.py"];
 }
 
 function parseOptions(args: string[]): Options {
@@ -146,7 +142,6 @@ function parseOptions(args: string[]): Options {
     withManager: true,
     record: command === "task",
     singleTask: command === "task",
-    useSimTime: false,
     logRoot: "runs/vision-runtime",
     video: true,
     chassisLog: true,
@@ -171,7 +166,6 @@ function parseOptions(args: string[]): Options {
     else if (arg === "--no-record") options.record = false;
     else if (arg === "--single-task") options.singleTask = true;
     else if (arg === "--continuous") options.singleTask = false;
-    else if (arg === "--use-sim-time") options.useSimTime = true;
     else if (arg === "--tile") options.tile = true;
     else if (arg === "--no-tile") options.tile = false;
     else if (arg === "--no-video") options.video = false;
@@ -312,7 +306,6 @@ function printUsage(): void {
   --task-id <id>                      初始或单次任务 task_id
   --single-task / --continuous        单任务或连续任务模式
   --with-manager / --no-manager       是否同时启动外部 target_manager，默认启动
-  --use-sim-time                      给 vision runtime 和外部 target_manager 使用 sim time
   --auto-source / --no-auto-source    是否自动 source ROS/control/local setup，默认开启
   --setup-file <path>                 追加一个 setup.bash，可重复
   --clear-setup-files                 清空默认 setup 列表，配合 --setup-file 使用

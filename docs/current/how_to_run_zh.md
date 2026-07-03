@@ -234,9 +234,6 @@ bun scripts/headless.ts run --record --session test01 --devices /dev/video0,/dev
 
 # target_manager 已经在别的终端启动时，只启动视觉节点
 bun scripts/headless.ts run --record --session test01 --no-manager
-
-# 用 sim time 跑仿真链路
-bun scripts/headless.ts run --record --session sim01 --use-sim-time
 ```
 
 ## 单次 task 触发
@@ -420,5 +417,5 @@ bun scripts/headless.ts --help
 bun scripts/headless.ts run --dry-run --record --devices /dev/video0,/dev/video2 --session dryrun
 ```
 
-真实验收还需要 ROS/Gazebo 或真实底盘链路提供 `/robot/chassis_position`，并
-确认 `/target/raw` 和 `/target/managed` 的时间、坐标和频率都正确。
+真实验收还需要真实底盘链路提供 `/robot/chassis_position`，并确认
+`/target/raw` 和 `/target/managed` 的时间、坐标和频率都正确。
