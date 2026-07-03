@@ -14,6 +14,7 @@ from tennisbot_yolo.package import (
     create_model_package,
     verify_model_package,
 )
+from tennisbot_yolo.cli import resolve_cli_path
 
 
 def read_json(path: Path) -> dict:
@@ -27,6 +28,12 @@ def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
         text=True,
         capture_output=True,
     )
+
+
+def test_resolve_cli_path_uses_current_working_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    assert resolve_cli_path(Path("relative/path")) == tmp_path / "relative" / "path"
 
 
 def test_cli_help_exposes_package_create_and_verify() -> None:

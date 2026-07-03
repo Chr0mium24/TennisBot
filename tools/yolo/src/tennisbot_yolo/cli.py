@@ -20,16 +20,20 @@ DEFAULT_MODEL_PACKAGE = REPO_ROOT / "artifacts" / "models" / "tennis_ball_yolo"
 ANNOTATOR_SCRIPT = TOOL_ROOT / "yolo" / "scripts" / "serve_annotator.py"
 
 
+def resolve_cli_path(path: Path) -> Path:
+    return path.expanduser().resolve()
+
+
 def cmd_annotate(args: argparse.Namespace) -> int:
     command = [
         sys.executable,
         str(ANNOTATOR_SCRIPT),
         "--images",
-        str(args.images_root),
+        str(resolve_cli_path(args.images_root)),
         "--labels",
-        str(args.labels_root),
+        str(resolve_cli_path(args.labels_root)),
         "--excluded",
-        str(args.excluded_file),
+        str(resolve_cli_path(args.excluded_file)),
         "--host",
         args.host,
         "--port",
