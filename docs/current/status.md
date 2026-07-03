@@ -13,18 +13,16 @@ vision runtime. The main tracked paths are now:
 - `tools/stereo` for local 4K stereo YOLO coordinate display;
 - `packages/core` and `packages/contracts` for TypeScript artifact/geometry
   helpers and shared contracts;
-- `src` for ROS2 interface packages, the TennisBot vision adapter, and the
+- `src` for ROS2 interface packages, the optional TennisBot vision adapter, and the
   headless vision runtime.
 
 ## Ready Now
 
 The ROS package path now includes:
 
-- `tennisbot_vision_msgs/msg/ChassisPose` for timestamped `x/y/z/roll/pitch/yaw`;
-- `tennisbot_interface_adapter` forwarding `/robot/chassis_state` to
-  `/vision/chassis_pose`;
-- `tennisbot_headless_vision` consuming `/vision/chassis_pose` and real stereo
-  camera frames, then publishing `/vision/target_prediction`.
+- `tennisbot_headless_vision` consuming `/robot/chassis_state` and real stereo
+  camera frames, then publishing `target_msgs/RawTarget` on `/target/raw`;
+- `target_manager` consuming `/target/raw` and publishing `/target/managed`.
 
 The current quick camera-device tool is:
 
@@ -63,7 +61,7 @@ remaining gaps are:
 - use ROS clock for image capture stamps and chassis pose timestamps;
 - verify real camera observations transform into field/interface coordinates
   before trajectory fitting;
-- verify the adapter chain to `/target/raw` and `/target/managed`.
+- verify the direct `/target/raw` and `/target/managed` chain.
 
 ## Next Commands
 
@@ -118,18 +116,18 @@ Build and run the headless ROS chain:
 source /opt/ros/humble/setup.bash
 source ~/tennis_robot_ws/install/setup.bash
 colcon build --base-paths src --packages-select \
-  target_manager tennisbot_vision_msgs \
-  tennisbot_interface_adapter tennisbot_headless_vision
+  target_manager tennisbot_headless_vision \
+  --symlink-install --allow-overriding target_manager
 source install/setup.bash
-ros2 launch tennisbot_interface_adapter interface_adapter.launch.py
 ros2 launch tennisbot_headless_vision headless_vision.launch.py
+ros2 launch target_manager target_manager.launch.py
 ```
 
 Inspect runtime topics:
 
 ```bash
 ros2 topic list -t
-ros2 topic hz /vision/chassis_pose
-ros2 topic hz /vision/target_prediction
+ros2 topic hz /robot/chassis_state
 ros2 topic echo /target/raw
+ros2 topic echo /target/managed
 ```

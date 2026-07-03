@@ -25,16 +25,16 @@ From the repository root:
 source /opt/ros/humble/setup.bash
 source ~/tennis_robot_ws/install/setup.bash
 colcon build --base-paths src --packages-select \
-  target_manager tennisbot_vision_msgs \
-  tennisbot_interface_adapter tennisbot_headless_vision
+  target_manager tennisbot_headless_vision \
+  --symlink-install --allow-overriding target_manager
 source install/setup.bash
 ```
 
-Start the ROS adapter and headless vision node in separate terminals:
+Start the headless vision node and target manager in separate terminals:
 
 ```bash
-ros2 launch tennisbot_interface_adapter interface_adapter.launch.py
 ros2 launch tennisbot_headless_vision headless_vision.launch.py
+ros2 launch target_manager target_manager.launch.py
 ```
 
 Start the local stereo coordinate GUI:
@@ -78,15 +78,13 @@ After the stereo package verifies and the camera rig is mounted:
 2. Confirm `/robot/chassis_state` is publishing
    `[x_m, y_m, v_mps, phi_rad, yaw_rad, ground_speed_mps]`.
 3. Set `chassis_state_input_frame` in
-   `src/tennisbot_interface_adapter/config/interface_adapter.yaml` to `field`
+   `src/tennisbot_headless_vision/config/headless_vision.yaml` to `field`
    or `cartesian`.
-4. Launch `tennisbot_interface_adapter` and confirm `/vision/chassis_pose` is
-   present at nominal 30 Hz.
-5. Launch `tennisbot_headless_vision` and confirm it publishes
-   `/vision/target_prediction` only when a real ball is detected in both
-   cameras and a recent pose is available.
-6. Confirm `/target/raw` and `/target/managed` before enabling chassis planner
-   behavior.
+4. Launch `tennisbot_headless_vision` and confirm it publishes `/target/raw`
+   only when a real ball is detected in both cameras and recent chassis state
+   is available.
+5. Launch `target_manager` and confirm `/target/managed` before enabling
+   chassis planner behavior.
 
 ## Local Stereo GUI Order
 

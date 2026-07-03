@@ -131,14 +131,14 @@ Owns tracked ROS2 interface integration:
 - `src/interface/target_manager`: validates, filters, and rate-limits raw
   target predictions before planner/state-machine consumption;
 - `src/tennisbot_vision_msgs`: repository-owned vision-side ROS messages;
-- `src/tennisbot_interface_adapter`: event-driven bridge between vision-side
-  topics and the imported external interface;
+- `src/tennisbot_interface_adapter`: optional compatibility bridge between
+  vision-side topics and the imported external interface;
 - `src/tennisbot_headless_vision`: headless ROS stereo vision runtime that
-  consumes camera frames plus chassis pose and publishes
-  `/vision/target_prediction`.
+  consumes camera frames plus `/robot/chassis_state` and publishes
+  `/target/raw`.
 
-The nominal vision target, chassis-position, and chassis-pose paths are 30 Hz.
-The managed target output remains at most 10 Hz by design.
+The nominal raw target path is 30 Hz. The managed target output remains at most
+10 Hz by design.
 
 ### Target Headless ROS Runtime
 
@@ -148,9 +148,8 @@ design is documented in
 
 The node consumes stereo camera frames and timestamped chassis pose, transforms
 triangulated ball points into the field/interface frame, fits the trajectory,
-and publishes `/vision/target_prediction`. The adapter then forwards that data
-to `/target/raw`. It publishes nothing without real camera observations and a
-recent chassis pose.
+and publishes `/target/raw`. It publishes nothing without real camera
+observations and recent `/robot/chassis_state` samples.
 
 ## Runtime Flow
 
@@ -159,13 +158,12 @@ recent chassis pose.
 2. tools/calibration solves mono/stereo calibration packages under artifacts/calibration/...
 3. tools/yolo creates or verifies artifacts/models/tennis_ball_yolo
 4. tools/stereo can run the local OpenCV 4K stereo coordinate GUI
-5. tennisbot_interface_adapter publishes `/vision/chassis_pose` from chassis state
+5. tennisbot_headless_vision consumes `/robot/chassis_state`
 6. tennisbot_headless_vision reads two camera streams
 7. the node runs YOLO, stereo pairing, triangulation, field-frame transforms,
    and trajectory prediction
-8. the node publishes `/vision/target_prediction`
-9. `tennisbot_interface_adapter` forwards to `/target/raw`
-10. `target_manager` publishes `/target/managed` for the planner/state machine
+8. the node publishes `/target/raw`
+9. `target_manager` publishes `/target/managed` for the planner/state machine
 ```
 
 ## Current Validation State
@@ -203,11 +201,11 @@ Build and launch the ROS runtime:
 source /opt/ros/humble/setup.bash
 source ~/tennis_robot_ws/install/setup.bash
 colcon build --base-paths src --packages-select \
-  target_manager tennisbot_vision_msgs \
-  tennisbot_interface_adapter tennisbot_headless_vision
+  target_manager tennisbot_headless_vision \
+  --symlink-install --allow-overriding target_manager
 source install/setup.bash
-ros2 launch tennisbot_interface_adapter interface_adapter.launch.py
 ros2 launch tennisbot_headless_vision headless_vision.launch.py
+ros2 launch target_manager target_manager.launch.py
 ```
 
 Start the local OpenCV stereo-coordinate GUI:
@@ -227,16 +225,17 @@ cd packages/core && bun test && bun run typecheck
 Inspect ROS interfaces and topics:
 
 ```bash
-ros2 interface show tennisbot_vision_msgs/msg/ChassisPose
-ros2 interface show tennisbot_vision_msgs/msg/TargetPrediction
+ros2 interface show target_msgs/msg/RawTarget
+ros2 interface show target_msgs/msg/ManagedTarget
 ros2 topic list -t
-ros2 topic echo /vision/chassis_pose
-ros2 topic echo /vision/target_prediction
+ros2 topic echo /robot/chassis_state
+ros2 topic echo /target/raw
+ros2 topic echo /target/managed
 ```
 
 ## Remaining Engineering Work
 
 - Recalibrate after the cameras are mounted in their real physical positions.
 - Measure and configure the real `T_chassis_camera` extrinsics.
-- Verify `/vision/target_prediction` -> `/target/raw` -> `/target/managed`
-  with ROS/Gazebo or real chassis pose and control links.
+- Verify `/target/raw` -> `/target/managed` with ROS/Gazebo or real chassis
+  pose and control links.

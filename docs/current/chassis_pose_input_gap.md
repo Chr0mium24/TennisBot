@@ -18,14 +18,14 @@ yaw
 
 Current behavior:
 
-- missing `stamp` is handled by `tennisbot_interface_adapter`, which stamps
-  `/vision/chassis_pose` with the ROS clock when `/robot/chassis_state` is
+- missing `stamp` is handled by `tennisbot_headless_vision`, which stamps the
+  internal pose sample with the ROS clock when `/robot/chassis_state` is
   received;
 - missing `yaw` is not solved;
-- if `/robot/chassis_state` has fewer than five values, the adapter drops the
-  sample and `/vision/chassis_pose` is not published;
-- without `/vision/chassis_pose`, `tennisbot_headless_vision` waits and does
-  not publish `/vision/target_prediction`.
+- if `/robot/chassis_state` has fewer than five values, the headless node drops
+  the sample;
+- without recent `/robot/chassis_state`, `tennisbot_headless_vision` waits and
+  does not publish `/target/raw`.
 
 Expected `/robot/chassis_state` layout today:
 
@@ -58,9 +58,9 @@ field/interface frame.
 
 Current conversion boundary:
 
-- `tennisbot_interface_adapter` converts `/robot/chassis_state` into
-  `/vision/chassis_pose`;
-- if `chassis_state_input_frame: cartesian`, the adapter applies:
+- `tennisbot_headless_vision` converts `/robot/chassis_state` into its internal
+  pose buffer;
+- if `chassis_state_input_frame: cartesian`, the headless node applies:
 
 ```text
 field_x = cartesian_y
@@ -68,25 +68,22 @@ field_y = -cartesian_x
 field_yaw = cartesian_yaw - pi / 2
 ```
 
-- if `chassis_state_input_frame: field`, the adapter assumes `x/y/yaw` are
+- if `chassis_state_input_frame: field`, the headless node assumes `x/y/yaw` are
   already in the field/interface frame;
-- `tennisbot_headless_vision` consumes `/vision/chassis_pose` and performs
-  trajectory fitting in field/interface coordinates;
-- `/vision/target_prediction -> /target/raw` is a message adapter, not the
-  coordinate conversion layer.
+- trajectory fitting and `/target/raw` publishing use field/interface
+  coordinates.
 
 ## Relevant Files
 
-- `src/tennisbot_interface_adapter/tennisbot_interface_adapter/vision_interface_adapter_node.py`
+- `src/tennisbot_headless_vision/tennisbot_headless_vision/headless_vision_node.py`
   - reads `/robot/chassis_state`;
   - currently requires `yaw_rad` at index `4`;
-  - stamps `/vision/chassis_pose` with ROS clock.
+  - stamps the internal pose sample with ROS clock;
+  - waits for recent chassis state;
+  - publishes `/target/raw` only after real camera observation and recent pose
+    are available.
 - `src/tennisbot_headless_vision/tennisbot_headless_vision/geometry.py`
   - transforms camera/chassis points into field/interface coordinates.
-- `src/tennisbot_headless_vision/tennisbot_headless_vision/headless_vision_node.py`
-  - waits for recent `/vision/chassis_pose`;
-  - publishes `/vision/target_prediction` only after real camera observation
-    and recent pose are available.
 - `src/tennisbot_headless_vision/tennisbot_headless_vision/trajectory.py`
   - fits the trajectory and predicts the configured target plane.
 
@@ -117,4 +114,4 @@ bring-up mode, not a correct closed-loop runtime.
 Do not silently invent yaw.
 
 Until a fallback mode is explicitly added and enabled, missing yaw blocks
-`/vision/chassis_pose` and therefore blocks `/vision/target_prediction`.
+the internal pose buffer and therefore blocks `/target/raw`.

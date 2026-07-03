@@ -18,18 +18,14 @@ from builtin_interfaces.msg import Time
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
-from tennisbot_vision_msgs.msg import ChassisPose
-from tennisbot_vision_msgs.msg import TargetPrediction
+from std_msgs.msg import Float64MultiArray
+from target_msgs.msg import RawTarget
 
 from .geometry import PoseSample, Transform3D, camera_point_to_field
 from .trajectory import BallObservation, predict_target, seconds_to_duration
 
 
 NANOSECONDS_PER_SECOND = 1_000_000_000
-
-
-def time_to_nanoseconds(stamp: Time) -> int:
-    return stamp.sec * NANOSECONDS_PER_SECOND + stamp.nanosec
 
 
 def finite_float(value: object, *, name: str) -> float:
@@ -39,12 +35,17 @@ def finite_float(value: object, *, name: str) -> float:
     return result
 
 
+def normalize_angle(angle_rad: float) -> float:
+    return (angle_rad + math.pi) % (2.0 * math.pi) - math.pi
+
+
 class HeadlessVisionNode(Node):
     def __init__(self) -> None:
         super().__init__("headless_vision")
 
-        self.declare_parameter("chassis_pose_topic", "/vision/chassis_pose")
-        self.declare_parameter("target_prediction_topic", "/vision/target_prediction")
+        self.declare_parameter("chassis_state_topic", "/robot/chassis_state")
+        self.declare_parameter("raw_target_topic", "/target/raw")
+        self.declare_parameter("chassis_state_input_frame", "field")
         self.declare_parameter("runtime_rate_hz", 30.0)
         self.declare_parameter("enable_camera", True)
         self.declare_parameter("dry_run", False)
@@ -94,6 +95,7 @@ class HeadlessVisionNode(Node):
         self._enable_camera = bool(self.get_parameter("enable_camera").value)
         self._dry_run = bool(self.get_parameter("dry_run").value)
         self._runtime_rate_hz = self._positive("runtime_rate_hz")
+        self._chassis_state_input_frame = self._frame_parameter("chassis_state_input_frame")
         self._max_pose_age_ns = int(self._positive("max_pose_age_s") * NANOSECONDS_PER_SECOND)
         self._track_max_age_ns = int(self._positive("track_max_age_s") * NANOSECONDS_PER_SECOND)
         self._new_task_gap_ns = int(self._positive("new_task_gap_s") * NANOSECONDS_PER_SECOND)
@@ -125,14 +127,14 @@ class HeadlessVisionNode(Node):
             reliability=ReliabilityPolicy.RELIABLE,
         )
         self._target_publisher = self.create_publisher(
-            TargetPrediction,
-            str(self.get_parameter("target_prediction_topic").value),
+            RawTarget,
+            str(self.get_parameter("raw_target_topic").value),
             target_qos,
         )
         self.create_subscription(
-            ChassisPose,
-            str(self.get_parameter("chassis_pose_topic").value),
-            self._pose_callback,
+            Float64MultiArray,
+            str(self.get_parameter("chassis_state_topic").value),
+            self._chassis_state_callback,
             pose_qos,
         )
 
@@ -147,28 +149,43 @@ class HeadlessVisionNode(Node):
 
         self._timer = self.create_timer(1.0 / self._runtime_rate_hz, self._on_timer)
         self.get_logger().info(
-            "headless vision ready: rate=%.1fHz camera=%s dry_run=%s target_topic=%s"
+            "headless vision ready: rate=%.1fHz camera=%s dry_run=%s raw_target_topic=%s"
             % (
                 self._runtime_rate_hz,
                 self._enable_camera,
                 self._dry_run,
-                str(self.get_parameter("target_prediction_topic").value),
+                str(self.get_parameter("raw_target_topic").value),
             )
         )
 
-    def _pose_callback(self, msg: ChassisPose) -> None:
+    def _chassis_state_callback(self, msg: Float64MultiArray) -> None:
+        now = self.get_clock().now()
+        if len(msg.data) < 5:
+            self.get_logger().warning(
+                "Dropped chassis state with fewer than 5 values; need x,y,v,phi,yaw"
+            )
+            return
         try:
+            raw_x = finite_float(msg.data[0], name="chassis state x")
+            raw_y = finite_float(msg.data[1], name="chassis state y")
+            yaw = finite_float(msg.data[4], name="chassis state yaw")
+            x = raw_x
+            y = raw_y
+            if self._chassis_state_input_frame == "cartesian":
+                x = raw_y
+                y = -raw_x
+                yaw = normalize_angle(yaw - math.pi / 2.0)
             pose = PoseSample(
-                stamp_ns=time_to_nanoseconds(msg.stamp),
-                x=finite_float(msg.x, name="pose x"),
-                y=finite_float(msg.y, name="pose y"),
-                z=finite_float(msg.z, name="pose z"),
-                roll=finite_float(msg.roll, name="pose roll"),
-                pitch=finite_float(msg.pitch, name="pose pitch"),
-                yaw=finite_float(msg.yaw, name="pose yaw"),
+                stamp_ns=int(now.nanoseconds),
+                x=x,
+                y=y,
+                z=0.0,
+                roll=0.0,
+                pitch=0.0,
+                yaw=yaw,
             )
         except ValueError as exc:
-            self.get_logger().warning(f"Dropped invalid chassis pose: {exc}")
+            self.get_logger().warning(f"Dropped invalid chassis state: {exc}")
             return
         self._pose_buffer.append(pose)
 
@@ -177,7 +194,7 @@ class HeadlessVisionNode(Node):
             self._log_waiting("headless vision camera runtime disabled; no predictions published")
             return
         if not self._pose_buffer:
-            self._log_waiting("waiting for /vision/chassis_pose before opening camera runtime")
+            self._log_waiting("waiting for /robot/chassis_state before opening camera runtime")
             return
         if self._camera_failed:
             return
@@ -244,7 +261,7 @@ class HeadlessVisionNode(Node):
             self.get_logger().debug("dropped prediction outside configured target bounds")
             return
 
-        msg = TargetPrediction()
+        msg = RawTarget()
         msg.capture_stamp = sample.capture_stamp
         msg.task_id = self._task_id
         msg.sequence_id = self._sequence_id
@@ -296,6 +313,12 @@ class HeadlessVisionNode(Node):
             raise ValueError(f"parameter '{name}' must be a list of {length} floats")
         result = tuple(finite_float(item, name=f"{name}[{index}]") for index, item in enumerate(value))
         return result
+
+    def _frame_parameter(self, name: str) -> str:
+        value = str(self.get_parameter(name).value).strip().lower()
+        if value not in {"field", "cartesian"}:
+            raise ValueError(f"parameter '{name}' must be 'field' or 'cartesian'")
+        return value
 
 
 class StereoSample:

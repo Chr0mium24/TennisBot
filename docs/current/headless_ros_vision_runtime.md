@@ -16,19 +16,17 @@ Already available:
 - `tools/stereo` has tested OpenCV stereo detection, matching, triangulation,
   and local recording paths.
 - external `target_msgs` is provided by the sourced control workspace.
-- `src/tennisbot_interface_adapter` bridges vision-side topics to the external
-  interface topics.
-- `src/tennisbot_vision_msgs/msg/ChassisPose` defines the vision-side full
-  chassis pose input.
+- `src/tennisbot_interface_adapter` remains available as an optional
+  compatibility bridge for vision-side topics.
 - `src/tennisbot_headless_vision` owns the first headless stereo camera,
-  field-frame transform, trajectory fit, and `/vision/target_prediction`
-  publishing path.
+  field-frame transform, trajectory fit, and direct `/target/raw` publishing
+  path.
 
 Not yet available:
 
 - A checked runtime configuration for the fixed camera pose on the chassis.
-- Real hardware or ROS/Gazebo validation that `/vision/target_prediction`
-  reaches `/target/raw` and `/target/managed` with correct timing.
+- Real hardware or ROS/Gazebo validation that `/target/raw` reaches
+  `/target/managed` with correct timing.
 
 ## Runtime Goal
 
@@ -40,8 +38,6 @@ Target high-level flow:
 ```text
 stereo cameras
   -> headless vision ROS node
-  -> /vision/target_prediction
-  -> tennisbot_interface_adapter
   -> /target/raw
   -> target_manager
   -> /target/managed
@@ -52,7 +48,7 @@ The vision node also consumes chassis pose:
 
 ```text
 ROS/Gazebo/chassis backend
-  -> chassis pose x, y, yaw, stamp
+  -> /robot/chassis_state [x, y, v, phi, yaw, ground_speed]
   -> headless vision ROS node pose buffer
 ```
 
@@ -69,10 +65,9 @@ headless ROS node that can run unattended with cameras and ROS topics.
 Current migration state:
 
 1. Live3D code and launcher are removed from the active tree.
-2. `tennisbot_headless_vision` provides the headless ROS main chain.
-3. `tennisbot_interface_adapter` provides `/vision/chassis_pose` from chassis
-   state and forwards `/vision/target_prediction` to `/target/raw`.
-4. Hardware validation remains required before claiming the real catch loop is
+2. `tennisbot_headless_vision` provides the headless ROS main chain, consumes
+   `/robot/chassis_state`, and publishes `/target/raw`.
+3. Hardware validation remains required before claiming the real catch loop is
    complete.
 
 ### 2. Add the Headless Vision Node
@@ -90,16 +85,11 @@ read left/right camera frames
   -> maintain field-frame ball point history
   -> reject outliers and fit projectile trajectory
   -> predict target-plane point and remaining time
-  -> publish tennisbot_vision_msgs/TargetPrediction on /vision/target_prediction
+  -> publish target_msgs/RawTarget on /target/raw
 ```
 
-The node should publish only the vision-side topic. The adapter owns conversion
-to the imported external interface:
-
-```text
-/vision/target_prediction
-  -> /target/raw
-```
+The headless node owns the conversion into the external raw target interface
+for the main runtime path.
 
 ### 3. Add Complete Chassis Pose
 
@@ -190,8 +180,8 @@ cartesian_yaw = field_yaw + pi / 2
 
 The algorithm should convert observations into field/interface coordinates as
 soon as camera points are transformed through chassis pose. Trajectory fitting,
-quality checks, prediction, logging, and `/vision/target_prediction` should all
-use the same field/interface frame.
+quality checks, prediction, logging, and `/target/raw` should all use the same
+field/interface frame.
 
 Do not convert only at the `/target/raw` publish boundary. That would leave
 intermediate state, diagnostics, and future decisions in a different frame from
@@ -245,8 +235,8 @@ time will be wrong.
 The headless vision node publishes:
 
 ```text
-/vision/target_prediction
-tennisbot_vision_msgs/TargetPrediction
+/target/raw
+target_msgs/RawTarget
 ```
 
 Required fields:
@@ -262,16 +252,8 @@ sigma_x
 sigma_y
 ```
 
-The adapter converts this to:
-
-```text
-/target/raw
-target_msgs/RawTarget
-```
-
-The vision node should not publish `/target/raw` directly. Keeping the adapter
-in the path isolates repository-owned vision topics from the imported external
-interface.
+The optional `tennisbot_interface_adapter` package is no longer part of the
+main runtime chain.
 
 ### 8. Confirm Target Semantics
 
@@ -306,8 +288,6 @@ left/right camera frames
   -> P_field
   -> field-frame trajectory buffer
   -> target-plane prediction
-  -> /vision/target_prediction
-  -> tennisbot_interface_adapter
   -> /target/raw
   -> target_manager
   -> /target/managed
@@ -330,16 +310,14 @@ source /opt/ros/humble/setup.bash
 source install/setup.bash
 ros2 pkg list
 ros2 topic list -t
-ros2 interface show tennisbot_vision_msgs/msg/ChassisPose
-ros2 interface show tennisbot_vision_msgs/msg/TargetPrediction
 ros2 interface show target_msgs/msg/RawTarget
+ros2 interface show target_msgs/msg/ManagedTarget
 ```
 
 Runtime topic checks:
 
 ```bash
-ros2 topic hz /vision/target_prediction
-ros2 topic echo /vision/target_prediction
+ros2 topic hz /robot/chassis_state
 ros2 topic echo /target/raw
 ros2 topic echo /target/managed
 ```
@@ -351,13 +329,12 @@ real catch-loop verification.
 ## Acceptance Criteria
 
 - The headless node runs without a browser frontend.
-- It consumes timestamped chassis pose with yaw.
+- It consumes `/robot/chassis_state` with yaw.
 - It reads stereo camera frames and assigns ROS-clock capture stamps.
 - It transforms triangulated ball points into field/interface coordinates
   before trajectory fitting.
-- It publishes `/vision/target_prediction` at the expected nominal rate, up to
-  30 Hz when data is available.
-- The adapter forwards to `/target/raw`.
+- It publishes `/target/raw` at the expected nominal rate, up to 30 Hz when
+  data is available.
 - `target_manager` produces `/target/managed` at no more than 10 Hz.
 - The published target uses the configured target-plane semantic.
 - Logs and diagnostics are in the same field/interface frame as the published

@@ -14,7 +14,7 @@ workflow.
 | --- | --- |
 | `packages/contracts` | Shared TypeScript data contracts |
 | `packages/core` | Artifact validation, stereo pairing, triangulation helpers |
-| `src` | ROS2 target interface, vision adapter, and headless vision runtime packages |
+| `src` | ROS2 target interface, optional vision adapter, and headless vision runtime packages |
 | `tools/calibration` | Fixed DFOptix ChArUco OpenCV mono/stereo capture GUI |
 | `tools/yolo` | Standalone YOLO runtime model package tooling |
 | `tools/stereo` | Local OpenCV stereo recorder, coordinate GUI, and replay tooling |
@@ -29,26 +29,26 @@ Build the ROS interface and headless vision packages:
 source /opt/ros/humble/setup.bash
 source ~/tennis_robot_ws/install/setup.bash
 colcon build --base-paths src --packages-select \
-  target_manager tennisbot_vision_msgs \
-  tennisbot_interface_adapter tennisbot_headless_vision
+  target_manager tennisbot_headless_vision \
+  --symlink-install --allow-overriding target_manager
 source install/setup.bash
 ```
 
-Start the ROS adapter and headless vision runtime in separate terminals after
+Start the headless vision runtime and target manager in separate terminals after
 the workspace is sourced:
 
 ```bash
-ros2 launch tennisbot_interface_adapter interface_adapter.launch.py
 ros2 launch tennisbot_headless_vision headless_vision.launch.py
+ros2 launch target_manager target_manager.launch.py
 ```
 
 Inspect the runtime topics:
 
 ```bash
 ros2 topic list -t
-ros2 topic echo /vision/chassis_pose
-ros2 topic echo /vision/target_prediction
+ros2 topic echo /robot/chassis_state
 ros2 topic echo /target/raw
+ros2 topic echo /target/managed
 ```
 
 Run camera checks and calibration:
