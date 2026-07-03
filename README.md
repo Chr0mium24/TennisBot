@@ -14,7 +14,7 @@ workflow.
 | --- | --- |
 | `packages/contracts` | Shared TypeScript data contracts |
 | `packages/core` | Artifact validation, stereo pairing, triangulation helpers |
-| `src` | ROS2 target interface and headless vision runtime packages |
+| `src` | ROS2 headless vision runtime package; target interfaces are provided by the external control workspace |
 | `tools/calibration` | Fixed DFOptix ChArUco OpenCV mono/stereo capture GUI |
 | `tools/yolo` | Standalone YOLO runtime model package tooling |
 | `tools/stereo` | Local OpenCV stereo recorder, coordinate GUI, and replay tooling |
@@ -23,19 +23,18 @@ workflow.
 
 ## Common Commands
 
-Build the ROS interface and headless vision packages:
+Build the local headless vision package after sourcing ROS and the control
+workspace that provides `target_msgs` and `target_manager`:
 
 ```bash
 source /opt/ros/humble/setup.bash
-source ~/tennis_robot_ws/install/setup.bash
-colcon build --base-paths src --packages-select \
-  target_manager tennisbot_headless_vision \
-  --symlink-install --allow-overriding target_manager
+source /home/cr/tennis_robot_ws/install/setup.bash
+colcon build --base-paths src --packages-select tennisbot_headless_vision --symlink-install
 source install/setup.bash
 ```
 
-Start the headless vision runtime and target manager in separate terminals after
-the workspace is sourced:
+Start the headless vision runtime and the external target manager in separate
+terminals after both workspaces are sourced:
 
 ```bash
 ros2 launch tennisbot_headless_vision headless_vision.launch.py

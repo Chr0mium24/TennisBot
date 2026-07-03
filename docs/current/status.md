@@ -13,7 +13,7 @@ vision runtime. The main tracked paths are now:
 - `tools/stereo` for local 4K stereo YOLO coordinate display;
 - `packages/core` and `packages/contracts` for TypeScript artifact/geometry
   helpers and shared contracts;
-- `src` for ROS2 interface packages and the headless vision runtime.
+- `src` for the ROS2 headless vision runtime.
 
 ## Ready Now
 
@@ -21,7 +21,10 @@ The ROS package path now includes:
 
 - `tennisbot_headless_vision` consuming `/robot/chassis_state` and real stereo
   camera frames, then publishing `target_msgs/RawTarget` on `/target/raw`;
-- `target_manager` consuming `/target/raw` and publishing `/target/managed`;
+- external `target_msgs` and `target_manager` from the sourced
+  `/home/cr/tennis_robot_ws` control workspace;
+- external `target_manager` consuming `/target/raw` and publishing
+  `/target/managed`;
 - `scripts/headless.ts` for logged runtime launches and single-task runs with
   caller-specified `task_id`.
 
@@ -115,10 +118,8 @@ Build and run the headless ROS chain:
 
 ```bash
 source /opt/ros/humble/setup.bash
-source ~/tennis_robot_ws/install/setup.bash
-colcon build --base-paths src --packages-select \
-  target_manager tennisbot_headless_vision \
-  --symlink-install --allow-overriding target_manager
+source /home/cr/tennis_robot_ws/install/setup.bash
+colcon build --base-paths src --packages-select tennisbot_headless_vision --symlink-install
 source install/setup.bash
 ros2 launch tennisbot_headless_vision headless_vision.launch.py
 ros2 launch target_manager target_manager.launch.py

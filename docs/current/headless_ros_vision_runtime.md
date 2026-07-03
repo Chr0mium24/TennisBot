@@ -15,7 +15,8 @@ Already available:
   predictor.
 - `tools/stereo` has tested OpenCV stereo detection, matching, triangulation,
   and local recording paths.
-- external `target_msgs` is provided by the sourced control workspace.
+- external `target_msgs` and `target_manager` are provided by the sourced
+  control workspace.
 - `src/tennisbot_headless_vision` owns the first headless stereo camera,
   field-frame transform, trajectory fit, and direct `/target/raw` publishing
   path.
@@ -39,7 +40,7 @@ Target high-level flow:
 stereo cameras
   -> headless vision ROS node
   -> /target/raw
-  -> target_manager
+  -> external target_manager
   -> /target/managed
   -> chassis planner / state machine
 ```
@@ -288,7 +289,7 @@ left/right camera frames
   -> field-frame trajectory buffer
   -> target-plane prediction
   -> /target/raw
-  -> target_manager
+  -> external target_manager
   -> /target/managed
   -> chassis planner / state machine
 ```
@@ -336,6 +337,7 @@ ROS package checks:
 
 ```bash
 source /opt/ros/humble/setup.bash
+source /home/cr/tennis_robot_ws/install/setup.bash
 source install/setup.bash
 ros2 pkg list
 ros2 topic list -t
@@ -364,7 +366,7 @@ real catch-loop verification.
   before trajectory fitting.
 - It publishes `/target/raw` at the expected nominal rate, up to 30 Hz when
   data is available.
-- `target_manager` produces `/target/managed` at no more than 10 Hz.
+- external `target_manager` produces `/target/managed` at no more than 10 Hz.
 - The published target uses the configured target-plane semantic.
 - Logs and diagnostics are in the same field/interface frame as the published
   target.

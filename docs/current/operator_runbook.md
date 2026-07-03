@@ -23,14 +23,13 @@ From the repository root:
 
 ```bash
 source /opt/ros/humble/setup.bash
-source ~/tennis_robot_ws/install/setup.bash
-colcon build --base-paths src --packages-select \
-  target_manager tennisbot_headless_vision \
-  --symlink-install --allow-overriding target_manager
+source /home/cr/tennis_robot_ws/install/setup.bash
+colcon build --base-paths src --packages-select tennisbot_headless_vision --symlink-install
 source install/setup.bash
 ```
 
-Start the headless vision node and target manager in separate terminals:
+Start the headless vision node and external target manager in separate
+terminals:
 
 ```bash
 ros2 launch tennisbot_headless_vision headless_vision.launch.py
@@ -91,8 +90,8 @@ After the stereo package verifies and the camera rig is mounted:
 4. Launch `tennisbot_headless_vision` and confirm it publishes `/target/raw`
    only when a real ball is detected in both cameras and recent chassis state
    is available.
-5. Launch `target_manager` and confirm `/target/managed` before enabling
-   chassis planner behavior.
+5. Launch external `target_manager` from the sourced control workspace and
+   confirm `/target/managed` before enabling chassis planner behavior.
 6. For evidence capture, prefer `bun scripts/headless.ts run --record` or
    `bun scripts/headless.ts task --task-id <id> --session <name>` so the video,
    chassis state, YOLO detections, selected observations, and raw targets share

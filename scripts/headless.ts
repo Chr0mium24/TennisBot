@@ -261,7 +261,7 @@ function printUsage(): void {
   bun scripts/headless.ts task --task-id <id> [options]
 
 主链路入口:
-  run   启动 headless vision，可选启动 target_manager，可选记录运行日志
+  run   启动 headless vision，可选启动外部 target_manager，可选记录运行日志
   task  用指定 task_id 启动单次任务，默认开启日志，任务结束后 headless 节点退出
 
 常用命令:
@@ -281,14 +281,14 @@ function printUsage(): void {
   --no-target-log                     不写 targets.ndjson
   --task-id <id>                      初始或单次任务 task_id
   --single-task / --continuous        单任务或连续任务模式
-  --with-manager / --no-manager       是否同时启动 target_manager，默认启动
-  --use-sim-time                      给 headless 和 target_manager 使用 sim time
+  --with-manager / --no-manager       是否同时启动外部 target_manager，默认启动
+  --use-sim-time                      给 headless 和外部 target_manager 使用 sim time
   --tile / --no-tile                  覆盖 YOLO tiled 推理
   --devices <left,right>              覆盖双目设备
   --param <name:=value>               透传 ROS 参数，可重复
 
 说明:
-  运行前需要先 source ROS 和包含 target_msgs 的控制工作区，再 source 本仓库 install。
+  运行前需要先 source ROS 和包含 target_msgs/target_manager 的控制工作区，再 source 本仓库 install。
   日志目录包含 session.json、left.mp4、right.mp4、frames.ndjson、chassis.ndjson、
   detections.ndjson、observations.ndjson、targets.ndjson 和 events.ndjson。
 `);

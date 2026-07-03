@@ -125,11 +125,10 @@ training code. The active ROS trajectory predictor lives in
 
 ### `src`
 
-Owns tracked ROS2 interface integration:
+Owns tracked ROS2 vision runtime integration:
 
-- external `target_msgs` from the sourced control workspace (`~/tennis_robot_ws/install`);
-- `src/interface/target_manager`: validates, filters, and rate-limits raw
-  target predictions before planner/state-machine consumption;
+- external `target_msgs` and `target_manager` come from the sourced control
+  workspace (`/home/cr/tennis_robot_ws/install`);
 - `src/tennisbot_headless_vision`: headless ROS stereo vision runtime that
   consumes camera frames plus `/robot/chassis_state` and publishes
   `/target/raw`, with optional timestamped runtime logging.
@@ -160,7 +159,8 @@ observations and recent `/robot/chassis_state` samples.
 7. the node runs YOLO, stereo pairing, triangulation, field-frame transforms,
    and trajectory prediction
 8. the node publishes `/target/raw`
-9. `target_manager` publishes `/target/managed` for the planner/state machine
+9. external `target_manager` publishes `/target/managed` for the planner/state
+   machine
 ```
 
 When runtime logging is enabled, headless sessions are written under
@@ -200,10 +200,8 @@ Build and launch the ROS runtime:
 
 ```bash
 source /opt/ros/humble/setup.bash
-source ~/tennis_robot_ws/install/setup.bash
-colcon build --base-paths src --packages-select \
-  target_manager tennisbot_headless_vision \
-  --symlink-install --allow-overriding target_manager
+source /home/cr/tennis_robot_ws/install/setup.bash
+colcon build --base-paths src --packages-select tennisbot_headless_vision --symlink-install
 source install/setup.bash
 ros2 launch tennisbot_headless_vision headless_vision.launch.py
 ros2 launch target_manager target_manager.launch.py
