@@ -10,7 +10,9 @@ and ROS/Gazebo or chassis validation.
 
 Already available:
 
-- `packages/core` has tested stereo geometry and trajectory prediction modules.
+- `packages/core` has tested TypeScript stereo geometry helpers.
+- `src/tennisbot_headless_vision` has the active ROS Python trajectory
+  predictor.
 - `tools/stereo` has tested OpenCV stereo detection, matching, triangulation,
   and local recording paths.
 - external `target_msgs` is provided by the sourced control workspace.

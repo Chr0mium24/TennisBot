@@ -13,7 +13,7 @@ workflow.
 | Project | Purpose |
 | --- | --- |
 | `packages/contracts` | Shared TypeScript data contracts |
-| `packages/core` | Artifact validation, stereo pairing, triangulation, trajectory prediction |
+| `packages/core` | Artifact validation, stereo pairing, triangulation helpers |
 | `src` | ROS2 target interface, vision adapter, and headless vision runtime packages |
 | `tools/calibration` | Fixed DFOptix ChArUco OpenCV mono/stereo capture GUI |
 | `tools/yolo` | Standalone YOLO runtime model package tooling |

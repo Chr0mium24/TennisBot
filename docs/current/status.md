@@ -11,8 +11,8 @@ vision runtime. The main tracked paths are now:
 - `tools/yolo` for annotation, model package operations, and pure YOLO detect
   GUI;
 - `tools/stereo` for local 4K stereo YOLO coordinate display;
-- `packages/core` and `packages/contracts` for runtime algorithms and shared
-  contracts;
+- `packages/core` and `packages/contracts` for TypeScript artifact/geometry
+  helpers and shared contracts;
 - `src` for ROS2 interface packages, the TennisBot vision adapter, and the
   headless vision runtime.
 

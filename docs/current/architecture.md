@@ -11,7 +11,7 @@ top-level `packages/`, `scripts/`, `src/`, and `tools/`.
 TennisBot/
   packages/
     contracts/       shared TypeScript data contracts
-    core/            artifact loaders, stereo pairing, triangulation, prediction
+    core/            artifact loaders, stereo pairing, triangulation helpers
   src/
     interface/       imported ROS2 target interface packages
     tennisbot_*      repository-owned ROS2 vision messages, adapter, runtime
@@ -112,16 +112,16 @@ It displays camera-frame geometry only: x right, y down, z forward.
 
 ### `packages/core`
 
-Owns pure runtime algorithms and artifact validation:
+Owns TypeScript artifact validation and stereo geometry helpers:
 
 - YOLO and stereo calibration artifact metadata loaders;
 - stereo detection pairing with rectification, disparity/depth filtering, and
   reprojection diagnostics;
-- rectified stereo triangulation;
-- projectile trajectory prediction.
+- rectified stereo triangulation helpers.
 
 It has no browser UI, OpenCV GUI, camera device access, dataset management, or
-training code.
+training code. The active ROS trajectory predictor lives in
+`src/tennisbot_headless_vision`.
 
 ### `src`
 
