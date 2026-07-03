@@ -15,5 +15,13 @@ artifacts/*
 artifacts/models/*
 !artifacts/models/tennis_ball_yolo/
 !artifacts/models/tennis_ball_yolo/**
+!artifacts/calibration/
+artifacts/calibration/*
+!artifacts/calibration/cam1/
+!artifacts/calibration/cam1/**
+!artifacts/calibration/cam2/
+!artifacts/calibration/cam2/**
+!artifacts/calibration/stereo_cam1_cam2/
+!artifacts/calibration/stereo_cam1_cam2/**
 desperate/
 tools/yolo/dataset/

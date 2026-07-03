@@ -1,0 +1,25 @@
+{
+  "accepted": true,
+  "checks": [
+    {
+      "minimum": 8,
+      "name": "accepted_view_count",
+      "passed": true,
+      "value": 53
+    },
+    {
+      "name": "rms_reprojection_px",
+      "passed": true,
+      "threshold": 1.0,
+      "value": 0.17772754466439294
+    }
+  ],
+  "coverage": {
+    "accepted_view_count": 53,
+    "corner_count_max": 104,
+    "corner_count_min": 104
+  },
+  "dry_run": false,
+  "hardware_validated": true,
+  "schema_version": "calibration.verification.v1"
+}

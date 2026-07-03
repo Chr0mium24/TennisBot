@@ -1,0 +1,49 @@
+{
+  "accepted": true,
+  "camera_ids": [
+    "cam1",
+    "cam2"
+  ],
+  "created_at": "2026-07-01T03:35:36Z",
+  "dry_run": false,
+  "files": {
+    "cam1": "cam1.json",
+    "cam2": "cam2.json",
+    "opencv_yaml": "calibration_opencv.yaml",
+    "rectification": "rectification.json",
+    "review_html": "review.html",
+    "stereo": "stereo.json",
+    "summary": "summary.md",
+    "verification": "verification.json"
+  },
+  "hardware_validated": true,
+  "mono_sources": {
+    "cam1": "artifacts/calibration/cam1",
+    "cam2": "artifacts/calibration/cam2"
+  },
+  "package_type": "stereo_camera_calibration",
+  "quality": {
+    "accepted": true,
+    "accepted_pair_count": 38,
+    "baseline_m": 0.1649889033601914,
+    "epipolar_rms_px": 0.2567744520215293,
+    "matched_point_count_min": 104,
+    "max_rms_px": 2.0,
+    "rectification_y_p95_px": 0.4296203553676605,
+    "stereo_rms_reprojection_px": 0.21213797585745228,
+    "total_pair_count": 38,
+    "warnings": []
+  },
+  "runtime_quality_warning": false,
+  "schema_version": "calibration.stereo.v1",
+  "source_session": "tools/calibration/captures/local/stereo_charuco_20260701_111930_CST",
+  "target": {
+    "dictionary": "DICT_5X5_100",
+    "marker_size_m": 0.01125,
+    "profile": "dfoptix_charuco_14x9_square15mm_marker11_25mm",
+    "square_size_m": 0.015,
+    "squares_x": 14,
+    "squares_y": 9,
+    "type": "charuco"
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "accepted": true,
+  "checks": [
+    {
+      "minimum": 12,
+      "name": "accepted_pair_count",
+      "passed": true,
+      "value": 38
+    },
+    {
+      "name": "stereo_rms_px",
+      "passed": true,
+      "threshold": 2.0,
+      "value": 0.21213797585745228
+    },
+    {
+      "name": "epipolar_rms_px",
+      "passed": true,
+      "value": 0.2567744520215293,
+      "warning": false,
+      "warning_threshold": 2.0
+    },
+    {
+      "name": "rectification_y_p95_px",
+      "passed": true,
+      "value": 0.4296203553676605,
+      "warning": false,
+      "warning_threshold": 2.0
+    },
+    {
+      "minimum": 0,
+      "name": "baseline_m",
+      "passed": true,
+      "value": 0.1649889033601914
+    }
+  ],
+  "dry_run": false,
+  "hardware_validated": true,
+  "rectification": {
+    "accepted": true,
+    "epipolar_error_px": 0.2567744520215293,
+    "rectification_y_p95_px": 0.4296203553676605
+  },
+  "schema_version": "calibration.stereo_verification.v1",
+  "warnings": []
+}

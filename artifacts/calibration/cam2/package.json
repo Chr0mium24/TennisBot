@@ -1,0 +1,38 @@
+{
+  "accepted": true,
+  "camera_id": "cam2",
+  "created_at": "2026-07-01T03:15:57Z",
+  "dry_run": false,
+  "files": {
+    "camera": "camera.json",
+    "opencv_yaml": "calibration_opencv.yaml",
+    "review_html": "review.html",
+    "summary": "summary.md",
+    "verification": "verification.json"
+  },
+  "hardware_validated": true,
+  "image_size": {
+    "height": 720,
+    "width": 1280
+  },
+  "package_type": "mono_camera_calibration",
+  "quality": {
+    "accepted": true,
+    "accepted_view_count": 50,
+    "max_rms_px": 1.0,
+    "rms_reprojection_px": 0.18010338779683746,
+    "total_view_count": 50
+  },
+  "schema_version": "calibration.mono.v1",
+  "source_device": "/dev/video2",
+  "source_session": "tools/calibration/captures/local/cam2_charuco_20260701_111120_CST",
+  "target": {
+    "dictionary": "DICT_5X5_100",
+    "marker_size_m": 0.01125,
+    "profile": "dfoptix_charuco_14x9_square15mm_marker11_25mm",
+    "square_size_m": 0.015,
+    "squares_x": 14,
+    "squares_y": 9,
+    "type": "charuco"
+  }
+}
