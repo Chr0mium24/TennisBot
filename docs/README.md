@@ -8,6 +8,7 @@
 - [无前端 ROS 视觉运行目标](current/headless_ros_vision_runtime.md)
 - [当前状态](current/status.md)
 - [底盘 pose 输入缺口](current/chassis_pose_input_gap.md)
+- [中文运行说明](current/how_to_run_zh.md)
 - [命令入口使用说明](current/command_usage.md)
 - [操作员运行手册](current/operator_runbook.md)
 - [相机设备检查](current/camera_devices.md)

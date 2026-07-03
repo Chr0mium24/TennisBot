@@ -1,0 +1,357 @@
+# TennisBot 中文运行说明
+
+日期：2026-07-03
+
+## 先分清两个工作区
+
+主链路现在不是一个仓库全部包起来跑。运行时分成两个工作区：
+
+```text
+/home/cr/tennis_robot_ws
+  target_msgs
+  target_manager
+  底盘 / 仿真 / 控制相关 ROS 包
+
+/home/cr/Codes/TennisBot
+  src/tennisbot_headless_vision
+  scripts/headless.ts
+  tools/calibration
+  tools/stereo
+  tools/yolo
+  artifacts/calibration/stereo_cam1_cam2
+  artifacts/models/tennis_ball_yolo
+```
+
+`target_manager` 不在 TennisBot 仓库里构建。TennisBot 只构建并运行
+`tennisbot_headless_vision`，它发布 `/target/raw`；外部 `target_manager`
+订阅 `/target/raw`，再发布 `/target/managed` 给规划/状态机。
+
+主链路数据流：
+
+```text
+双目相机
+  -> tennisbot_headless_vision
+  -> /target/raw
+  -> target_manager
+  -> /target/managed
+  -> 底盘规划 / 状态机
+
+/robot/chassis_state
+  -> tennisbot_headless_vision
+```
+
+## 新电脑部署顺序
+
+### 1. 准备基础工具
+
+需要先装好这些工具：
+
+- ROS 2 Humble
+- `colcon`
+- `bun`
+- `uv`
+- 摄像头和 YOLO 所需的系统图形/视频依赖
+
+如果目标机器只做无相机 dry-run，可以先不处理摄像头权限；真实双目运行时要能
+访问 `/dev/video0` 和 `/dev/video2`，或者运行时显式传入设备。
+
+### 2. 准备控制工作区
+
+先准备 `/home/cr/tennis_robot_ws`，并确认它能提供 `target_msgs` 和
+`target_manager`：
+
+```bash
+cd /home/cr/tennis_robot_ws
+source /opt/ros/humble/setup.bash
+colcon build --symlink-install
+source install/setup.bash
+
+ros2 pkg list | grep -E 'target_msgs|target_manager'
+ros2 interface show target_msgs/msg/RawTarget
+ros2 interface show target_msgs/msg/ManagedTarget
+```
+
+如果这里失败，先修控制工作区。TennisBot 这边依赖这两个 ROS 包。
+
+### 3. 准备 TennisBot 仓库
+
+```bash
+cd /home/cr/Codes/TennisBot
+git pull
+```
+
+确认默认标定包和模型包存在。它们已经是 Git 跟踪文件，新电脑 clone/pull 后
+应该直接有：
+
+```bash
+test -d artifacts/calibration/stereo_cam1_cam2 && echo calibration_ok
+test -f artifacts/models/tennis_ball_yolo/model.pt && echo model_ok
+```
+
+只有在换相机安装位置、换双目设备或换模型时，才需要重新生成这些 artifact。
+
+### 4. 构建 TennisBot 里的 ROS 包
+
+每次打开新终端都要按顺序 source。构建时也一样：
+
+```bash
+cd /home/cr/Codes/TennisBot
+source /opt/ros/humble/setup.bash
+source /home/cr/tennis_robot_ws/install/setup.bash
+
+colcon build --base-paths src --packages-select tennisbot_headless_vision --symlink-install
+source install/setup.bash
+```
+
+注意这里不要 build `target_manager`，也不要加
+`--allow-overriding target_manager`。`target_manager` 属于
+`/home/cr/tennis_robot_ws`。
+
+## 每次开机后的最短运行命令
+
+### 1. 进入仓库并 source 环境
+
+```bash
+cd /home/cr/Codes/TennisBot
+source /opt/ros/humble/setup.bash
+source /home/cr/tennis_robot_ws/install/setup.bash
+source install/setup.bash
+```
+
+### 2. 先确认 ROS 包和话题接口
+
+```bash
+ros2 pkg list | grep -E 'target_msgs|target_manager|tennisbot_headless_vision'
+ros2 interface show target_msgs/msg/RawTarget
+ros2 interface show target_msgs/msg/ManagedTarget
+```
+
+### 3. 确认底盘位置输入
+
+真实主链路需要 `/robot/chassis_state`，消息类型现在是
+`std_msgs/Float64MultiArray`，数据顺序为：
+
+```text
+[x_m, y_m, v_mps, phi_rad, yaw_rad, ground_speed_mps]
+```
+
+检查：
+
+```bash
+ros2 topic list -t
+ros2 topic hz /robot/chassis_state
+ros2 topic echo /robot/chassis_state
+```
+
+如果没有 `/robot/chassis_state`，视觉节点会等待，不应该把无底盘输入的本地
+替身逻辑当成真实接球闭环。
+
+### 4. dry-run 看 Bun 会启动什么
+
+```bash
+bun scripts/headless.ts run --dry-run --record --devices /dev/video0,/dev/video2 --session dryrun
+```
+
+正常会打印两条命令：
+
+```text
+ros2 launch target_manager target_manager.launch.py
+ros2 run tennisbot_headless_vision headless_vision_node --ros-args ...
+```
+
+第一条来自外部控制工作区，第二条来自 TennisBot。
+
+### 5. 真实启动主链路
+
+默认会同时启动外部 `target_manager` 和本仓库的 headless 视觉节点：
+
+```bash
+bun scripts/headless.ts run --record --session test01 --tile
+```
+
+常用变体：
+
+```bash
+# 不分块 YOLO，使用配置默认值
+bun scripts/headless.ts run --record --session test01
+
+# 指定双目设备
+bun scripts/headless.ts run --record --session test01 --devices /dev/video0,/dev/video2
+
+# target_manager 已经在别的终端启动时，只启动视觉节点
+bun scripts/headless.ts run --record --session test01 --no-manager
+
+# 用 sim time 跑仿真链路
+bun scripts/headless.ts run --record --session sim01 --use-sim-time
+```
+
+## 单次 task 触发
+
+单次任务用 `task` 子命令。它会把 `task_id` 传给 headless 节点，默认打开日志，
+并在任务完成后让 headless 节点退出：
+
+```bash
+bun scripts/headless.ts task --task-id 42 --session catch42 --tile
+```
+
+如果只想记录文本数据，不录双路视频：
+
+```bash
+bun scripts/headless.ts task --task-id 42 --session catch42 --no-video
+```
+
+## 日志和录像在哪里
+
+`run --record` 和 `task` 默认写到：
+
+```text
+runs/headless/<session>/
+```
+
+主要文件：
+
+```text
+session.json       会话参数和启动信息
+left.mp4           左目视频
+right.mp4          右目视频
+frames.ndjson      帧时间戳
+chassis.ndjson     底盘输入和转换后的 field pose
+detections.ndjson  YOLO 检测和双目匹配诊断
+observations.ndjson 选中的球点观测
+targets.ndjson     发布到 /target/raw 的目标
+events.ndjson      运行事件和错误
+```
+
+这些文件用于复盘：能同时对齐双路视频、底盘位置、YOLO 结果、双目三角化结果
+和最终 `/target/raw`。
+
+## 手动分开启动
+
+不用 Bun 也可以分两个终端手动跑。
+
+终端 A：
+
+```bash
+cd /home/cr/Codes/TennisBot
+source /opt/ros/humble/setup.bash
+source /home/cr/tennis_robot_ws/install/setup.bash
+source install/setup.bash
+
+ros2 launch target_manager target_manager.launch.py
+```
+
+终端 B：
+
+```bash
+cd /home/cr/Codes/TennisBot
+source /opt/ros/humble/setup.bash
+source /home/cr/tennis_robot_ws/install/setup.bash
+source install/setup.bash
+
+ros2 launch tennisbot_headless_vision headless_vision.launch.py
+```
+
+Bun 入口只是把这两个进程按统一参数启动，并把日志参数、task 参数、设备参数
+转换成 ROS 参数传给 headless 节点。
+
+## 相机和标定检查
+
+先看设备亮度和画面：
+
+```bash
+bun scripts/calib.ts brightness
+bun scripts/calib.ts preview
+```
+
+重新标定顺序：
+
+```bash
+bun scripts/calib.ts mono cam1
+bun scripts/calib.ts mono cam2
+bun scripts/calib.ts stereo
+```
+
+默认输出：
+
+```text
+artifacts/calibration/cam1
+artifacts/calibration/cam2
+artifacts/calibration/stereo_cam1_cam2
+```
+
+如果只想看本机双目 YOLO 坐标 GUI，不接 ROS：
+
+```bash
+bun scripts/stereo.ts record
+bun scripts/stereo.ts gui --tile
+```
+
+这只是本机诊断工具，不能算真实接球闭环验证。
+
+## 常见问题
+
+### 找不到 `target_msgs` 或 `target_manager`
+
+原因通常是没有先 source 控制工作区：
+
+```bash
+source /opt/ros/humble/setup.bash
+source /home/cr/tennis_robot_ws/install/setup.bash
+```
+
+再检查：
+
+```bash
+ros2 pkg list | grep -E 'target_msgs|target_manager'
+```
+
+### `colcon build` 找不到 `target_msgs`
+
+构建 TennisBot 前必须先 build 并 source `/home/cr/tennis_robot_ws`。TennisBot
+不再包含本地 `target_msgs` 或 `target_manager` 副本。
+
+### 没有 `/target/raw`
+
+先查四件事：
+
+```bash
+ros2 topic hz /robot/chassis_state
+ls artifacts/calibration/stereo_cam1_cam2
+ls artifacts/models/tennis_ball_yolo/model.pt
+bun scripts/headless.ts run --dry-run --record --devices /dev/video0,/dev/video2
+```
+
+视觉节点只有在有近期底盘状态、双目相机帧、YOLO 检测和有效双目匹配时才发布
+`/target/raw`。
+
+### 有 `/target/raw` 但没有 `/target/managed`
+
+确认外部 `target_manager` 正在运行：
+
+```bash
+ros2 node list
+ros2 topic echo /target/raw
+ros2 topic echo /target/managed
+```
+
+如果 Bun 是用 `--no-manager` 启动的，需要在别的终端手动启动
+`target_manager`。
+
+### Python 依赖缺失
+
+真实相机 YOLO 运行需要 ROS 进程能 import `numpy`、`cv2` 和 `ultralytics`。
+本仓库的 Python 工具使用 `uv` 管理；部署镜像里也要保证 ROS 运行环境能访问
+这些依赖。无相机链路排查时可以先用 dry-run 或关闭相机参数确认 ROS topic
+链路。
+
+## 推荐验收命令
+
+```bash
+uv run -- python -m compileall -q src/tennisbot_headless_vision
+PYTHONPATH=src/tennisbot_headless_vision uv run python -m unittest discover -s src/tennisbot_headless_vision/tests -v
+bun scripts/headless.ts --help
+bun scripts/headless.ts run --dry-run --record --devices /dev/video0,/dev/video2 --session dryrun
+```
+
+真实验收还需要 ROS/Gazebo 或真实底盘链路提供 `/robot/chassis_state`，并确认
+`/target/raw` 和 `/target/managed` 的时间、坐标和频率都正确。

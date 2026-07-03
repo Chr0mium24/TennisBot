@@ -105,6 +105,7 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 - [Current architecture](docs/current/architecture.md)
 - [Headless ROS vision runtime target](docs/current/headless_ros_vision_runtime.md)
 - [Current status](docs/current/status.md)
+- [Chinese run guide](docs/current/how_to_run_zh.md)
 - [Command usage](docs/current/command_usage.md)
 - [Operator runbook](docs/current/operator_runbook.md)
 - [Camera devices](docs/current/camera_devices.md)
