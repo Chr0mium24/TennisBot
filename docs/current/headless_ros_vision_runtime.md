@@ -50,11 +50,13 @@ The vision node also consumes chassis pose:
 ```text
 ROS/Gazebo/chassis backend
   -> /robot/chassis_state [x, y, v, phi, yaw, ground_speed]
+  -> external chassis_position_publisher
+  -> /robot/chassis_position target_msgs/ChassisPosition
   -> headless vision ROS node pose buffer
 ```
 
-The current no-yaw behavior and acceptable fallback options are tracked in
-[Chassis Pose Input Gap](chassis_pose_input_gap.md).
+The chassis pose interface contract is tracked in
+[Chassis Pose Input Contract](chassis_pose_input_gap.md).
 
 ## Required Changes
 
@@ -67,7 +69,7 @@ Current migration state:
 
 1. Live3D code and launcher are removed from the active tree.
 2. `tennisbot_headless_vision` provides the headless ROS main chain, consumes
-   `/robot/chassis_state`, and publishes `/target/raw`.
+   `/robot/chassis_position`, and publishes `/target/raw`.
 3. Hardware validation remains required before claiming the real catch loop is
    complete.
 
@@ -318,11 +320,11 @@ events.ndjson
 ```
 
 `frames.ndjson` carries the ROS capture timestamp for each left/right video
-frame. `chassis.ndjson` stores raw `/robot/chassis_state` plus the converted
-field pose. `detections.ndjson` stores YOLO detections and stereo matching
-diagnostics, including frames with no valid stereo match. `observations.ndjson`
-stores selected camera-frame and field-frame ball points, and `targets.ndjson`
-stores each published `RawTarget`.
+frame. `chassis.ndjson` stores source `/robot/chassis_position` fields plus the
+converted field pose. `detections.ndjson` stores YOLO detections and stereo
+matching diagnostics, including frames with no valid stereo match.
+`observations.ndjson` stores selected camera-frame and field-frame ball points,
+and `targets.ndjson` stores each published `RawTarget`.
 
 ## Verification Plan
 
@@ -341,6 +343,7 @@ source /home/cr/tennis_robot_ws/install/setup.bash
 source install/setup.bash
 ros2 pkg list
 ros2 topic list -t
+ros2 interface show target_msgs/msg/ChassisPosition
 ros2 interface show target_msgs/msg/RawTarget
 ros2 interface show target_msgs/msg/ManagedTarget
 ```
@@ -348,7 +351,7 @@ ros2 interface show target_msgs/msg/ManagedTarget
 Runtime topic checks:
 
 ```bash
-ros2 topic hz /robot/chassis_state
+ros2 topic hz /robot/chassis_position
 ros2 topic echo /target/raw
 ros2 topic echo /target/managed
 ```
@@ -360,7 +363,7 @@ real catch-loop verification.
 ## Acceptance Criteria
 
 - The headless node runs without a browser frontend.
-- It consumes `/robot/chassis_state` with yaw.
+- It consumes `/robot/chassis_position` with yaw.
 - It reads stereo camera frames and assigns ROS-clock capture stamps.
 - It transforms triangulated ball points into field/interface coordinates
   before trajectory fitting.

@@ -26,7 +26,7 @@ source install/setup.bash
 
 默认值：
 
-- `tennisbot_headless_vision` 订阅 `/robot/chassis_state`
+- `tennisbot_headless_vision` 订阅 `/robot/chassis_position`
 - `tennisbot_headless_vision` 直接发布 `/target/raw`
 - 外部 `target_manager` 订阅 `/target/raw` 并发布 `/target/managed`
 - 名义频率：vision raw target 最高 30 Hz，managed target 最高 10 Hz
@@ -71,10 +71,11 @@ bun scripts/headless.ts run --dry-run --record --devices /dev/video0,/dev/video2
 查看接口和话题：
 
 ```bash
+ros2 interface show target_msgs/msg/ChassisPosition
 ros2 interface show target_msgs/msg/RawTarget
 ros2 interface show target_msgs/msg/ManagedTarget
 ros2 topic list -t
-ros2 topic hz /robot/chassis_state
+ros2 topic hz /robot/chassis_position
 ros2 topic echo /target/raw
 ros2 topic echo /target/managed
 ```

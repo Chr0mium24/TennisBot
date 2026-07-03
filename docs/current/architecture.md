@@ -130,7 +130,7 @@ Owns tracked ROS2 vision runtime integration:
 - external `target_msgs` and `target_manager` come from the sourced control
   workspace (`/home/cr/tennis_robot_ws/install`);
 - `src/tennisbot_headless_vision`: headless ROS stereo vision runtime that
-  consumes camera frames plus `/robot/chassis_state` and publishes
+  consumes camera frames plus `/robot/chassis_position` and publishes
   `/target/raw`, with optional timestamped runtime logging.
 
 The nominal raw target path is 30 Hz. The managed target output remains at most
@@ -145,7 +145,7 @@ design is documented in
 The node consumes stereo camera frames and timestamped chassis pose, transforms
 triangulated ball points into the field/interface frame, fits the trajectory,
 and publishes `/target/raw`. It publishes nothing without real camera
-observations and recent `/robot/chassis_state` samples.
+observations and recent `/robot/chassis_position` samples.
 
 ## Runtime Flow
 
@@ -154,7 +154,7 @@ observations and recent `/robot/chassis_state` samples.
 2. tools/calibration solves mono/stereo calibration packages under artifacts/calibration/...
 3. tools/yolo creates or verifies artifacts/models/tennis_ball_yolo
 4. tools/stereo can run the local OpenCV 4K stereo coordinate GUI
-5. tennisbot_headless_vision consumes `/robot/chassis_state`
+5. tennisbot_headless_vision consumes `/robot/chassis_position`
 6. tennisbot_headless_vision reads two camera streams
 7. the node runs YOLO, stereo pairing, triangulation, field-frame transforms,
    and trajectory prediction
@@ -165,7 +165,8 @@ observations and recent `/robot/chassis_state` samples.
 
 When runtime logging is enabled, headless sessions are written under
 `runs/headless/<session>/` with left/right video, frame timestamps, chassis
-state, YOLO detections, selected observations, raw targets, and runtime events.
+position, YOLO detections, selected observations, raw targets, and runtime
+events.
 
 ## Current Validation State
 
@@ -231,10 +232,11 @@ cd packages/core && bun test && bun run typecheck
 Inspect ROS interfaces and topics:
 
 ```bash
+ros2 interface show target_msgs/msg/ChassisPosition
 ros2 interface show target_msgs/msg/RawTarget
 ros2 interface show target_msgs/msg/ManagedTarget
 ros2 topic list -t
-ros2 topic echo /robot/chassis_state
+ros2 topic echo /robot/chassis_position
 ros2 topic echo /target/raw
 ros2 topic echo /target/managed
 ```

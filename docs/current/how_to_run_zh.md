@@ -29,15 +29,17 @@
 主链路数据流：
 
 ```text
+/robot/chassis_state
+  -> chassis_position_publisher
+  -> /robot/chassis_position
+  -> tennisbot_headless_vision
+
 双目相机
   -> tennisbot_headless_vision
   -> /target/raw
   -> target_manager
   -> /target/managed
   -> 底盘规划 / 状态机
-
-/robot/chassis_state
-  -> tennisbot_headless_vision
 ```
 
 ## 新电脑部署顺序
@@ -67,6 +69,7 @@ colcon build --symlink-install
 source install/setup.bash
 
 ros2 pkg list | grep -E 'target_msgs|target_manager'
+ros2 interface show target_msgs/msg/ChassisPosition
 ros2 interface show target_msgs/msg/RawTarget
 ros2 interface show target_msgs/msg/ManagedTarget
 ```
@@ -163,29 +166,38 @@ source install/setup.bash
 
 ```bash
 ros2 pkg list | grep -E 'target_msgs|target_manager|tennisbot_headless_vision'
+ros2 interface show target_msgs/msg/ChassisPosition
 ros2 interface show target_msgs/msg/RawTarget
 ros2 interface show target_msgs/msg/ManagedTarget
 ```
 
 ### 3. 确认底盘位置输入
 
-真实主链路需要 `/robot/chassis_state`，消息类型现在是
-`std_msgs/Float64MultiArray`，数据顺序为：
+真实主链路需要 interface 层发布 `/robot/chassis_position`，消息类型是
+`target_msgs/ChassisPosition`：
 
 ```text
-[x_m, y_m, v_mps, phi_rad, yaw_rad, ground_speed_mps]
+publish_stamp
+sequence_id
+x
+y
+yaw
 ```
+
+`/robot/chassis_state` 仍然可以作为底盘或仿真的原始数组输入，但它应该先进入
+外部 `chassis_position_publisher_node`，再由该节点发布
+`/robot/chassis_position` 给视觉节点。
 
 检查：
 
 ```bash
 ros2 topic list -t
-ros2 topic hz /robot/chassis_state
-ros2 topic echo /robot/chassis_state
+ros2 topic hz /robot/chassis_position
+ros2 topic echo /robot/chassis_position
 ```
 
-如果没有 `/robot/chassis_state`，视觉节点会等待，不应该把无底盘输入的本地
-替身逻辑当成真实接球闭环。
+如果没有 `/robot/chassis_position`，视觉节点会等待，不应该把无底盘输入的
+本地替身逻辑当成真实接球闭环。
 
 ### 4. dry-run 看 Bun 会启动什么
 
@@ -370,13 +382,13 @@ test -f /home/cr/Codes/TennisBot/install/setup.bash
 先查四件事：
 
 ```bash
-ros2 topic hz /robot/chassis_state
+ros2 topic hz /robot/chassis_position
 ls artifacts/calibration/stereo_cam1_cam2
 ls artifacts/models/tennis_ball_yolo/model.pt
 bun scripts/headless.ts run --dry-run --record --devices /dev/video0,/dev/video2
 ```
 
-视觉节点只有在有近期底盘状态、双目相机帧、YOLO 检测和有效双目匹配时才发布
+视觉节点只有在有近期底盘位置、双目相机帧、YOLO 检测和有效双目匹配时才发布
 `/target/raw`。
 
 ### 有 `/target/raw` 但没有 `/target/managed`
@@ -408,5 +420,5 @@ bun scripts/headless.ts --help
 bun scripts/headless.ts run --dry-run --record --devices /dev/video0,/dev/video2 --session dryrun
 ```
 
-真实验收还需要 ROS/Gazebo 或真实底盘链路提供 `/robot/chassis_state`，并确认
-`/target/raw` 和 `/target/managed` 的时间、坐标和频率都正确。
+真实验收还需要 ROS/Gazebo 或真实底盘链路提供 `/robot/chassis_position`，并
+确认 `/target/raw` 和 `/target/managed` 的时间、坐标和频率都正确。

@@ -1,13 +1,13 @@
 headless_vision:
   ros__parameters:
-    chassis_state_topic: /robot/chassis_state
+    chassis_position_topic: /robot/chassis_position
     raw_target_topic: /target/raw
-    # /robot/chassis_state is Float64MultiArray:
-    # [x_m, y_m, v_mps, phi_rad, yaw_rad, ground_speed_mps].
+    # /robot/chassis_position is target_msgs/ChassisPosition:
+    # publish_stamp, sequence_id, x_m, y_m, yaw_rad.
     # Use "field" when x/y/yaw are already in the field/interface frame.
     # Use "cartesian" to apply field_x=cartesian_y,
     # field_y=-cartesian_x, field_yaw=cartesian_yaw-pi/2.
-    chassis_state_input_frame: field
+    chassis_position_input_frame: field
     runtime_rate_hz: 30.0
     enable_camera: true
     dry_run: false

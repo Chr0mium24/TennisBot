@@ -19,8 +19,9 @@ vision runtime. The main tracked paths are now:
 
 The ROS package path now includes:
 
-- `tennisbot_headless_vision` consuming `/robot/chassis_state` and real stereo
-  camera frames, then publishing `target_msgs/RawTarget` on `/target/raw`;
+- `tennisbot_headless_vision` consuming `/robot/chassis_position` and real
+  stereo camera frames, then publishing `target_msgs/RawTarget` on
+  `/target/raw`;
 - external `target_msgs` and `target_manager` from the sourced
   `/home/cr/tennis_robot_ws` control workspace;
 - external `target_manager` consuming `/target/raw` and publishing
@@ -60,8 +61,8 @@ implemented code path still needs hardware or ROS/Gazebo validation. The main
 remaining gaps are:
 
 - measure and configure fixed chassis-to-camera extrinsics;
-- provide chassis yaw in `/robot/chassis_state`; see
-  [Chassis Pose Input Gap](chassis_pose_input_gap.md);
+- provide chassis yaw in `target_msgs/ChassisPosition`; see
+  [Chassis Pose Input Contract](chassis_pose_input_gap.md);
 - use ROS clock for image capture stamps and chassis pose timestamps;
 - verify real camera observations transform into field/interface coordinates
   before trajectory fitting;
@@ -136,7 +137,7 @@ Inspect runtime topics:
 
 ```bash
 ros2 topic list -t
-ros2 topic hz /robot/chassis_state
+ros2 topic hz /robot/chassis_position
 ros2 topic echo /target/raw
 ros2 topic echo /target/managed
 ```

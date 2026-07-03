@@ -20,8 +20,7 @@ from builtin_interfaces.msg import Time
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
-from std_msgs.msg import Float64MultiArray
-from target_msgs.msg import RawTarget
+from target_msgs.msg import ChassisPosition, RawTarget
 
 from .geometry import PoseSample, Transform3D, camera_point_to_field
 from .trajectory import BallObservation, predict_target, seconds_to_duration
@@ -45,9 +44,9 @@ class HeadlessVisionNode(Node):
     def __init__(self) -> None:
         super().__init__("headless_vision")
 
-        self.declare_parameter("chassis_state_topic", "/robot/chassis_state")
+        self.declare_parameter("chassis_position_topic", "/robot/chassis_position")
         self.declare_parameter("raw_target_topic", "/target/raw")
-        self.declare_parameter("chassis_state_input_frame", "field")
+        self.declare_parameter("chassis_position_input_frame", "field")
         self.declare_parameter("runtime_rate_hz", 30.0)
         self.declare_parameter("enable_camera", True)
         self.declare_parameter("dry_run", False)
@@ -109,7 +108,7 @@ class HeadlessVisionNode(Node):
         self._enable_camera = bool(self.get_parameter("enable_camera").value)
         self._dry_run = bool(self.get_parameter("dry_run").value)
         self._runtime_rate_hz = self._positive("runtime_rate_hz")
-        self._chassis_state_input_frame = self._frame_parameter("chassis_state_input_frame")
+        self._chassis_position_input_frame = self._frame_parameter("chassis_position_input_frame")
         self._single_task_mode = bool(self.get_parameter("single_task_mode").value)
         self._single_task_shutdown_on_complete = bool(
             self.get_parameter("single_task_shutdown_on_complete").value
@@ -152,9 +151,9 @@ class HeadlessVisionNode(Node):
             target_qos,
         )
         self.create_subscription(
-            Float64MultiArray,
-            str(self.get_parameter("chassis_state_topic").value),
-            self._chassis_state_callback,
+            ChassisPosition,
+            str(self.get_parameter("chassis_position_topic").value),
+            self._chassis_position_callback,
             pose_qos,
         )
 
@@ -190,25 +189,20 @@ class HeadlessVisionNode(Node):
             },
         )
 
-    def _chassis_state_callback(self, msg: Float64MultiArray) -> None:
-        now = self.get_clock().now()
-        if len(msg.data) < 5:
-            self.get_logger().warning(
-                "Dropped chassis state with fewer than 5 values; need x,y,v,phi,yaw"
-            )
-            return
+    def _chassis_position_callback(self, msg: ChassisPosition) -> None:
         try:
-            raw_x = finite_float(msg.data[0], name="chassis state x")
-            raw_y = finite_float(msg.data[1], name="chassis state y")
-            yaw = finite_float(msg.data[4], name="chassis state yaw")
+            raw_x = finite_float(msg.x, name="chassis position x")
+            raw_y = finite_float(msg.y, name="chassis position y")
+            raw_yaw = finite_float(msg.yaw, name="chassis position yaw")
             x = raw_x
             y = raw_y
-            if self._chassis_state_input_frame == "cartesian":
+            yaw = raw_yaw
+            if self._chassis_position_input_frame == "cartesian":
                 x = raw_y
                 y = -raw_x
                 yaw = normalize_angle(yaw - math.pi / 2.0)
             pose = PoseSample(
-                stamp_ns=int(now.nanoseconds),
+                stamp_ns=time_to_nanoseconds(msg.publish_stamp),
                 x=x,
                 y=y,
                 z=0.0,
@@ -217,13 +211,18 @@ class HeadlessVisionNode(Node):
                 yaw=yaw,
             )
         except ValueError as exc:
-            self.get_logger().warning(f"Dropped invalid chassis state: {exc}")
+            self.get_logger().warning(f"Dropped invalid chassis position: {exc}")
             return
         self._pose_buffer.append(pose)
         self._runtime_logger.record_chassis(
-            stamp=now.to_msg(),
-            raw_values=[float(value) for value in msg.data],
-            input_frame=self._chassis_state_input_frame,
+            stamp=msg.publish_stamp,
+            source={
+                "sequence_id": int(msg.sequence_id),
+                "x": raw_x,
+                "y": raw_y,
+                "yaw": raw_yaw,
+            },
+            input_frame=self._chassis_position_input_frame,
             pose=pose,
         )
 
@@ -234,7 +233,7 @@ class HeadlessVisionNode(Node):
             self._log_waiting("headless vision camera runtime disabled; no predictions published")
             return
         if not self._pose_buffer:
-            self._log_waiting("waiting for /robot/chassis_state before opening camera runtime")
+            self._log_waiting("waiting for /robot/chassis_position before opening camera runtime")
             return
         if self._camera_failed:
             return
@@ -426,6 +425,10 @@ def duration_to_nanoseconds(duration: Any) -> int:
     return int(duration.sec) * NANOSECONDS_PER_SECOND + int(duration.nanosec)
 
 
+def time_to_nanoseconds(stamp: Time) -> int:
+    return int(stamp.sec) * NANOSECONDS_PER_SECOND + int(stamp.nanosec)
+
+
 def stamp_to_dict(stamp: Time) -> dict[str, int]:
     sec = int(stamp.sec)
     nanosec = int(stamp.nanosec)
@@ -558,7 +561,7 @@ class RuntimeRunLogger:
             "created_at_local": datetime.now().isoformat(timespec="seconds"),
             "node": "tennisbot_headless_vision",
             "topics": {
-                "chassis_state": str(node.get_parameter("chassis_state_topic").value),
+                "chassis_position": str(node.get_parameter("chassis_position_topic").value),
                 "raw_target": str(node.get_parameter("raw_target_topic").value),
             },
             "runtime": {
@@ -571,7 +574,9 @@ class RuntimeRunLogger:
                 "model_path": str(node.get_parameter("model_path").value),
                 "calibration_package": str(node.get_parameter("calibration_package").value),
                 "tile": bool(node.get_parameter("tile").value),
-                "chassis_state_input_frame": str(node.get_parameter("chassis_state_input_frame").value),
+                "chassis_position_input_frame": str(
+                    node.get_parameter("chassis_position_input_frame").value
+                ),
                 "initial_task_id": int(node.get_parameter("initial_task_id").value),
                 "single_task_mode": bool(node.get_parameter("single_task_mode").value),
             },
@@ -669,7 +674,7 @@ class RuntimeRunLogger:
         self,
         *,
         stamp: Time,
-        raw_values: list[float],
+        source: dict[str, float | int],
         input_frame: str,
         pose: PoseSample,
     ) -> None:
@@ -677,7 +682,7 @@ class RuntimeRunLogger:
             "chassis",
             {
                 "stamp": stamp_to_dict(stamp),
-                "raw_values": raw_values,
+                "source": source,
                 "input_frame": input_frame,
                 "field_pose": pose_to_dict(pose),
             },

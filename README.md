@@ -55,7 +55,8 @@ Inspect the runtime topics:
 
 ```bash
 ros2 topic list -t
-ros2 topic echo /robot/chassis_state
+ros2 interface show target_msgs/msg/ChassisPosition
+ros2 topic echo /robot/chassis_position
 ros2 topic echo /target/raw
 ros2 topic echo /target/managed
 ```

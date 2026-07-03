@@ -1,4 +1,4 @@
-# Chassis Pose Input Gap
+# Chassis Pose Input Contract
 
 Date: 2026-07-03
 
@@ -18,20 +18,27 @@ yaw
 
 Current behavior:
 
-- missing `stamp` is handled by `tennisbot_headless_vision`, which stamps the
-  internal pose sample with the ROS clock when `/robot/chassis_state` is
-  received;
-- missing `yaw` is not solved;
-- if `/robot/chassis_state` has fewer than five values, the headless node drops
-  the sample;
-- without recent `/robot/chassis_state`, `tennisbot_headless_vision` waits and
-  does not publish `/target/raw`.
+- `tennisbot_headless_vision` subscribes to `/robot/chassis_position` as
+  `target_msgs/ChassisPosition`;
+- the internal pose sample timestamp comes from `ChassisPosition.publish_stamp`;
+- if `x`, `y`, or `yaw` is non-finite, the headless node drops the sample;
+- without recent `/robot/chassis_position`, `tennisbot_headless_vision` waits
+  and does not publish `/target/raw`.
 
-Expected `/robot/chassis_state` layout today:
+Expected `/robot/chassis_position` layout today:
 
 ```text
-[x_m, y_m, v_mps, phi_rad, yaw_rad, ground_speed_mps]
+publish_stamp
+sequence_id
+x
+y
+yaw
 ```
+
+The interface layer can still receive the lower-level
+`/robot/chassis_state std_msgs/Float64MultiArray`
+`[x_m, y_m, v_mps, phi_rad, yaw_rad, ground_speed_mps]`, but that array should
+be converted by `chassis_position_publisher_node` before the vision runtime.
 
 ## Why Yaw Is Required
 
@@ -58,9 +65,9 @@ field/interface frame.
 
 Current conversion boundary:
 
-- `tennisbot_headless_vision` converts `/robot/chassis_state` into its internal
-  pose buffer;
-- if `chassis_state_input_frame: cartesian`, the headless node applies:
+- `tennisbot_headless_vision` converts `/robot/chassis_position` into its
+  internal pose buffer;
+- if `chassis_position_input_frame: cartesian`, the headless node applies:
 
 ```text
 field_x = cartesian_y
@@ -68,18 +75,18 @@ field_y = -cartesian_x
 field_yaw = cartesian_yaw - pi / 2
 ```
 
-- if `chassis_state_input_frame: field`, the headless node assumes `x/y/yaw` are
-  already in the field/interface frame;
+- if `chassis_position_input_frame: field`, the headless node assumes
+  `x/y/yaw` are already in the field/interface frame;
 - trajectory fitting and `/target/raw` publishing use field/interface
   coordinates.
 
 ## Relevant Files
 
 - `src/tennisbot_headless_vision/tennisbot_headless_vision/headless_vision_node.py`
-  - reads `/robot/chassis_state`;
-  - currently requires `yaw_rad` at index `4`;
-  - stamps the internal pose sample with ROS clock;
-  - waits for recent chassis state;
+  - reads `/robot/chassis_position`;
+  - requires `x`, `y`, and `yaw`;
+  - timestamps the internal pose sample from `publish_stamp`;
+  - waits for recent chassis position;
   - publishes `/target/raw` only after real camera observation and recent pose
     are available.
 - `src/tennisbot_headless_vision/tennisbot_headless_vision/geometry.py`
@@ -91,7 +98,8 @@ field_yaw = cartesian_yaw - pi / 2
 
 ### Correct Fix
 
-Make the chassis backend publish yaw in `/robot/chassis_state`.
+Make the interface layer publish yaw in `target_msgs/ChassisPosition` on
+`/robot/chassis_position`.
 
 This is required for accurate field/world coordinates when the camera rig is
 mounted on a moving chassis.
@@ -113,5 +121,5 @@ bring-up mode, not a correct closed-loop runtime.
 
 Do not silently invent yaw.
 
-Until a fallback mode is explicitly added and enabled, missing yaw blocks
-the internal pose buffer and therefore blocks `/target/raw`.
+Until a fallback mode is explicitly added and enabled, missing yaw blocks the
+internal pose buffer and therefore blocks `/target/raw`.
