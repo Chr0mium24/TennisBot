@@ -1,0 +1,36 @@
+[augmentation]
+pipeline = "copy_paste"
+
+[inputs]
+dataset_root = "tools/yolo/yolo/dataset"
+sprites_root = "tools/yolo/yolo/runs/sprites/approved"
+excluded_file = "tools/yolo/yolo/dataset/excluded_images.txt"
+
+[output]
+root = "tools/yolo/yolo/runs/copy_paste_aug"
+count = 1000
+seed = 42
+image_format = "jpg"
+jpeg_quality = 92
+
+[selection]
+allow_labeled_backgrounds = true
+prefer_negative_backgrounds = true
+paste_per_image = [1, 1]
+
+[background]
+brightness = [-25, 25]
+contrast = [0.85, 1.15]
+blur_probability = 0.10
+blur_kernel = [3, 5]
+
+[ball]
+scale = [0.6, 1.8]
+brightness = [-35, 35]
+contrast = [0.8, 1.25]
+rotate_degrees = [-8, 8]
+motion_blur_probability = 0.20
+motion_blur_kernel = [3, 9]
+alpha_threshold_for_bbox = 16
+min_visible_area_px = 12
+avoid_existing_iou = 0.02

@@ -18,6 +18,12 @@ try {
   if (command === "annotate") {
     process.exit(await runYolo(["annotate", ...rest]));
   }
+  if (command === "sprites") {
+    process.exit(await runYolo(["sprites", ...rest], { extra: "augment" }));
+  }
+  if (command === "augment") {
+    process.exit(await runYolo(["augment", ...rest], { extra: "augment" }));
+  }
   throw new Error(`Unknown command: ${command}`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
@@ -26,9 +32,12 @@ try {
   process.exit(2);
 }
 
-async function runYolo(args: string[]): Promise<number> {
-  const proc = Bun.spawn(["uv", "run", "tennisbot-yolo", ...args], {
-    cwd: yoloCwd,
+async function runYolo(args: string[], options: { extra?: string } = {}): Promise<number> {
+  const command = ["uv", "run", "--project", yoloCwd];
+  if (options.extra !== undefined) command.push("--extra", options.extra);
+  command.push("tennisbot-yolo", ...args);
+  const proc = Bun.spawn(command, {
+    cwd: repoRoot,
     env: process.env,
     stdin: "inherit",
     stdout: "inherit",
@@ -65,6 +74,9 @@ async function waitForChild(proc: ReturnType<typeof Bun.spawn>): Promise<number>
 function printUsage(): void {
   console.log(`用法:
   bun scripts/yolo.ts annotate [options]
+  bun scripts/yolo.ts sprites extract [options]
+  bun scripts/yolo.ts sprites review [options]
+  bun scripts/yolo.ts augment copy-paste [options]
 
 启动 YOLO 标注前端/后端。默认值:
   图片目录   tools/yolo/yolo/dataset/images
@@ -76,9 +88,13 @@ function printUsage(): void {
   bun scripts/yolo.ts annotate
   bun scripts/yolo.ts annotate --port 8766
   bun scripts/yolo.ts annotate --images-root tools/yolo/yolo/dataset/images --labels-root tools/yolo/yolo/dataset/labels
+  bun scripts/yolo.ts sprites extract
+  bun scripts/yolo.ts sprites review
+  bun scripts/yolo.ts augment copy-paste --config tools/yolo/configs/augmentation.toml
 
 说明:
   annotate 使用 tools/yolo 的默认 uv 环境，不安装 torch、ultralytics 或 CUDA/NVIDIA Python 包。
+  sprites 和 augment 使用 tools/yolo 的 augment extra，只安装 OpenCV/NumPy，不安装 torch、ultralytics 或 CUDA/NVIDIA Python 包。
   需要纯 YOLO 相机检测 GUI 时仍使用 tools/yolo 的 detect extra。
 `);
 }

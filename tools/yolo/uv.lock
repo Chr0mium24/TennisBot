@@ -1240,6 +1240,10 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+augment = [
+    { name = "numpy" },
+    { name = "opencv-python" },
+]
 detect = [
     { name = "numpy" },
     { name = "opencv-python" },
@@ -1254,13 +1258,15 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115.0" },
+    { name = "numpy", marker = "extra == 'augment'", specifier = ">=2.0.0" },
     { name = "numpy", marker = "extra == 'detect'", specifier = ">=2.0.0" },
+    { name = "opencv-python", marker = "extra == 'augment'", specifier = ">=4.13.0.92" },
     { name = "opencv-python", marker = "extra == 'detect'", specifier = ">=4.13.0.92" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "ultralytics", marker = "extra == 'detect'", specifier = ">=8.4.46" },
     { name = "uvicorn", specifier = ">=0.34.0" },
 ]
-provides-extras = ["detect"]
+provides-extras = ["augment", "detect"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=9.0.3" }]

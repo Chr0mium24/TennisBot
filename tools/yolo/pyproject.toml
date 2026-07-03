@@ -11,6 +11,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+augment = [
+    "numpy>=2.0.0",
+    "opencv-python>=4.13.0.92",
+]
 detect = [
     "numpy>=2.0.0",
     "opencv-python>=4.13.0.92",

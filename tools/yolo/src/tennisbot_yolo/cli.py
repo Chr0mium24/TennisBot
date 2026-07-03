@@ -5,8 +5,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+from .augmentation import add_augment_parser
 from .detect_gui import add_detect_gui_parser
 from .package import PackageVerificationError, create_model_package, verify_model_package
+from .sprites import add_sprites_parser
 
 
 TOOL_ROOT = Path(__file__).resolve().parents[2]
@@ -84,6 +86,8 @@ def build_parser() -> argparse.ArgumentParser:
     annotate.set_defaults(func=cmd_annotate)
 
     add_detect_gui_parser(subparsers)
+    add_sprites_parser(subparsers)
+    add_augment_parser(subparsers)
 
     package = subparsers.add_parser("package", help="创建和验证运行时模型包。", **parser_kwargs)
     package_subparsers = package.add_subparsers(dest="package_command", required=True)

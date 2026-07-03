@@ -1,0 +1,8 @@
+{
+  "name": "@tennisbot/yolo-sprite-review",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "cd ../.. && uv run --extra augment tennisbot-yolo sprites review"
+  }
+}

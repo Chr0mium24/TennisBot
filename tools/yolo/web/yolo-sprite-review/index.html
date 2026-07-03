@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TennisBot YOLO Sprite Review</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+    }
+
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #f6f7f4;
+      color: #171b19;
+      font: 14px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .toolbar {
+      height: 56px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-bottom: 1px solid #d8ddd4;
+      background: #fbfcf8;
+    }
+
+    .title {
+      font-weight: 700;
+      margin-right: 8px;
+      white-space: nowrap;
+    }
+
+    .status {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #5f6963;
+      flex: 1;
+    }
+
+    .button {
+      height: 34px;
+      min-width: 38px;
+      border: 1px solid #c7cec6;
+      border-radius: 6px;
+      background: #fff;
+      color: #1c231f;
+      font-weight: 650;
+      padding: 0 12px;
+      cursor: pointer;
+    }
+
+    .button:hover {
+      background: #eef2ed;
+    }
+
+    .button.primary {
+      border-color: #9dc5ae;
+      background: #e8f6ee;
+      color: #134326;
+    }
+
+    .button.danger {
+      border-color: #e3b2b2;
+      background: #fff0f0;
+      color: #7b1f25;
+    }
+
+    .layout {
+      height: calc(100% - 56px);
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr) 320px;
+      min-width: 0;
+    }
+
+    .sidebar,
+    .controls {
+      min-height: 0;
+      overflow: auto;
+      border-right: 1px solid #d8ddd4;
+      background: #fbfcf8;
+    }
+
+    .controls {
+      border-right: 0;
+      border-left: 1px solid #d8ddd4;
+      padding: 14px;
+    }
+
+    .list-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 4px 8px;
+      width: 100%;
+      border: 0;
+      border-bottom: 1px solid #e4e8e1;
+      background: transparent;
+      color: inherit;
+      text-align: left;
+      padding: 10px 12px;
+      cursor: pointer;
+    }
+
+    .list-item:hover,
+    .list-item.active {
+      background: #eef2ed;
+    }
+
+    .list-id {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 650;
+    }
+
+    .badge {
+      border: 1px solid #cbd3cb;
+      border-radius: 999px;
+      padding: 1px 7px;
+      color: #516058;
+      font-size: 12px;
+      align-self: start;
+    }
+
+    .source {
+      grid-column: 1 / -1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #69736c;
+      font-size: 12px;
+    }
+
+    .workspace {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) 168px;
+      background: #eef1ec;
+    }
+
+    .canvas-wrap {
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    canvas {
+      max-width: 100%;
+      max-height: 100%;
+      background: #20251f;
+      image-rendering: auto;
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+    }
+
+    .preview-strip {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      border-top: 1px solid #d8ddd4;
+      padding: 12px;
+      background: #fbfcf8;
+    }
+
+    .preview {
+      display: flex;
+      min-width: 0;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      border: 1px solid #d8ddd4;
+      border-radius: 6px;
+    }
+
+    .preview.dark {
+      background: #141816;
+    }
+
+    .preview.light {
+      background:
+        linear-gradient(45deg, #e1e5df 25%, transparent 25%),
+        linear-gradient(-45deg, #e1e5df 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #e1e5df 75%),
+        linear-gradient(-45deg, transparent 75%, #e1e5df 75%);
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+      background-size: 16px 16px;
+      background-color: #fff;
+    }
+
+    .preview img {
+      max-width: 140px;
+      max-height: 140px;
+    }
+
+    .field {
+      display: grid;
+      grid-template-columns: 96px 1fr 72px;
+      gap: 8px;
+      align-items: center;
+      margin: 0 0 12px;
+    }
+
+    .field label {
+      color: #4d5851;
+      font-weight: 650;
+    }
+
+    .field input[type="range"] {
+      width: 100%;
+    }
+
+    .field input[type="number"] {
+      width: 72px;
+      height: 32px;
+      border: 1px solid #cbd3cb;
+      border-radius: 6px;
+      padding: 0 8px;
+      background: #fff;
+    }
+
+    .control-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    @media (max-width: 920px) {
+      .layout {
+        grid-template-columns: 220px minmax(0, 1fr);
+      }
+
+      .controls {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <div class="title">Sprite Review</div>
+    <button class="button" id="previous">Prev</button>
+    <button class="button" id="next">Next</button>
+    <button class="button" id="reset">Reset</button>
+    <button class="button primary" id="save">Save</button>
+    <button class="button primary" id="approve">Approve</button>
+    <button class="button danger" id="reject">Reject</button>
+    <div class="status" id="status">Loading sprites...</div>
+  </div>
+
+  <div class="layout">
+    <aside class="sidebar" id="spriteList"></aside>
+
+    <main class="workspace">
+      <div class="canvas-wrap">
+        <canvas id="canvas" width="640" height="480"></canvas>
+      </div>
+      <div class="preview-strip">
+        <div class="preview light"><img id="previewLight" alt="sprite preview on light background"></div>
+        <div class="preview dark"><img id="previewDark" alt="sprite preview on dark background"></div>
+      </div>
+    </main>
+
+    <aside class="controls">
+      <div class="field">
+        <label for="centerX">Center X</label>
+        <input id="centerX" type="range" min="0" max="100" step="0.5">
+        <input id="centerXNum" type="number" step="0.5">
+      </div>
+      <div class="field">
+        <label for="centerY">Center Y</label>
+        <input id="centerY" type="range" min="0" max="100" step="0.5">
+        <input id="centerYNum" type="number" step="0.5">
+      </div>
+      <div class="field">
+        <label for="radiusX">Radius X</label>
+        <input id="radiusX" type="range" min="1" max="100" step="0.5">
+        <input id="radiusXNum" type="number" step="0.5">
+      </div>
+      <div class="field">
+        <label for="radiusY">Radius Y</label>
+        <input id="radiusY" type="range" min="1" max="100" step="0.5">
+        <input id="radiusYNum" type="number" step="0.5">
+      </div>
+      <div class="field">
+        <label for="rotation">Rotation</label>
+        <input id="rotation" type="range" min="-45" max="45" step="0.5">
+        <input id="rotationNum" type="number" step="0.5">
+      </div>
+      <div class="field">
+        <label for="feather">Feather</label>
+        <input id="feather" type="range" min="0" max="32" step="1">
+        <input id="featherNum" type="number" step="1">
+      </div>
+      <div class="control-actions">
+        <button class="button" id="fit">Fit View</button>
+        <button class="button" id="reload">Reload</button>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const state = {
+      sprites: [],
+      index: -1,
+      current: null,
+      cropImage: new Image(),
+      defaults: null,
+      mask: null,
+    };
+
+    const elements = {
+      list: document.getElementById("spriteList"),
+      status: document.getElementById("status"),
+      canvas: document.getElementById("canvas"),
+      previous: document.getElementById("previous"),
+      next: document.getElementById("next"),
+      reset: document.getElementById("reset"),
+      save: document.getElementById("save"),
+      approve: document.getElementById("approve"),
+      reject: document.getElementById("reject"),
+      fit: document.getElementById("fit"),
+      reload: document.getElementById("reload"),
+      previewLight: document.getElementById("previewLight"),
+      previewDark: document.getElementById("previewDark"),
+    };
+
+    const fields = [
+      ["center_x", "centerX", "centerXNum"],
+      ["center_y", "centerY", "centerYNum"],
+      ["radius_x", "radiusX", "radiusXNum"],
+      ["radius_y", "radiusY", "radiusYNum"],
+      ["rotation_deg", "rotation", "rotationNum"],
+      ["feather_px", "feather", "featherNum"],
+    ];
+
+    function setStatus(text) {
+      elements.status.textContent = text;
+    }
+
+    async function requestJson(url, options) {
+      const response = await fetch(url, options);
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`${response.status} ${text}`);
+      }
+      return response.json();
+    }
+
+    async function loadSprites() {
+      const payload = await requestJson("/api/sprites");
+      state.sprites = payload.sprites;
+      renderList();
+      if (state.sprites.length === 0) {
+        setStatus("No sprite candidates found");
+        return;
+      }
+      await selectSprite(Math.max(0, state.index));
+    }
+
+    function renderList() {
+      elements.list.textContent = "";
+      for (const [index, sprite] of state.sprites.entries()) {
+        const button = document.createElement("button");
+        button.className = `list-item${index === state.index ? " active" : ""}`;
+        button.type = "button";
+        button.addEventListener("click", () => selectSprite(index));
+        button.innerHTML = `
+          <span class="list-id"></span>
+          <span class="badge"></span>
+          <span class="source"></span>
+        `;
+        button.querySelector(".list-id").textContent = sprite.id;
+        button.querySelector(".badge").textContent = sprite.status;
+        button.querySelector(".source").textContent = sprite.source.image;
+        elements.list.appendChild(button);
+      }
+    }
+
+    async function selectSprite(index) {
+      if (index < 0 || index >= state.sprites.length) return;
+      state.index = index;
+      const id = state.sprites[index].id;
+      const sprite = await requestJson(`/api/sprites/${encodeURIComponent(id)}`);
+      state.current = sprite;
+      state.mask = { ...sprite.mask };
+      state.defaults = defaultMask(sprite);
+      syncControls(sprite.crop.width, sprite.crop.height);
+      elements.previewLight.src = `${sprite.urls.sprite}?t=${Date.now()}`;
+      elements.previewDark.src = elements.previewLight.src;
+      state.cropImage = new Image();
+      state.cropImage.onload = drawCanvas;
+      state.cropImage.src = `${sprite.urls.crop}?t=${Date.now()}`;
+      renderList();
+      setStatus(`${state.index + 1}/${state.sprites.length} ${sprite.id}`);
+    }
+
+    function defaultMask(sprite) {
+      return {
+        center_x: sprite.crop.width / 2,
+        center_y: sprite.crop.height / 2,
+        radius_x: Math.max(1, sprite.crop.width * 0.32),
+        radius_y: Math.max(1, sprite.crop.height * 0.32),
+        rotation_deg: 0,
+        feather_px: sprite.mask.feather_px ?? 4,
+      };
+    }
+
+    function syncControls(width, height) {
+      const limits = {
+        center_x: [0, width],
+        center_y: [0, height],
+        radius_x: [1, width],
+        radius_y: [1, height],
+        rotation_deg: [-45, 45],
+        feather_px: [0, 32],
+      };
+      for (const [key, rangeId, numberId] of fields) {
+        const range = document.getElementById(rangeId);
+        const number = document.getElementById(numberId);
+        range.min = limits[key][0];
+        range.max = limits[key][1];
+        number.min = limits[key][0];
+        number.max = limits[key][1];
+        range.value = state.mask[key];
+        number.value = state.mask[key];
+      }
+      drawCanvas();
+    }
+
+    function updateField(key, value) {
+      state.mask[key] = Number(value);
+      for (const [fieldKey, rangeId, numberId] of fields) {
+        if (fieldKey !== key) continue;
+        document.getElementById(rangeId).value = state.mask[key];
+        document.getElementById(numberId).value = state.mask[key];
+      }
+      drawCanvas();
+    }
+
+    function drawCanvas() {
+      const canvas = elements.canvas;
+      const context = canvas.getContext("2d");
+      if (!state.cropImage.complete || !state.current) {
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        return;
+      }
+      canvas.width = state.current.crop.width;
+      canvas.height = state.current.crop.height;
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(state.cropImage, 0, 0);
+      context.save();
+      context.translate(state.mask.center_x, state.mask.center_y);
+      context.rotate((state.mask.rotation_deg * Math.PI) / 180);
+      context.beginPath();
+      context.ellipse(0, 0, state.mask.radius_x, state.mask.radius_y, 0, 0, Math.PI * 2);
+      context.fillStyle = "rgba(16, 185, 129, 0.26)";
+      context.strokeStyle = "rgba(5, 150, 105, 0.95)";
+      context.lineWidth = Math.max(1, Math.min(canvas.width, canvas.height) / 120);
+      context.fill();
+      context.stroke();
+      context.restore();
+    }
+
+    async function saveMask() {
+      if (!state.current) return;
+      const payload = {
+        center_x: Number(state.mask.center_x),
+        center_y: Number(state.mask.center_y),
+        radius_x: Number(state.mask.radius_x),
+        radius_y: Number(state.mask.radius_y),
+        rotation_deg: Number(state.mask.rotation_deg),
+        feather_px: Math.max(0, Math.round(Number(state.mask.feather_px))),
+      };
+      const result = await requestJson(`/api/sprites/${encodeURIComponent(state.current.id)}/mask`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      state.current = result.sprite;
+      elements.previewLight.src = `${state.current.urls.sprite}?t=${Date.now()}`;
+      elements.previewDark.src = elements.previewLight.src;
+      setStatus(`Saved ${state.current.id}`);
+    }
+
+    async function review(action) {
+      if (!state.current) return;
+      await saveMask();
+      await requestJson(`/api/sprites/${encodeURIComponent(state.current.id)}/${action}`, { method: "POST" });
+      setStatus(`${action === "approve" ? "Approved" : "Rejected"} ${state.current.id}`);
+      await loadSprites();
+    }
+
+    for (const [key, rangeId, numberId] of fields) {
+      const range = document.getElementById(rangeId);
+      const number = document.getElementById(numberId);
+      range.addEventListener("input", () => updateField(key, range.value));
+      number.addEventListener("input", () => updateField(key, number.value));
+    }
+
+    elements.previous.addEventListener("click", () => selectSprite(state.index - 1));
+    elements.next.addEventListener("click", () => selectSprite(state.index + 1));
+    elements.reset.addEventListener("click", () => {
+      if (!state.defaults) return;
+      state.mask = { ...state.defaults };
+      syncControls(state.current.crop.width, state.current.crop.height);
+    });
+    elements.save.addEventListener("click", () => saveMask().catch((error) => setStatus(error.message)));
+    elements.approve.addEventListener("click", () => review("approve").catch((error) => setStatus(error.message)));
+    elements.reject.addEventListener("click", () => review("reject").catch((error) => setStatus(error.message)));
+    elements.fit.addEventListener("click", drawCanvas);
+    elements.reload.addEventListener("click", () => loadSprites().catch((error) => setStatus(error.message)));
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowLeft") selectSprite(state.index - 1);
+      if (event.key === "ArrowRight") selectSprite(state.index + 1);
+      if (event.key.toLowerCase() === "s") saveMask().catch((error) => setStatus(error.message));
+      if (event.key.toLowerCase() === "a") review("approve").catch((error) => setStatus(error.message));
+      if (event.key.toLowerCase() === "x") review("reject").catch((error) => setStatus(error.message));
+    });
+
+    loadSprites().catch((error) => setStatus(error.message));
+  </script>
+</body>
+</html>
