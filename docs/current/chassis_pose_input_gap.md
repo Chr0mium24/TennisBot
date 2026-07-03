@@ -4,7 +4,7 @@ Date: 2026-07-03
 
 ## Problem
 
-The headless vision runtime needs timestamped chassis pose to transform a
+The vision runtime needs timestamped chassis pose to transform a
 triangulated camera-frame ball point into the field/interface frame.
 
 Minimum pose needed by the algorithm:
@@ -21,7 +21,7 @@ Current behavior:
 - `tennisbot_headless_vision` subscribes to `/robot/chassis_position` as
   `target_msgs/ChassisPosition`;
 - the internal pose sample timestamp comes from `ChassisPosition.publish_stamp`;
-- if `x`, `y`, or `yaw` is non-finite, the headless node drops the sample;
+- if `x`, `y`, or `yaw` is non-finite, the vision runtime node drops the sample;
 - without recent `/robot/chassis_position`, `tennisbot_headless_vision` waits
   and does not publish `/target/raw`.
 

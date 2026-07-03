@@ -5,13 +5,13 @@ Date: 2026-07-03
 ## Scope
 
 This runbook is the local-machine sequence for the current local reference
-tools. The target real runtime is the headless ROS vision path documented in
-[Headless ROS Vision Runtime Target](headless_ros_vision_runtime.md).
+tools. The target real runtime is the vision runtime path documented in
+[Vision Runtime](vision_runtime.md).
 
 1. `tools/calibration` OpenCV GUI for fixed DFOptix ChArUco mono/stereo capture.
 2. `tools/yolo` for pure YOLO detection and runtime model packages.
 3. `tools/stereo` for local OpenCV 4K stereo YOLO coordinate display.
-4. `src/tennisbot_headless_vision` for the ROS headless camera-to-target
+4. `src/tennisbot_headless_vision` for the vision runtime camera-to-target
    runtime path.
 
 The real catch loop still requires ROS/Gazebo or real chassis pose and control
@@ -28,7 +28,7 @@ colcon build --base-paths src --packages-select tennisbot_headless_vision --syml
 source install/setup.bash
 ```
 
-Start the headless vision node and external target manager in separate
+Start the vision runtime node and external target manager in separate
 terminals:
 
 ```bash
@@ -76,7 +76,7 @@ Use the mainline OpenCV GUI in order:
 5. `bun scripts/calib.ts stereo` for stereo capture, solve, and runtime package
    export under `artifacts/calibration/stereo_cam1_cam2`.
 
-## Headless ROS Order
+## Vision Runtime Order
 
 After the stereo package verifies and the camera rig is mounted:
 
@@ -121,4 +121,5 @@ selected trajectory window. Do not pass replay time windows through CLI flags.
 ## Current Runtime Evidence
 
 Historical browser/runtime reports remain under `docs/archive/`. Current
-runtime evidence should come from ROS topics and logs from the headless chain.
+runtime evidence should come from runtime topics and logs from the vision
+runtime chain.

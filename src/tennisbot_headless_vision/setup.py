@@ -18,7 +18,7 @@ setup(
     zip_safe=True,
     maintainer="syh",
     maintainer_email="syh@example.com",
-    description="Headless ROS stereo vision runtime for TennisBot target prediction.",
+    description="TennisBot vision runtime for stereo target prediction.",
     license="TODO",
     entry_points={
         "console_scripts": [

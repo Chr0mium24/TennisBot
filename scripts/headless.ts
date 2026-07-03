@@ -53,13 +53,13 @@ try {
 }
 
 async function run(options: Options): Promise<number> {
-  const headless = wrapRosCommand(buildHeadlessCommand(options), options);
+  const visionRuntime = wrapRosCommand(buildVisionRuntimeCommand(options), options);
   const managerCommand = buildManagerCommand(options);
   const manager = managerCommand === undefined ? undefined : wrapRosCommand(managerCommand, options);
 
   if (options.dryRun) {
     if (manager !== undefined) console.log(displayCommand(manager));
-    console.log(displayCommand(headless));
+    console.log(displayCommand(visionRuntime));
     return 0;
   }
 
@@ -67,8 +67,8 @@ async function run(options: Options): Promise<number> {
   if (manager !== undefined) {
     procs.push(spawn(manager));
   }
-  const headlessProc = spawn(headless);
-  procs.push(headlessProc);
+  const visionRuntimeProc = spawn(visionRuntime);
+  procs.push(visionRuntimeProc);
 
   const removeSignals = forwardSignals(procs);
   try {
@@ -84,7 +84,7 @@ async function run(options: Options): Promise<number> {
   }
 }
 
-function buildHeadlessCommand(options: Options): string[] {
+function buildVisionRuntimeCommand(options: Options): string[] {
   const params: string[] = [];
   addParam(params, "use_sim_time", boolValue(options.useSimTime));
   addParam(params, "runtime_log_enabled", boolValue(options.record));
@@ -147,7 +147,7 @@ function parseOptions(args: string[]): Options {
     record: command === "task",
     singleTask: command === "task",
     useSimTime: false,
-    logRoot: "runs/headless",
+    logRoot: "runs/vision-runtime",
     video: true,
     chassisLog: true,
     yoloLog: true,
@@ -291,8 +291,8 @@ function printUsage(): void {
   bun scripts/headless.ts task --task-id <id> [options]
 
 主链路入口:
-  run   启动 headless vision，可选启动外部 target_manager，可选记录运行日志
-  task  用指定 task_id 启动单次任务，默认开启日志，任务结束后 headless 节点退出
+  run   启动 vision runtime，可选启动外部 target_manager，可选记录运行日志
+  task  用指定 task_id 启动单次任务，默认开启日志，任务结束后 vision runtime 节点退出
 
 常用命令:
   bun scripts/headless.ts run
@@ -302,8 +302,8 @@ function printUsage(): void {
   bun scripts/headless.ts run --dry-run --record --devices /dev/video0,/dev/video2
 
 选项:
-  --record / --no-record              开关 runs/headless 日志
-  --log-root <path>                   日志根目录，默认 runs/headless
+  --record / --no-record              开关 runs/vision-runtime 日志
+  --log-root <path>                   日志根目录，默认 runs/vision-runtime
   --session <name>                    日志会话名，默认自动时间戳
   --no-video                          不写 left.mp4/right.mp4
   --no-chassis-log                    不写 chassis.ndjson
@@ -312,7 +312,7 @@ function printUsage(): void {
   --task-id <id>                      初始或单次任务 task_id
   --single-task / --continuous        单任务或连续任务模式
   --with-manager / --no-manager       是否同时启动外部 target_manager，默认启动
-  --use-sim-time                      给 headless 和外部 target_manager 使用 sim time
+  --use-sim-time                      给 vision runtime 和外部 target_manager 使用 sim time
   --auto-source / --no-auto-source    是否自动 source ROS/control/local setup，默认开启
   --setup-file <path>                 追加一个 setup.bash，可重复
   --clear-setup-files                 清空默认 setup 列表，配合 --setup-file 使用

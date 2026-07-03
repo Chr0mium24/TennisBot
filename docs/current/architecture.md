@@ -125,22 +125,22 @@ training code. The active ROS trajectory predictor lives in
 
 ### `src`
 
-Owns tracked ROS2 vision runtime integration:
+Owns tracked vision runtime integration:
 
 - external `target_msgs` and `target_manager` come from the sourced control
   workspace (`/home/cr/tennis_robot_ws/install`);
-- `src/tennisbot_headless_vision`: headless ROS stereo vision runtime that
+- `src/tennisbot_headless_vision`: stereo vision runtime that
   consumes camera frames plus `/robot/chassis_position` and publishes
   `/target/raw`, with optional timestamped runtime logging.
 
 The nominal raw target path is 30 Hz. The managed target output remains at most
 10 Hz by design.
 
-### Target Headless ROS Runtime
+### Target Vision Runtime
 
-The real runtime is a headless ROS vision node, not a frontend. The runtime
+The real runtime is a vision runtime, not a frontend. The runtime
 design is documented in
-[Headless ROS Vision Runtime Target](headless_ros_vision_runtime.md).
+[Vision Runtime](vision_runtime.md).
 
 The node consumes stereo camera frames and timestamped chassis pose, transforms
 triangulated ball points into the field/interface frame, fits the trajectory,
@@ -163,8 +163,8 @@ observations and recent `/robot/chassis_position` samples.
    machine
 ```
 
-When runtime logging is enabled, headless sessions are written under
-`runs/headless/<session>/` with left/right video, frame timestamps, chassis
+When runtime logging is enabled, vision runtime sessions are written under
+`runs/vision-runtime/<session>/` with left/right video, frame timestamps, chassis
 position, YOLO detections, selected observations, raw targets, and runtime
 events.
 
@@ -184,7 +184,7 @@ The epipolar metric is computed after undistorting points and evaluating the
 essential-matrix constraint in normalized coordinates, converted back to pixels
 by average focal length. The remaining physical gap is the measured
 chassis-to-camera extrinsic and full ROS/Gazebo or real chassis validation. The
-headless node includes a configurable `T_chassis_camera`, but the default
+vision runtime node includes a configurable `T_chassis_camera`, but the default
 translation is only a placeholder until measured on the mounted rig.
 
 ## Main Commands

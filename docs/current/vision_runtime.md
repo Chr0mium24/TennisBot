@@ -1,23 +1,22 @@
-# Headless ROS Vision Runtime Target
+# Vision Runtime
 
 Date: 2026-07-03
 
 ## Status
 
-This document describes the target runtime architecture and the first headless
-ROS implementation path. The code path exists, but it still needs real camera
-and ROS/Gazebo or chassis validation.
+This document describes the target camera-to-target runtime architecture and
+the current implementation path. The code path exists, but it still needs real
+camera and ROS/Gazebo or chassis validation.
 
 Already available:
 
 - `packages/core` has tested TypeScript stereo geometry helpers.
-- `src/tennisbot_headless_vision` has the active ROS Python trajectory
-  predictor.
+- `src/tennisbot_headless_vision` has the active Python trajectory predictor.
 - `tools/stereo` has tested OpenCV stereo detection, matching, triangulation,
   and local recording paths.
 - external `target_msgs` and `target_manager` are provided by the sourced
   control workspace.
-- `src/tennisbot_headless_vision` owns the first headless stereo camera,
+- `src/tennisbot_headless_vision` owns the first stereo camera,
   field-frame transform, trajectory fit, and direct `/target/raw` publishing
   path.
 - `scripts/headless.ts` launches the main chain with optional timestamped
@@ -31,28 +30,29 @@ Not yet available:
 
 ## Runtime Goal
 
-The real runtime should be one headless algorithm path, not a browser frontend.
+The real runtime should be one camera-to-target algorithm path, not a browser
+frontend.
 The active tree no longer contains the old Live3D frontend path.
 
 Target high-level flow:
 
 ```text
 stereo cameras
-  -> headless vision ROS node
+  -> vision runtime node
   -> /target/raw
   -> external target_manager
   -> /target/managed
   -> chassis planner / state machine
 ```
 
-The vision node also consumes chassis pose:
+The runtime also consumes chassis pose:
 
 ```text
 ROS/Gazebo/chassis backend
   -> /robot/chassis_state [x, y, v, phi, yaw, ground_speed]
   -> external chassis_position_publisher
   -> /robot/chassis_position target_msgs/ChassisPosition
-  -> headless vision ROS node pose buffer
+  -> vision runtime node pose buffer
 ```
 
 The chassis pose interface contract is tracked in
@@ -63,19 +63,20 @@ The chassis pose interface contract is tracked in
 ### 1. Replace Live3D as the Main Runtime Path
 
 The real runtime does not depend on `apps/live3d`. The replacement is a
-headless ROS node that can run unattended with cameras and ROS topics.
+vision runtime node that can run unattended with cameras, pose input, and
+target topics.
 
 Current migration state:
 
 1. Live3D code and launcher are removed from the active tree.
-2. `tennisbot_headless_vision` provides the headless ROS main chain, consumes
+2. `tennisbot_headless_vision` provides the vision runtime main chain, consumes
    `/robot/chassis_position`, and publishes `/target/raw`.
 3. Hardware validation remains required before claiming the real catch loop is
    complete.
 
-### 2. Add the Headless Vision Node
+### 2. Add the Vision Runtime Node
 
-The headless node should own the real-time algorithm:
+The vision runtime node should own the real-time algorithm:
 
 ```text
 read left/right camera frames
@@ -91,7 +92,7 @@ read left/right camera frames
   -> publish target_msgs/RawTarget on /target/raw
 ```
 
-The headless node owns the conversion into the external raw target interface
+The vision runtime node owns the conversion into the external raw target interface
 for the main runtime path.
 
 ### 3. Add Complete Chassis Pose
@@ -181,8 +182,8 @@ field_yaw = cartesian_yaw - pi / 2
 cartesian_yaw = field_yaw + pi / 2
 ```
 
-This mapping is an upstream interface-layer responsibility. The headless vision
-runtime does not expose a Cartesian input mode; it expects
+This mapping is an upstream interface-layer responsibility. The vision runtime
+does not expose a Cartesian input mode; it expects
 `target_msgs/ChassisPosition` to already use field/interface `x/y/yaw`.
 Trajectory fitting, quality checks, prediction, logging, and `/target/raw`
 should all use the same field/interface frame.
@@ -236,7 +237,7 @@ time will be wrong.
 
 ### 7. Publish the Raw Target Input
 
-The headless vision node publishes:
+The vision runtime node publishes:
 
 ```text
 /target/raw
@@ -262,7 +263,7 @@ There is no separate vision-interface adapter in the main runtime chain.
 
 The imported interface carries `target_x` and `target_y` as the predicted ball
 position when the ball reaches the configured target plane. The current
-headless runtime default is the catching plane:
+The default target plane is the catching plane:
 
 ```text
 target_plane_z = 0.6
@@ -306,7 +307,7 @@ bun scripts/headless.ts run --record --session test01 --tile
 bun scripts/headless.ts task --task-id 42 --session catch42 --tile
 ```
 
-The session directory is `runs/headless/<session>/` and contains:
+The session directory is `runs/vision-runtime/<session>/` and contains:
 
 ```text
 session.json
@@ -363,7 +364,7 @@ real catch-loop verification.
 
 ## Acceptance Criteria
 
-- The headless node runs without a browser frontend.
+- The vision runtime node runs without a browser frontend.
 - It consumes `/robot/chassis_position` with yaw.
 - It reads stereo camera frames and assigns ROS-clock capture stamps.
 - It transforms triangulated ball points into field/interface coordinates

@@ -4,8 +4,8 @@ Date: 2026-07-03
 
 ## Current Step
 
-The project is moving from local operator visualization toward a headless ROS
-vision runtime. The main tracked paths are now:
+The project is moving from local operator visualization toward a vision
+runtime. The main tracked paths are now:
 
 - `tools/calibration` for the fixed DFOptix ChArUco OpenCV capture GUI;
 - `tools/yolo` for annotation, model package operations, and pure YOLO detect
@@ -13,11 +13,11 @@ vision runtime. The main tracked paths are now:
 - `tools/stereo` for local 4K stereo YOLO coordinate display;
 - `packages/core` and `packages/contracts` for TypeScript artifact/geometry
   helpers and shared contracts;
-- `src` for the ROS2 headless vision runtime.
+- `src` for the vision runtime.
 
 ## Ready Now
 
-The ROS package path now includes:
+The runtime package path now includes:
 
 - `tennisbot_headless_vision` consuming `/robot/chassis_position` and real
   stereo camera frames, then publishing `target_msgs/RawTarget` on
@@ -38,7 +38,7 @@ bun scripts/calib.ts preview
 ```
 
 It prints average brightness for two USB cameras and can open a live preview
-with shutter and brightness controls before calibration or headless vision runs.
+with shutter and brightness controls before calibration or vision runtime runs.
 
 ## Important Gaps
 
@@ -56,8 +56,8 @@ baseline_m=0.1650
 stereo solve, and runtime calibration package export.
 
 The target real runtime is documented in
-[Headless ROS Vision Runtime Target](headless_ros_vision_runtime.md). The
-implemented code path still needs hardware or ROS/Gazebo validation. The main
+[Vision Runtime](vision_runtime.md). The implemented code path still needs
+hardware or ROS/Gazebo validation. The main
 remaining gaps are:
 
 - measure and configure fixed chassis-to-camera extrinsics;
@@ -115,7 +115,7 @@ bun scripts/calib.ts mono cam2
 bun scripts/calib.ts stereo
 ```
 
-Build and run the headless ROS chain:
+Build and run the vision runtime chain:
 
 ```bash
 source /opt/ros/humble/setup.bash

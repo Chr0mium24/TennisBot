@@ -216,7 +216,7 @@ bash -lc 'source /opt/ros/humble/setup.bash && source /home/cr/tennis_robot_ws/i
 
 ### 5. 真实启动主链路
 
-默认会同时启动外部 `target_manager` 和本仓库的 headless 视觉节点。这里不需要
+默认会同时启动外部 `target_manager` 和本仓库的视觉运行时节点。这里不需要
 再手动 source：
 
 ```bash
@@ -241,8 +241,8 @@ bun scripts/headless.ts run --record --session sim01 --use-sim-time
 
 ## 单次 task 触发
 
-单次任务用 `task` 子命令。它会把 `task_id` 传给 headless 节点，默认打开日志，
-并在任务完成后让 headless 节点退出：
+单次任务用 `task` 子命令。它会把 `task_id` 传给视觉运行时节点，默认打开日志，
+并在任务完成后让视觉运行时节点退出：
 
 ```bash
 bun scripts/headless.ts task --task-id 42 --session catch42 --tile
@@ -259,7 +259,7 @@ bun scripts/headless.ts task --task-id 42 --session catch42 --no-video
 `run --record` 和 `task` 默认写到：
 
 ```text
-runs/headless/<session>/
+runs/vision-runtime/<session>/
 ```
 
 主要文件：
@@ -306,7 +306,7 @@ ros2 launch tennisbot_headless_vision headless_vision.launch.py
 ```
 
 Bun 入口只是把这两个进程按统一参数启动，并把日志参数、task 参数、设备参数
-转换成 ROS 参数传给 headless 节点。
+转换成 ROS 参数传给视觉运行时节点。
 
 ## 相机和标定检查
 

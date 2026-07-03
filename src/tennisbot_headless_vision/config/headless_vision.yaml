@@ -67,7 +67,7 @@ headless_vision:
     max_abs_target_y: 8.0
 
     runtime_log_enabled: false
-    runtime_log_root: runs/headless
+    runtime_log_root: runs/vision-runtime
     runtime_log_session: ""
     runtime_log_video: true
     runtime_log_chassis: true

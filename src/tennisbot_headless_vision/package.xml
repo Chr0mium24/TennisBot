@@ -3,7 +3,7 @@
 <package format="3">
   <name>tennisbot_headless_vision</name>
   <version>0.1.0</version>
-  <description>Headless ROS stereo vision runtime for TennisBot target prediction.</description>
+  <description>TennisBot vision runtime for stereo target prediction.</description>
   <maintainer email="syh@example.com">syh</maintainer>
   <license>TODO</license>
 

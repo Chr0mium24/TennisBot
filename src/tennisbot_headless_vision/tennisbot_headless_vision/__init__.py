@@ -1,1 +1,1 @@
-"""Headless TennisBot ROS vision runtime."""
+"""TennisBot vision runtime."""

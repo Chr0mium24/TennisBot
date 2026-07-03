@@ -14,7 +14,7 @@ workflow.
 | --- | --- |
 | `packages/contracts` | Shared TypeScript data contracts |
 | `packages/core` | Artifact validation, stereo pairing, triangulation helpers |
-| `src` | ROS2 headless vision runtime package; target interfaces are provided by the external control workspace |
+| `src` | Vision runtime package; target interfaces are provided by the external control workspace |
 | `tools/calibration` | Fixed DFOptix ChArUco OpenCV mono/stereo capture GUI |
 | `tools/yolo` | Standalone YOLO runtime model package tooling |
 | `tools/stereo` | Local OpenCV stereo recorder, coordinate GUI, and replay tooling |
@@ -23,7 +23,7 @@ workflow.
 
 ## Common Commands
 
-Build the local headless vision package after sourcing ROS and the control
+Build the local vision runtime package after sourcing ROS and the control
 workspace that provides `target_msgs` and `target_manager`:
 
 ```bash
@@ -33,7 +33,7 @@ colcon build --base-paths src --packages-select tennisbot_headless_vision --syml
 source install/setup.bash
 ```
 
-Start the headless vision runtime and the external target manager in separate
+Start the vision runtime and the external target manager in separate
 terminals after both workspaces are sourced:
 
 ```bash
@@ -106,7 +106,7 @@ uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_y
 ## Architecture
 
 - [Current architecture](docs/current/architecture.md)
-- [Headless ROS vision runtime target](docs/current/headless_ros_vision_runtime.md)
+- [Vision Runtime](docs/current/vision_runtime.md)
 - [Current status](docs/current/status.md)
 - [Chinese run guide](docs/current/how_to_run_zh.md)
 - [Command usage](docs/current/command_usage.md)

@@ -1,4 +1,4 @@
-"""Headless stereo vision ROS node.
+"""Vision runtime node.
 
 The node publishes only observations derived from real camera frames and a
 recent chassis pose. It does not generate simulated target predictions.
@@ -91,7 +91,7 @@ class HeadlessVisionNode(Node):
         self.declare_parameter("max_abs_target_x", 15.0)
         self.declare_parameter("max_abs_target_y", 8.0)
         self.declare_parameter("runtime_log_enabled", False)
-        self.declare_parameter("runtime_log_root", "runs/headless")
+        self.declare_parameter("runtime_log_root", "runs/vision-runtime")
         self.declare_parameter("runtime_log_session", "")
         self.declare_parameter("runtime_log_video", True)
         self.declare_parameter("runtime_log_chassis", True)
@@ -162,7 +162,7 @@ class HeadlessVisionNode(Node):
 
         self._timer = self.create_timer(1.0 / self._runtime_rate_hz, self._on_timer)
         self.get_logger().info(
-            "headless vision ready: rate=%.1fHz camera=%s dry_run=%s task_id=%d raw_target_topic=%s"
+            "vision runtime ready: rate=%.1fHz camera=%s dry_run=%s task_id=%d raw_target_topic=%s"
             % (
                 self._runtime_rate_hz,
                 self._enable_camera,
@@ -172,7 +172,7 @@ class HeadlessVisionNode(Node):
             )
         )
         self._runtime_logger.record_event(
-            "headless_vision_ready",
+            "vision_runtime_ready",
             {
                 "runtime_rate_hz": self._runtime_rate_hz,
                 "enable_camera": self._enable_camera,
@@ -216,7 +216,7 @@ class HeadlessVisionNode(Node):
         if self._single_task_complete:
             return
         if self._dry_run or not self._enable_camera:
-            self._log_waiting("headless vision camera runtime disabled; no predictions published")
+            self._log_waiting("vision runtime camera disabled; no predictions published")
             return
         if not self._pose_buffer:
             self._log_waiting("waiting for /robot/chassis_position before opening camera runtime")
@@ -531,15 +531,15 @@ class RuntimeRunLogger:
         root = Path(str(node.get_parameter("runtime_log_root").value)).expanduser()
         session = str(node.get_parameter("runtime_log_session").value).strip()
         if not session:
-            session = "headless_" + datetime.now().strftime("%Y%m%d_%H%M%S")
+            session = "vision_runtime_" + datetime.now().strftime("%Y%m%d_%H%M%S")
         video_fourcc = str(node.get_parameter("runtime_log_video_fourcc").value)
         if len(video_fourcc) != 4:
             raise ValueError("runtime_log_video_fourcc must contain exactly four characters")
 
         metadata = {
-            "schema_version": "tennisbot.headless_runtime_log.v1",
+            "schema_version": "tennisbot.vision_runtime_log.v1",
             "created_at_local": datetime.now().isoformat(timespec="seconds"),
-            "node": "tennisbot_headless_vision",
+            "node": "vision_runtime",
             "topics": {
                 "chassis_position": str(node.get_parameter("chassis_position_topic").value),
                 "raw_target": str(node.get_parameter("raw_target_topic").value),
