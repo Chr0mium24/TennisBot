@@ -489,11 +489,15 @@ def compute_peak_metrics(
     height: int,
     radius_px: float,
     thresholds: list[float],
+    selection: str = "f1",
 ) -> PeakMetrics:
+    if selection not in {"f1", "recall"}:
+        raise ValueError("selection must be 'f1' or 'recall'")
     positives = sum(1 for prediction in predictions if prediction.positive)
     negatives = len(predictions) - positives
     oracle_hits = 0
     best: PeakMetrics | None = None
+    best_key: tuple[float, float, float] | None = None
     for threshold in thresholds:
         tp = fp = fn = 0
         tp_distances: list[float] = []
@@ -530,7 +534,12 @@ def compute_peak_metrics(
             mean_tp_distance=statistics.mean(tp_distances) if tp_distances else None,
             oracle_recall=oracle_hits / positives if positives else 0.0,
         )
-        if best is None or (metric.f1, metric.recall, metric.precision) > (best.f1, best.recall, best.precision):
+        if selection == "recall":
+            key = (metric.recall, metric.precision, metric.f1)
+        else:
+            key = (metric.f1, metric.recall, metric.precision)
+        if best_key is None or key > best_key:
+            best_key = key
             best = metric
     if best is None:
         return PeakMetrics(0.0, 0, 0, 0, positives, negatives, 0.0, 0.0, 0.0, None, 0.0)
@@ -579,9 +588,17 @@ def evaluate_model(
     height: int,
     radius_px: float,
     thresholds: list[float],
+    selection: str = "f1",
 ) -> PeakMetrics:
     predictions = collect_predictions(model, loader, device=device, width=width, height=height)
-    return compute_peak_metrics(predictions, width=width, height=height, radius_px=radius_px, thresholds=thresholds)
+    return compute_peak_metrics(
+        predictions,
+        width=width,
+        height=height,
+        radius_px=radius_px,
+        thresholds=thresholds,
+        selection=selection,
+    )
 
 
 def benchmark_latency(model: Any, *, device: str, input_channels: int, height: int, width: int, repeats: int) -> float:
@@ -617,9 +634,15 @@ def format_report(
     best_epoch: int,
     best_loss: float,
     best_metrics: PeakMetrics,
+    best_recall_epoch: int,
+    best_recall_loss: float,
+    best_recall_metrics: PeakMetrics,
     latency_ms: float,
 ) -> str:
     distance = "" if best_metrics.mean_tp_distance is None else f"{best_metrics.mean_tp_distance:.2f}"
+    recall_distance = (
+        "" if best_recall_metrics.mean_tp_distance is None else f"{best_recall_metrics.mean_tp_distance:.2f}"
+    )
     stereo_fps = 1000.0 / (latency_ms * 2.0) if latency_ms > 0 else 0.0
     return "\n".join(
         [
@@ -656,6 +679,8 @@ def format_report(
             "",
             "## Best Validation",
             "",
+            "### Best F1",
+            "",
             "| epoch | loss | threshold | TP | FP | FN | recall | precision | F1 | oracle recall | mean TP dist px |",
             "|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
             (
@@ -663,6 +688,17 @@ def format_report(
                 f"{best_metrics.tp} | {best_metrics.fp} | {best_metrics.fn} | "
                 f"{best_metrics.recall:.3f} | {best_metrics.precision:.3f} | {best_metrics.f1:.3f} | "
                 f"{best_metrics.oracle_recall:.3f} | {distance} |"
+            ),
+            "",
+            "### Best Recall",
+            "",
+            "| epoch | loss | threshold | TP | FP | FN | recall | precision | F1 | oracle recall | mean TP dist px |",
+            "|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+            (
+                f"| {best_recall_epoch} | {best_recall_loss:.5f} | {best_recall_metrics.threshold:.2f} | "
+                f"{best_recall_metrics.tp} | {best_recall_metrics.fp} | {best_recall_metrics.fn} | "
+                f"{best_recall_metrics.recall:.3f} | {best_recall_metrics.precision:.3f} | "
+                f"{best_recall_metrics.f1:.3f} | {best_recall_metrics.oracle_recall:.3f} | {recall_distance} |"
             ),
             "",
             "## Latency",
@@ -779,9 +815,13 @@ def cmd_temporal_heatmap_train(args: argparse.Namespace) -> int:
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     thresholds = [float(value) for value in args.thresholds.split(",") if value.strip()]
     best_score: tuple[float, float, float] = (-1.0, -1.0, -1.0)
+    best_recall_score: tuple[float, float, float] = (-1.0, -1.0, -1.0)
     best_epoch = 0
     best_loss = 0.0
     best_metrics: PeakMetrics | None = None
+    best_recall_epoch = 0
+    best_recall_loss = 0.0
+    best_recall_metrics: PeakMetrics | None = None
     patience_left = args.patience
 
     for epoch in range(1, args.epochs + 1):
@@ -798,28 +838,45 @@ def cmd_temporal_heatmap_train(args: argparse.Namespace) -> int:
             optimizer.step()
             losses.append(float(loss.detach().cpu().item()))
 
-        metrics = evaluate_model(
+        predictions = collect_predictions(
             model,
             val_loader,
             device=device,
             width=args.input_width,
             height=args.input_height,
+        )
+        metrics = compute_peak_metrics(
+            predictions,
+            width=args.input_width,
+            height=args.input_height,
             radius_px=args.radius_px,
             thresholds=thresholds,
+            selection="f1",
+        )
+        recall_metrics = compute_peak_metrics(
+            predictions,
+            width=args.input_width,
+            height=args.input_height,
+            radius_px=args.radius_px,
+            thresholds=thresholds,
+            selection="recall",
         )
         loss_value = statistics.mean(losses) if losses else 0.0
         score = (metrics.f1, metrics.recall, metrics.precision)
+        recall_score = (recall_metrics.recall, recall_metrics.precision, recall_metrics.f1)
+        improved = False
         print(
             f"epoch={epoch} loss={loss_value:.5f} "
             f"recall={metrics.recall:.3f} precision={metrics.precision:.3f} "
-            f"f1={metrics.f1:.3f} threshold={metrics.threshold:.2f} oracle={metrics.oracle_recall:.3f}"
+            f"f1={metrics.f1:.3f} threshold={metrics.threshold:.2f} oracle={metrics.oracle_recall:.3f} "
+            f"best_recall={recall_metrics.recall:.3f}@{recall_metrics.threshold:.2f}"
         )
         if score > best_score:
+            improved = True
             best_score = score
             best_epoch = epoch
             best_loss = loss_value
             best_metrics = metrics
-            patience_left = args.patience
             torch.save(
                 {
                     "model_state": model.state_dict(),
@@ -831,6 +888,25 @@ def cmd_temporal_heatmap_train(args: argparse.Namespace) -> int:
                 },
                 output_dir / "best.pt",
             )
+        if recall_score > best_recall_score:
+            improved = True
+            best_recall_score = recall_score
+            best_recall_epoch = epoch
+            best_recall_loss = loss_value
+            best_recall_metrics = recall_metrics
+            torch.save(
+                {
+                    "model_state": model.state_dict(),
+                    "input_width": args.input_width,
+                    "input_height": args.input_height,
+                    "window": args.window,
+                    "sigma": args.sigma,
+                    "metrics": recall_metrics.__dict__,
+                },
+                output_dir / "best_recall.pt",
+            )
+        if improved:
+            patience_left = args.patience
         else:
             patience_left -= 1
             if patience_left <= 0:
@@ -849,6 +925,8 @@ def cmd_temporal_heatmap_train(args: argparse.Namespace) -> int:
     )
     if best_metrics is None:
         raise SystemExit("training finished without validation metrics")
+    if best_recall_metrics is None:
+        raise SystemExit("training finished without recall metrics")
 
     latency_ms = benchmark_latency(
         model,
@@ -872,6 +950,9 @@ def cmd_temporal_heatmap_train(args: argparse.Namespace) -> int:
         best_epoch=best_epoch,
         best_loss=best_loss,
         best_metrics=best_metrics,
+        best_recall_epoch=best_recall_epoch,
+        best_recall_loss=best_recall_loss,
+        best_recall_metrics=best_recall_metrics,
         latency_ms=latency_ms,
     )
     (output_dir / "report.md").write_text(report + "\n", encoding="utf-8")
