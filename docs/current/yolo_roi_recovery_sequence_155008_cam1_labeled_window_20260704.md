@@ -1,0 +1,53 @@
+# YOLO Stateful ROI Replay Result - 2026-07-04
+
+## Scope
+
+This replay exercises a stateful visual ROI tracker on an ordered real-frame sequence.
+It decides whether each frame runs full-frame search or ROI-only inference.
+It does not use ROS/Gazebo, stereo triangulation, target prediction, or chassis control.
+
+## Settings
+
+- Model: `tools/yolo/workspace/runs/training/roi_crop_960x540_teacher_imgsz320_20260704/weights/best.pt`
+- Sequence glob: `tools/yolo/workspace/dataset/images/0260701/20260701_155008_cam1_frame_*.jpg`
+- Search imgsz: `416`
+- ROI: `960x540` at imgsz `320`
+- Expanded ROI: `1280x720`
+- Lost after misses: `3`
+- Expand after misses: `1`
+- Edge margin ratio: `0.2`
+- Distance score weight: `0.35`
+- Max update distance ratio: `0.5`
+- Candidate confirmation frames: `2`
+- Acquire confirmation frames: `1`
+- Candidate match distance ratio: `0.2`
+- Same-frame search-on-miss imgsz: `512`
+- Confidence threshold: `0.05`
+- Prediction IoU setting: `0.7`
+- Match IoU: `0.5`
+- Device argument: `cpu`
+- CUDA available: `False`
+- Torch: `2.12.1+cu130`
+
+## Mode Counts
+
+- Search frames: `49`
+- ROI frames: `75`
+- Expanded ROI frames: `25`
+- Same-frame search-on-miss frames: `44`
+- Lock acquisitions: `22`
+- Lost events: `21`
+- Detection updates used by tracker: `54`
+
+## Result
+
+| mode | profile | imgsz | images | gt | TP | FP | FN | recall | precision | median ms/img | p95 ms/img | est stereo FPS | notes |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| stateful_roi | 960x540->1280x720 | 416/320 | 124 | 49 | 29 | 34 | 20 | 0.592 | 0.460 | 16.59 | 29.88 | 30.13 | search=49 roi=75 expanded=25 acquired=22 lost=21 |
+
+## Readout
+
+- This is closer to the intended runtime than `coarse_roi`, because locked frames do not also run full-frame search.
+- The result still uses one monocular image sequence and estimates stereo FPS as sequential left+right processing.
+- If the tracker locks onto false positives, precision and recall will expose that in this replay.
+- Full ROS/Gazebo catch-loop validation is still separate and must use the real backend pose/control chain.

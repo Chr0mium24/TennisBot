@@ -11,7 +11,7 @@ import time
 from typing import Any
 
 from .paths import REPO_ROOT
-from .roi_tracking import RoiTrackConfig, StatefulRoiTracker
+from .roi_tracking import CropWindow, RoiTrackConfig, StatefulRoiTracker
 
 
 DEFAULT_MODEL = REPO_ROOT / "artifacts" / "models" / "tennis_ball_yolo" / "model.pt"
@@ -949,6 +949,7 @@ def build_roi_track_report(
     match_iou: float,
     device: str | None,
     torch_module: Any,
+    same_frame_search_on_miss_imgsz: int,
 ) -> str:
     lines = [
         f"# YOLO Stateful ROI Replay Result - {datetime.now().strftime('%Y-%m-%d')}",
@@ -969,6 +970,12 @@ def build_roi_track_report(
         f"- Lost after misses: `{config.lost_after_misses}`",
         f"- Expand after misses: `{config.expand_after_misses}`",
         f"- Edge margin ratio: `{config.edge_margin_ratio}`",
+        f"- Distance score weight: `{config.distance_score_weight}`",
+        f"- Max update distance ratio: `{config.max_update_distance_ratio}`",
+        f"- Candidate confirmation frames: `{config.candidate_confirmation_frames}`",
+        f"- Acquire confirmation frames: `{config.acquire_confirmation_frames}`",
+        f"- Candidate match distance ratio: `{config.candidate_match_distance_ratio}`",
+        f"- Same-frame search-on-miss imgsz: `{same_frame_search_on_miss_imgsz}`",
         f"- Confidence threshold: `{conf}`",
         f"- Prediction IoU setting: `{iou}`",
         f"- Match IoU: `{match_iou}`",
@@ -981,6 +988,7 @@ def build_roi_track_report(
         f"- Search frames: `{mode_counts.get('search', 0)}`",
         f"- ROI frames: `{mode_counts.get('roi', 0)}`",
         f"- Expanded ROI frames: `{mode_counts.get('expanded', 0)}`",
+        f"- Same-frame search-on-miss frames: `{mode_counts.get('same_frame_search', 0)}`",
         f"- Lock acquisitions: `{mode_counts.get('acquired', 0)}`",
         f"- Lost events: `{mode_counts.get('lost', 0)}`",
         f"- Detection updates used by tracker: `{mode_counts.get('updates', 0)}`",
@@ -1075,6 +1083,11 @@ def cmd_benchmark_roi_track(args: argparse.Namespace) -> int:
         edge_margin_ratio=args.edge_margin_ratio,
         velocity_alpha=args.velocity_alpha,
         min_lock_confidence=args.min_lock_confidence,
+        distance_score_weight=args.distance_score_weight,
+        max_update_distance_ratio=args.max_update_distance_ratio,
+        candidate_confirmation_frames=args.candidate_confirmation_frames,
+        acquire_confirmation_frames=args.acquire_confirmation_frames,
+        candidate_match_distance_ratio=args.candidate_match_distance_ratio,
     )
     tracker = StatefulRoiTracker(config)
     model = YOLO(str(args.model))
@@ -1090,7 +1103,15 @@ def cmd_benchmark_roi_track(args: argparse.Namespace) -> int:
 
     pred_by_image: list[list[DetBox]] = []
     elapsed_ms: list[float] = []
-    mode_counts = {"search": 0, "roi": 0, "expanded": 0, "acquired": 0, "lost": 0, "updates": 0}
+    mode_counts = {
+        "search": 0,
+        "roi": 0,
+        "expanded": 0,
+        "same_frame_search": 0,
+        "acquired": 0,
+        "lost": 0,
+        "updates": 0,
+    }
     for sample, image in zip(samples, images, strict=True):
         window = tracker.window(sample.width, sample.height)
         mode_counts[window.mode] += 1
@@ -1117,14 +1138,50 @@ def cmd_benchmark_roi_track(args: argparse.Namespace) -> int:
             offset_x=offset_x,
             offset_y=offset_y,
         )
-        elapsed_ms.append((time.perf_counter() - start) * 1000.0)
         update = tracker.update(detections, frame_width=sample.width, frame_height=sample.height, window=window)
-        if update.acquired:
-            mode_counts["acquired"] += 1
-        if update.lost:
-            mode_counts["lost"] += 1
-        if update.detection_used:
-            mode_counts["updates"] += 1
+
+        def record_update_counts(current_update: Any) -> None:
+            if current_update.acquired:
+                mode_counts["acquired"] += 1
+            if current_update.lost:
+                mode_counts["lost"] += 1
+            if current_update.detection_used:
+                mode_counts["updates"] += 1
+
+        record_update_counts(update)
+
+        if (
+            args.same_frame_search_on_miss_imgsz > 0
+            and window.mode == "roi"
+            and not update.detection_used
+        ):
+            mode_counts["same_frame_search"] += 1
+            recovery_window = CropWindow(
+                mode="search",
+                x1=0,
+                y1=0,
+                x2=sample.width,
+                y2=sample.height,
+                imgsz=args.same_frame_search_on_miss_imgsz,
+            )
+            detections = predict_det_boxes(
+                model=model,
+                image=image,
+                imgsz=args.same_frame_search_on_miss_imgsz,
+                conf=args.conf,
+                iou=args.iou,
+                max_detections=args.max_detections,
+                device=args.device,
+            )
+            recovery_update = tracker.update(
+                detections,
+                frame_width=sample.width,
+                frame_height=sample.height,
+                window=recovery_window,
+            )
+            record_update_counts(recovery_update)
+
+        elapsed_ms.append((time.perf_counter() - start) * 1000.0)
         pred_by_image.append(detections)
 
     notes = (
@@ -1152,6 +1209,7 @@ def cmd_benchmark_roi_track(args: argparse.Namespace) -> int:
         match_iou=args.match_iou,
         device=args.device,
         torch_module=torch,
+        same_frame_search_on_miss_imgsz=args.same_frame_search_on_miss_imgsz,
     )
     print(report)
     if args.output_markdown is not None:
@@ -1311,6 +1369,12 @@ def add_benchmark_parser(subparsers: argparse._SubParsersAction[argparse.Argumen
     track.add_argument("--edge-margin-ratio", type=float, default=0.20, help="检测靠 ROI 边缘多少比例内则下一帧扩窗")
     track.add_argument("--velocity-alpha", type=float, default=0.60, help="像素速度 EMA 权重")
     track.add_argument("--min-lock-confidence", type=float, default=0.05, help="用于锁定/更新 ROI 的最低置信度")
+    track.add_argument("--distance-score-weight", type=float, default=0.35, help="LOCKED 时检测离预测中心越远的打分惩罚")
+    track.add_argument("--max-update-distance-ratio", type=float, default=0.50, help="超过窗口对角线该比例的大跳变需确认")
+    track.add_argument("--candidate-confirmation-frames", type=int, default=2, help="LOCKED 大跳变候选需要连续确认的帧数")
+    track.add_argument("--acquire-confirmation-frames", type=int, default=1, help="SEARCH 获取锁定需要连续确认的帧数")
+    track.add_argument("--candidate-match-distance-ratio", type=float, default=0.20, help="候选连续确认时允许的中心距离比例")
+    track.add_argument("--same-frame-search-on-miss-imgsz", type=int, default=0, help="LOCKED ROI 未被接受时同帧追加全图 search；0 表示关闭")
     track.add_argument("--device", default="cpu", help="Ultralytics device，例如 cpu、0 或 0,1")
     track.add_argument("--threads", type=int, default=10, help="CPU torch 线程数；0 表示不修改")
     track.add_argument("--conf", type=float, default=0.05, help="置信度阈值")

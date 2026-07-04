@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Protocol
 
 
@@ -25,6 +26,11 @@ class RoiTrackConfig:
     edge_margin_ratio: float = 0.20
     velocity_alpha: float = 0.60
     min_lock_confidence: float = 0.05
+    distance_score_weight: float = 0.35
+    max_update_distance_ratio: float = 0.50
+    candidate_confirmation_frames: int = 2
+    acquire_confirmation_frames: int = 1
+    candidate_match_distance_ratio: float = 0.20
 
     def __post_init__(self) -> None:
         for name in ("roi_width", "roi_height", "expanded_width", "expanded_height", "search_imgsz", "roi_imgsz"):
@@ -38,6 +44,16 @@ class RoiTrackConfig:
             raise ValueError("edge_margin_ratio must be in [0, 0.5)")
         if not 0.0 <= self.velocity_alpha <= 1.0:
             raise ValueError("velocity_alpha must be in [0, 1]")
+        if self.distance_score_weight < 0.0:
+            raise ValueError("distance_score_weight must be nonnegative")
+        if self.max_update_distance_ratio <= 0.0:
+            raise ValueError("max_update_distance_ratio must be positive")
+        if self.candidate_confirmation_frames <= 0:
+            raise ValueError("candidate_confirmation_frames must be positive")
+        if self.acquire_confirmation_frames <= 0:
+            raise ValueError("acquire_confirmation_frames must be positive")
+        if self.candidate_match_distance_ratio <= 0.0:
+            raise ValueError("candidate_match_distance_ratio must be positive")
 
 
 @dataclass(frozen=True)
@@ -68,6 +84,10 @@ class RoiTrackState:
     velocity_y: float = 0.0
     miss_count: int = 0
     force_expanded: bool = False
+    pending_active: bool = False
+    pending_center_x: float = 0.0
+    pending_center_y: float = 0.0
+    pending_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -122,41 +142,41 @@ class StatefulRoiTracker:
     ) -> RoiTrackUpdate:
         locked_before = self.state.locked
         usable = [item for item in detections if item.conf >= self.config.min_lock_confidence]
-        best = max(usable, key=lambda item: item.conf, default=None)
+        best = self._select_detection(usable, window)
         if best is None:
-            if self.state.locked:
-                self.state.center_x = clamp(
-                    self.state.center_x + self.state.velocity_x,
-                    0.0,
-                    float(frame_width),
-                )
-                self.state.center_y = clamp(
-                    self.state.center_y + self.state.velocity_y,
-                    0.0,
-                    float(frame_height),
-                )
-                self.state.miss_count += 1
-                if self.state.miss_count >= self.config.lost_after_misses:
-                    self.state = RoiTrackState()
-                    return RoiTrackUpdate(
-                        locked_before=locked_before,
-                        locked_after=False,
-                        acquired=False,
-                        lost=True,
-                        detection_used=False,
-                        miss_count=0,
-                    )
-            return RoiTrackUpdate(
-                locked_before=locked_before,
-                locked_after=self.state.locked,
-                acquired=False,
-                lost=False,
-                detection_used=False,
-                miss_count=self.state.miss_count,
-            )
+            self._clear_pending()
+            return self._record_miss(locked_before, frame_width, frame_height)
 
         cx = 0.5 * (best.x1 + best.x2)
         cy = 0.5 * (best.y1 + best.y2)
+        if not self.state.locked and self.config.acquire_confirmation_frames > 1:
+            scale = frame_diagonal(frame_width, frame_height)
+            if not self._candidate_confirmed(
+                cx,
+                cy,
+                scale=scale,
+                required=self.config.acquire_confirmation_frames,
+            ):
+                return RoiTrackUpdate(
+                    locked_before=locked_before,
+                    locked_after=False,
+                    acquired=False,
+                    lost=False,
+                    detection_used=False,
+                    miss_count=0,
+                )
+
+        if self.state.locked and self._is_far_update(cx, cy, window):
+            scale = window_diagonal(window)
+            if not self._candidate_confirmed(
+                cx,
+                cy,
+                scale=scale,
+                required=self.config.candidate_confirmation_frames,
+            ):
+                return self._record_miss(locked_before, frame_width, frame_height)
+
+        self._clear_pending()
         if self.state.locked:
             raw_vx = cx - self.state.center_x
             raw_vy = cy - self.state.center_y
@@ -179,6 +199,84 @@ class StatefulRoiTracker:
             lost=False,
             detection_used=True,
             miss_count=0,
+        )
+
+    def _select_detection(self, detections: list[DetectionLike], window: CropWindow) -> DetectionLike | None:
+        if not detections:
+            return None
+        if not self.state.locked:
+            return max(detections, key=lambda item: item.conf)
+
+        predicted_x = self.state.center_x + self.state.velocity_x
+        predicted_y = self.state.center_y + self.state.velocity_y
+        scale = window_diagonal(window)
+
+        def score(detection: DetectionLike) -> float:
+            cx = 0.5 * (detection.x1 + detection.x2)
+            cy = 0.5 * (detection.y1 + detection.y2)
+            distance = math.hypot(cx - predicted_x, cy - predicted_y)
+            return detection.conf - self.config.distance_score_weight * distance / scale
+
+        return max(detections, key=score)
+
+    def _is_far_update(self, cx: float, cy: float, window: CropWindow) -> bool:
+        predicted_x = self.state.center_x + self.state.velocity_x
+        predicted_y = self.state.center_y + self.state.velocity_y
+        distance = math.hypot(cx - predicted_x, cy - predicted_y)
+        return distance > self.config.max_update_distance_ratio * window_diagonal(window)
+
+    def _candidate_confirmed(self, cx: float, cy: float, *, scale: float, required: int) -> bool:
+        if required <= 1:
+            return True
+        if (
+            self.state.pending_active
+            and math.hypot(cx - self.state.pending_center_x, cy - self.state.pending_center_y)
+            <= self.config.candidate_match_distance_ratio * scale
+        ):
+            self.state.pending_count += 1
+        else:
+            self.state.pending_count = 1
+        self.state.pending_active = True
+        self.state.pending_center_x = cx
+        self.state.pending_center_y = cy
+        return self.state.pending_count >= required
+
+    def _clear_pending(self) -> None:
+        self.state.pending_active = False
+        self.state.pending_center_x = 0.0
+        self.state.pending_center_y = 0.0
+        self.state.pending_count = 0
+
+    def _record_miss(self, locked_before: bool, frame_width: int, frame_height: int) -> RoiTrackUpdate:
+        if self.state.locked:
+            self.state.center_x = clamp(
+                self.state.center_x + self.state.velocity_x,
+                0.0,
+                float(frame_width),
+            )
+            self.state.center_y = clamp(
+                self.state.center_y + self.state.velocity_y,
+                0.0,
+                float(frame_height),
+            )
+            self.state.miss_count += 1
+            if self.state.miss_count >= self.config.lost_after_misses:
+                self.state = RoiTrackState()
+                return RoiTrackUpdate(
+                    locked_before=locked_before,
+                    locked_after=False,
+                    acquired=False,
+                    lost=True,
+                    detection_used=False,
+                    miss_count=0,
+                )
+        return RoiTrackUpdate(
+            locked_before=locked_before,
+            locked_after=self.state.locked,
+            acquired=False,
+            lost=False,
+            detection_used=False,
+            miss_count=self.state.miss_count,
         )
 
 
@@ -208,6 +306,14 @@ def detection_near_window_edge(detection: DetectionLike, window: CropWindow, edg
     local_y = (cy - window.y1) / window.height
     margin = edge_margin_ratio
     return local_x <= margin or local_x >= 1.0 - margin or local_y <= margin or local_y >= 1.0 - margin
+
+
+def window_diagonal(window: CropWindow) -> float:
+    return max(1.0, math.hypot(float(window.width), float(window.height)))
+
+
+def frame_diagonal(frame_width: int, frame_height: int) -> float:
+    return max(1.0, math.hypot(float(frame_width), float(frame_height)))
 
 
 def clamp(value: float, lower: float, upper: float) -> float:
