@@ -42,12 +42,14 @@ def test_cli_help_exposes_package_create_and_verify() -> None:
     detect_help = run_cli("detect-gui", "--help")
     sprites_help = run_cli("sprites", "--help")
     augment_help = run_cli("augment", "--help")
+    benchmark_help = run_cli("benchmark", "--help")
 
     assert help_result.returncode == 0
     assert "package" in help_result.stdout
     assert "detect-gui" in help_result.stdout
     assert "sprites" in help_result.stdout
     assert "augment" in help_result.stdout
+    assert "benchmark" in help_result.stdout
     assert package_help.returncode == 0
     assert "create" in package_help.stdout
     assert "verify" in package_help.stdout
@@ -58,6 +60,30 @@ def test_cli_help_exposes_package_create_and_verify() -> None:
     assert "review" in sprites_help.stdout
     assert augment_help.returncode == 0
     assert "copy-paste" in augment_help.stdout
+    assert benchmark_help.returncode == 0
+    assert "tiles" in benchmark_help.stdout
+
+
+def test_benchmark_tiles_dry_run_does_not_require_model_or_detector_dependencies() -> None:
+    result = run_cli(
+        "benchmark",
+        "tiles",
+        "--dry-run",
+        "--frame-width",
+        "3840",
+        "--frame-height",
+        "2160",
+        "--tile-profile",
+        "tile_1536x864:1536:864:160",
+        "--imgsz-values",
+        "960,1280",
+    )
+
+    assert result.returncode == 0
+    assert "tile_1536x864" in result.stdout
+    assert "960" in result.stdout
+    assert "1280" in result.stdout
+    assert "9 (3x3)" in result.stdout
 
 
 def test_detect_gui_dry_run_does_not_require_camera_or_detector_dependencies(tmp_path: Path) -> None:

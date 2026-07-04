@@ -24,6 +24,9 @@ try {
   if (command === "augment") {
     process.exit(await runYolo(["augment", ...rest], { extra: "augment" }));
   }
+  if (command === "benchmark") {
+    process.exit(await runYolo(["benchmark", ...rest], detectExtraOptions(rest)));
+  }
   throw new Error(`Unknown command: ${command}`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
@@ -44,6 +47,13 @@ async function runYolo(args: string[], options: { extra?: string } = {}): Promis
     stderr: "inherit",
   });
   return await waitForChild(proc);
+}
+
+function detectExtraOptions(args: string[]): { extra?: string } {
+  if (args.includes("--dry-run") || args.includes("--help") || args.includes("-h")) {
+    return {};
+  }
+  return { extra: "detect" };
 }
 
 async function waitForChild(proc: ReturnType<typeof Bun.spawn>): Promise<number> {
@@ -77,6 +87,7 @@ function printUsage(): void {
   bun scripts/yolo.ts sprites extract [options]
   bun scripts/yolo.ts sprites review [options]
   bun scripts/yolo.ts augment copy-paste [options]
+  bun scripts/yolo.ts benchmark tiles [options]
 
 启动 YOLO 标注前端/后端。默认值:
   图片目录   tools/yolo/workspace/dataset/images
@@ -91,10 +102,12 @@ function printUsage(): void {
   bun scripts/yolo.ts sprites extract
   bun scripts/yolo.ts sprites review
   bun scripts/yolo.ts augment copy-paste --config tools/yolo/configs/augmentation.toml
+  bun scripts/yolo.ts benchmark tiles --dry-run
+  bun scripts/yolo.ts benchmark tiles --output-markdown docs/current/yolo_tile_inference_benchmark_result_20260704.md
 
 说明:
   annotate 使用 tools/yolo 的默认 uv 环境，不安装 torch、ultralytics 或 CUDA/NVIDIA Python 包。
   sprites 和 augment 使用 tools/yolo 的 augment extra，只安装 OpenCV/NumPy，不安装 torch、ultralytics 或 CUDA/NVIDIA Python 包。
-  需要纯 YOLO 相机检测 GUI 时仍使用 tools/yolo 的 detect extra。
+  benchmark 实跑和纯 YOLO 相机检测 GUI 使用 tools/yolo 的 detect extra。
 `);
 }

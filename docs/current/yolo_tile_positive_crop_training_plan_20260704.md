@@ -18,7 +18,7 @@ Primary runtime profile:
 Fast fallback profile:
 
 - Capture: `3840x2160`
-- Tile: `2048x1152`
+- Tile: `2048x1216`
 - Tile overlap: `160`
 - YOLO `imgsz`: `1280`
 
@@ -30,6 +30,11 @@ Accuracy escalation profile:
 - YOLO `imgsz`: `1536`
 
 Training should prioritize the primary profile first. The fallback and escalation profiles are for runtime experiments after a crop-trained model exists.
+
+The first random-input performance benchmark is saved in
+`docs/current/yolo_tile_inference_benchmark_result_20260704.md`. It shows
+`2048x1216 + imgsz=1280` at about `13.22` stereo FPS and
+`1536x864 + imgsz=1280` at about `5.92` stereo FPS on the RTX 4060 Ti.
 
 ## New Training Scheme
 
@@ -159,7 +164,7 @@ Fast fallback recognition profile:
 bun scripts/stereo.ts gui \
   --tile \
   --tile-width 2048 \
-  --tile-height 1152 \
+  --tile-height 1216 \
   --tile-overlap 160 \
   --imgsz 1280 \
   --max-depth-m 25.0
@@ -196,7 +201,7 @@ Boundary handling:
 Performance path:
 
 - Baseline first: use the existing tiled implementation in `tools/stereo`.
-- If FPS is too low, test the `2048x1152` fallback profile.
+- If FPS is too low, test the `2048x1216` fallback profile.
 - Do not change the recognition pipeline before the first crop-trained model test.
 
 ## Implementation Plan
@@ -224,7 +229,7 @@ Performance path:
    - Test `1536x864 overlap=160 imgsz=1280`.
    - Record detection recall, false positives, and FPS.
    - If recall is insufficient, test `imgsz=1536`.
-   - If FPS is insufficient, test `2048x1152 overlap=160 imgsz=1280`.
+   - If FPS is insufficient, test `2048x1216 overlap=160 imgsz=1280`.
 7. Promote the selected model package only after both training and recognition results are documented.
 
 ## Experiment Outputs To Save
