@@ -940,7 +940,8 @@ def cmd_benchmark_roi_sample(args: argparse.Namespace) -> int:
 def build_roi_track_report(
     *,
     row: RoiSampleRow,
-    model_path: Path,
+    search_model_path: Path,
+    roi_model_path: Path,
     sequence_glob: str,
     config: RoiTrackConfig,
     mode_counts: dict[str, int],
@@ -962,7 +963,8 @@ def build_roi_track_report(
         "",
         "## Settings",
         "",
-        f"- Model: `{model_path}`",
+        f"- Search model: `{search_model_path}`",
+        f"- ROI model: `{roi_model_path}`",
         f"- Sequence glob: `{sequence_glob}`",
         f"- Search imgsz: `{config.search_imgsz}`",
         f"- ROI: `{config.roi_width}x{config.roi_height}` at imgsz `{config.roi_imgsz}`",
@@ -1027,8 +1029,13 @@ def cmd_benchmark_roi_track(args: argparse.Namespace) -> int:
             print(f"last={sample_paths[-1]}")
         return 0
 
-    if not args.model.is_file():
-        print(f"error: model not found: {args.model}")
+    search_model_path = args.model
+    roi_model_path = args.roi_model if args.roi_model is not None else args.model
+    if not search_model_path.is_file():
+        print(f"error: model not found: {search_model_path}")
+        return 2
+    if not roi_model_path.is_file():
+        print(f"error: ROI model not found: {roi_model_path}")
         return 2
     if not sample_paths:
         print(f"error: no images matched sequence glob: {sequence_glob}")
@@ -1090,11 +1097,24 @@ def cmd_benchmark_roi_track(args: argparse.Namespace) -> int:
         candidate_match_distance_ratio=args.candidate_match_distance_ratio,
     )
     tracker = StatefulRoiTracker(config)
-    model = YOLO(str(args.model))
+    search_model = YOLO(str(search_model_path))
+    if roi_model_path.resolve() == search_model_path.resolve():
+        roi_model = search_model
+    else:
+        roi_model = YOLO(str(roi_model_path))
     predict_det_boxes(
-        model=model,
+        model=search_model,
         image=images[0],
         imgsz=config.search_imgsz,
+        conf=args.conf,
+        iou=args.iou,
+        max_detections=args.max_detections,
+        device=args.device,
+    )
+    predict_det_boxes(
+        model=roi_model,
+        image=images[0],
+        imgsz=config.roi_imgsz,
         conf=args.conf,
         iou=args.iou,
         max_detections=args.max_detections,
@@ -1118,17 +1138,19 @@ def cmd_benchmark_roi_track(args: argparse.Namespace) -> int:
         if window.expanded:
             mode_counts["expanded"] += 1
         if window.mode == "search":
+            active_model = search_model
             source = image
             offset_x = 0
             offset_y = 0
         else:
+            active_model = roi_model
             source = image[window.y1 : window.y2, window.x1 : window.x2]
             offset_x = window.x1
             offset_y = window.y1
 
         start = time.perf_counter()
         detections = predict_det_boxes(
-            model=model,
+            model=active_model,
             image=source,
             imgsz=window.imgsz,
             conf=args.conf,
@@ -1165,7 +1187,7 @@ def cmd_benchmark_roi_track(args: argparse.Namespace) -> int:
                 imgsz=args.same_frame_search_on_miss_imgsz,
             )
             detections = predict_det_boxes(
-                model=model,
+                model=search_model,
                 image=image,
                 imgsz=args.same_frame_search_on_miss_imgsz,
                 conf=args.conf,
@@ -1200,7 +1222,8 @@ def cmd_benchmark_roi_track(args: argparse.Namespace) -> int:
     )
     report = build_roi_track_report(
         row=row,
-        model_path=args.model,
+        search_model_path=search_model_path,
+        roi_model_path=roi_model_path,
         sequence_glob=sequence_glob,
         config=config,
         mode_counts=mode_counts,
@@ -1356,6 +1379,7 @@ def add_benchmark_parser(subparsers: argparse._SubParsersAction[argparse.Argumen
         **parser_kwargs,
     )
     track.add_argument("--model", type=Path, default=DEFAULT_MODEL, help="Ultralytics YOLO .pt 模型路径")
+    track.add_argument("--roi-model", type=Path, default=None, help="LOCKED ROI 阶段使用的 YOLO .pt；默认复用 --model")
     track.add_argument("--sequence-glob", default=str(DEFAULT_ROI_TRACK_GLOB), help="有序帧 glob")
     track.add_argument("--sample-limit", type=int, default=0, help="最多读取多少张样本；0 表示全量")
     track.add_argument("--search-imgsz", type=int, default=320, help="SEARCH 全图检测 imgsz")

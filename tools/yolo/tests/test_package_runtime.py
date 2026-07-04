@@ -70,6 +70,7 @@ def test_cli_help_exposes_package_create_and_verify() -> None:
     assert "--roi-profile" in benchmark_roi_help.stdout
     assert benchmark_roi_track_help.returncode == 0
     assert "--roi-width" in benchmark_roi_track_help.stdout
+    assert "--roi-model" in benchmark_roi_track_help.stdout
 
 
 def test_benchmark_tiles_dry_run_does_not_require_model_or_detector_dependencies() -> None:
