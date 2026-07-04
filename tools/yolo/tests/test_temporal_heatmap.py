@@ -4,12 +4,16 @@ from pathlib import Path
 
 from tennisbot_yolo.temporal_heatmap import (
     PeakPrediction,
+    TemporalPeakCandidate,
     SyntheticConfig,
     SyntheticTemporalHeatmapDataset,
+    HeatmapSample,
+    build_mining_temporal_samples,
     build_temporal_samples,
     collect_synthetic_backgrounds,
     collect_synthetic_sprites,
     compute_peak_metrics,
+    filter_temporal_tracks,
     frame_sort_key,
 )
 
@@ -78,6 +82,43 @@ def test_build_temporal_samples_excludes_validation_token(tmp_path: Path) -> Non
     assert samples[0].sequence_key == "0260701/train_seq"
     assert samples[0].frame_index == 2
     assert samples[0].positive is True
+
+
+def test_build_mining_temporal_samples_does_not_require_labels(tmp_path: Path) -> None:
+    images = tmp_path / "images"
+    labels = tmp_path / "labels"
+    for frame in range(1, 6):
+        rel = Path("0260701") / f"train_seq_frame_{frame:06d}.jpg"
+        touch(images / rel)
+
+    samples = build_mining_temporal_samples(images_root=images, labels_root=labels, window=3)
+
+    assert [sample.frame_index for sample in samples] == [2, 3, 4]
+    assert all(sample.positive is False for sample in samples)
+
+
+def test_filter_temporal_tracks_requires_consistent_motion() -> None:
+    def candidate(frame: int, x: float, score: float = 0.8) -> TemporalPeakCandidate:
+        sample = HeatmapSample(
+            window_paths=(Path(f"frame_{frame - 1}.jpg"), Path(f"frame_{frame}.jpg"), Path(f"frame_{frame + 1}.jpg")),
+            center_image=Path(f"seq_frame_{frame:06d}.jpg"),
+            label_path=Path(f"seq_frame_{frame:06d}.txt"),
+            sequence_key="seq",
+            frame_index=frame,
+            positive=False,
+        )
+        return TemporalPeakCandidate(sample=sample, score=score, x_px=x, y_px=10.0)
+
+    tracks = filter_temporal_tracks(
+        [candidate(1, 10.0), candidate(2, 18.0), candidate(3, 26.0), candidate(4, 140.0)],
+        min_score=0.7,
+        min_track_length=3,
+        max_frame_gap=1,
+        max_motion_px=12.0,
+    )
+
+    assert len(tracks) == 1
+    assert [item.sample.frame_index for item in tracks[0].candidates] == [1, 2, 3]
 
 
 def test_compute_peak_metrics_counts_bad_localization_as_fp_and_fn() -> None:

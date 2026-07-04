@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import argparse
+import csv
 from dataclasses import dataclass
 from datetime import datetime
+import math
 from pathlib import Path
 import random
 import re
+import shutil
 import statistics
 import time
 from typing import Any
 
-from .dataset import IMAGE_SUFFIXES, read_yolo_labels
+from .dataset import IMAGE_SUFFIXES, format_yolo_box, read_yolo_labels, YoloBox
 from .paths import DEFAULT_IMAGES_ROOT, DEFAULT_LABELS_ROOT, DEFAULT_RUNS_ROOT, DEFAULT_SPRITES_ROOT
 
 
@@ -64,6 +67,20 @@ class PeakMetrics:
     f1: float
     mean_tp_distance: float | None
     oracle_recall: float
+
+
+@dataclass(frozen=True)
+class TemporalPeakCandidate:
+    sample: HeatmapSample
+    score: float
+    x_px: float
+    y_px: float
+
+
+@dataclass(frozen=True)
+class PseudoTrack:
+    track_id: int
+    candidates: tuple[TemporalPeakCandidate, ...]
 
 
 @dataclass(frozen=True)
@@ -204,6 +221,49 @@ def build_temporal_samples(
                     y_center=label.y_center,
                     box_width=label.width,
                     box_height=label.height,
+                )
+            )
+    return samples
+
+
+def build_mining_temporal_samples(
+    *,
+    images_root: Path,
+    labels_root: Path,
+    window: int,
+    include_tokens: tuple[str, ...] = (),
+    exclude_tokens: tuple[str, ...] = (),
+) -> list[HeatmapSample]:
+    if window <= 0 or window % 2 != 1:
+        raise ValueError("window must be a positive odd integer")
+    radius = window // 2
+    samples: list[HeatmapSample] = []
+    frame_groups = collect_frame_refs(
+        images_root=images_root,
+        labels_root=labels_root,
+        include_tokens=include_tokens,
+        exclude_tokens=exclude_tokens,
+    )
+    for sequence_key, frames in sorted(frame_groups.items()):
+        for frame_index, center in sorted(frames.items()):
+            window_refs: list[Path] = []
+            missing = False
+            for offset in range(-radius, radius + 1):
+                ref = frames.get(frame_index + offset)
+                if ref is None:
+                    missing = True
+                    break
+                window_refs.append(ref.image_path)
+            if missing:
+                continue
+            samples.append(
+                HeatmapSample(
+                    window_paths=tuple(window_refs),
+                    center_image=center.image_path,
+                    label_path=center.label_path,
+                    sequence_key=sequence_key,
+                    frame_index=frame_index,
+                    positive=False,
                 )
             )
     return samples
@@ -601,6 +661,253 @@ def evaluate_model(
     )
 
 
+def collect_peak_candidates(
+    model: Any,
+    samples: list[HeatmapSample],
+    *,
+    device: str,
+    input_width: int,
+    input_height: int,
+    sigma: float,
+    batch_size: int,
+    workers: int,
+) -> list[TemporalPeakCandidate]:
+    import torch
+    from torch.utils.data import DataLoader
+
+    dataset = TemporalHeatmapDataset(
+        samples=samples,
+        input_width=input_width,
+        input_height=input_height,
+        sigma=sigma,
+        augment=False,
+    )
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=workers)
+    candidates: list[TemporalPeakCandidate] = []
+    sample_offset = 0
+    model.eval()
+    with torch.no_grad():
+        for images, _targets, _metas in loader:
+            images = images.to(device)
+            heatmaps = torch.sigmoid(model(images)).detach().cpu()
+            batch, _, heatmap_height, heatmap_width = heatmaps.shape
+            flat = heatmaps.view(batch, -1)
+            scores, indices = flat.max(dim=1)
+            ys = torch.div(indices, heatmap_width, rounding_mode="floor").float()
+            xs = (indices % heatmap_width).float()
+            for index in range(batch):
+                candidates.append(
+                    TemporalPeakCandidate(
+                        sample=samples[sample_offset + index],
+                        score=float(scores[index].item()),
+                        x_px=float(xs[index].item()),
+                        y_px=float(ys[index].item()),
+                    )
+                )
+            sample_offset += batch
+    return candidates
+
+
+def filter_temporal_tracks(
+    candidates: list[TemporalPeakCandidate],
+    *,
+    min_score: float,
+    min_track_length: int,
+    max_frame_gap: int,
+    max_motion_px: float,
+) -> list[PseudoTrack]:
+    if min_track_length <= 0:
+        raise ValueError("min_track_length must be positive")
+    if max_frame_gap <= 0:
+        raise ValueError("max_frame_gap must be positive")
+    if max_motion_px < 0:
+        raise ValueError("max_motion_px must be non-negative")
+
+    by_sequence: dict[str, list[TemporalPeakCandidate]] = {}
+    for candidate in candidates:
+        if candidate.score < min_score:
+            continue
+        by_sequence.setdefault(candidate.sample.sequence_key, []).append(candidate)
+
+    tracks: list[PseudoTrack] = []
+    next_track_id = 1
+    for sequence_candidates in by_sequence.values():
+        current: list[TemporalPeakCandidate] = []
+        previous: TemporalPeakCandidate | None = None
+        for candidate in sorted(sequence_candidates, key=lambda item: item.sample.frame_index):
+            if previous is None:
+                current = [candidate]
+                previous = candidate
+                continue
+            frame_gap = candidate.sample.frame_index - previous.sample.frame_index
+            distance = math.hypot(candidate.x_px - previous.x_px, candidate.y_px - previous.y_px)
+            if 0 < frame_gap <= max_frame_gap and distance <= max_motion_px * frame_gap:
+                current.append(candidate)
+            else:
+                if len(current) >= min_track_length:
+                    tracks.append(PseudoTrack(next_track_id, tuple(current)))
+                    next_track_id += 1
+                current = [candidate]
+            previous = candidate
+        if len(current) >= min_track_length:
+            tracks.append(PseudoTrack(next_track_id, tuple(current)))
+            next_track_id += 1
+    return tracks
+
+
+def estimate_box_size(labels_root: Path, *, exclude_tokens: tuple[str, ...]) -> tuple[float, float]:
+    widths: list[float] = []
+    heights: list[float] = []
+    for label_path in sorted(labels_root.rglob("*.txt")):
+        haystack = label_path.relative_to(labels_root).as_posix()
+        if exclude_tokens and any(token in haystack for token in exclude_tokens):
+            continue
+        for label in read_yolo_labels(label_path):
+            widths.append(label.width)
+            heights.append(label.height)
+    if not widths or not heights:
+        return 0.006, 0.011
+    return statistics.median(widths), statistics.median(heights)
+
+
+def copy_base_labels(base_labels_root: Path, output_labels_root: Path) -> int:
+    copied = 0
+    if not base_labels_root.exists():
+        return copied
+    for source in sorted(base_labels_root.rglob("*.txt")):
+        target = output_labels_root / source.relative_to(base_labels_root)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+        copied += 1
+    return copied
+
+
+def clamp_unit(value: float) -> float:
+    return max(0.0, min(1.0, value))
+
+
+def write_pseudo_outputs(
+    *,
+    tracks: list[PseudoTrack],
+    candidates: list[TemporalPeakCandidate],
+    images_root: Path,
+    base_labels_root: Path,
+    output_root: Path,
+    input_width: int,
+    input_height: int,
+    box_width: float,
+    box_height: float,
+    max_pseudo: int,
+) -> dict[str, int]:
+    output_labels_root = output_root / "labels"
+    output_labels_root.mkdir(parents=True, exist_ok=True)
+    copied_labels = copy_base_labels(base_labels_root, output_labels_root)
+
+    track_lookup: dict[TemporalPeakCandidate, tuple[int, int]] = {}
+    for track in tracks:
+        for candidate in track.candidates:
+            track_lookup[candidate] = (track.track_id, len(track.candidates))
+
+    accepted = sorted(track_lookup, key=lambda candidate: (-candidate.score, candidate.sample.sequence_key, candidate.sample.frame_index))
+    if max_pseudo > 0:
+        accepted = accepted[:max_pseudo]
+    accepted_set = set(accepted)
+
+    manifest_path = output_root / "manifest.csv"
+    candidates_path = output_root / "candidates.csv"
+    written = 0
+    skipped_existing = 0
+    with manifest_path.open("w", encoding="utf-8", newline="") as manifest_file:
+        manifest_writer = csv.writer(manifest_file)
+        manifest_writer.writerow(
+            [
+                "image",
+                "label",
+                "sequence",
+                "frame",
+                "score",
+                "x_center",
+                "y_center",
+                "box_width",
+                "box_height",
+                "track_id",
+                "track_length",
+            ]
+        )
+        for candidate in sorted(accepted, key=lambda item: (item.sample.sequence_key, item.sample.frame_index)):
+            rel_image = candidate.sample.center_image.relative_to(images_root)
+            rel_label = rel_image.with_suffix(".txt")
+            label_path = output_labels_root / rel_label
+            label_path.parent.mkdir(parents=True, exist_ok=True)
+            if read_yolo_labels(label_path):
+                skipped_existing += 1
+                continue
+            x_center = clamp_unit(candidate.x_px / max(1, input_width - 1))
+            y_center = clamp_unit(candidate.y_px / max(1, input_height - 1))
+            box = YoloBox(
+                class_id=0,
+                x_center=x_center,
+                y_center=y_center,
+                width=clamp_unit(box_width),
+                height=clamp_unit(box_height),
+            )
+            label_path.write_text(format_yolo_box(box) + "\n", encoding="utf-8")
+            track_id, track_length = track_lookup[candidate]
+            manifest_writer.writerow(
+                [
+                    rel_image.as_posix(),
+                    rel_label.as_posix(),
+                    candidate.sample.sequence_key,
+                    candidate.sample.frame_index,
+                    f"{candidate.score:.6f}",
+                    f"{x_center:.6f}",
+                    f"{y_center:.6f}",
+                    f"{box.width:.6f}",
+                    f"{box.height:.6f}",
+                    track_id,
+                    track_length,
+                ]
+            )
+            written += 1
+
+    threshold_candidates = [candidate for candidate in candidates if candidate in track_lookup or candidate.score > 0.0]
+    with candidates_path.open("w", encoding="utf-8", newline="") as candidates_file:
+        writer = csv.writer(candidates_file)
+        writer.writerow(["image", "sequence", "frame", "score", "x_px", "y_px", "status", "track_id", "track_length"])
+        for candidate in sorted(threshold_candidates, key=lambda item: (item.sample.sequence_key, item.sample.frame_index)):
+            rel_image = candidate.sample.center_image.relative_to(images_root)
+            if candidate in accepted_set:
+                track_id, track_length = track_lookup[candidate]
+                status = "accepted"
+            elif candidate in track_lookup:
+                track_id, track_length = track_lookup[candidate]
+                status = "max_pseudo_skipped"
+            else:
+                track_id, track_length = "", ""
+                status = "track_rejected"
+            writer.writerow(
+                [
+                    rel_image.as_posix(),
+                    candidate.sample.sequence_key,
+                    candidate.sample.frame_index,
+                    f"{candidate.score:.6f}",
+                    f"{candidate.x_px:.2f}",
+                    f"{candidate.y_px:.2f}",
+                    status,
+                    track_id,
+                    track_length,
+                ]
+            )
+
+    return {
+        "copied_labels": copied_labels,
+        "tracks": len(tracks),
+        "accepted_candidates": len(accepted),
+        "written": written,
+        "skipped_existing": skipped_existing,
+    }
+
+
 def benchmark_latency(model: Any, *, device: str, input_channels: int, height: int, width: int, repeats: int) -> float:
     import torch
 
@@ -963,6 +1270,142 @@ def cmd_temporal_heatmap_train(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_temporal_heatmap_mine_pseudo(args: argparse.Namespace) -> int:
+    import torch
+
+    if args.batch <= 0:
+        raise SystemExit("--batch must be positive")
+    if args.max_samples < 0:
+        raise SystemExit("--max-samples must be non-negative")
+
+    checkpoint_path = args.checkpoint.resolve()
+    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    window = int(checkpoint.get("window", args.window or 0))
+    input_width = int(checkpoint.get("input_width", args.input_width or 0))
+    input_height = int(checkpoint.get("input_height", args.input_height or 0))
+    sigma = float(checkpoint.get("sigma", args.sigma))
+    if window <= 0 or window % 2 != 1:
+        raise SystemExit("checkpoint does not define a valid odd window")
+    if input_width <= 0 or input_height <= 0:
+        raise SystemExit("checkpoint does not define valid input dimensions")
+
+    device = args.device
+    if device == "auto":
+        device = "cuda:0" if torch.cuda.is_available() else "cpu"
+
+    images_root = args.images_root.resolve()
+    base_labels_root = args.base_labels_root.resolve()
+    include_tokens = parse_token_list(args.include)
+    exclude_tokens = parse_token_list(args.exclude)
+
+    samples = build_mining_temporal_samples(
+        images_root=images_root,
+        labels_root=base_labels_root,
+        window=window,
+        include_tokens=include_tokens,
+        exclude_tokens=exclude_tokens,
+    )
+    if args.max_samples:
+        samples = samples[: args.max_samples]
+    if not samples:
+        raise SystemExit("no mining samples found")
+
+    output_root = args.output_root
+    if output_root is None:
+        output_root = DEFAULT_RUNS_ROOT / "temporal_pseudo_labels" / args.name
+    output_root = output_root.resolve()
+    if output_root.exists():
+        if not args.overwrite:
+            raise SystemExit(f"output already exists: {output_root}")
+        shutil.rmtree(output_root)
+    output_root.mkdir(parents=True, exist_ok=True)
+
+    box_width = float(args.box_width)
+    box_height = float(args.box_height)
+    if box_width <= 0.0 or box_height <= 0.0:
+        box_width, box_height = estimate_box_size(base_labels_root, exclude_tokens=exclude_tokens)
+
+    model = build_model(input_channels=window * 3)
+    model.load_state_dict(checkpoint["model_state"])
+    model.to(device)
+    candidates = collect_peak_candidates(
+        model,
+        samples,
+        device=device,
+        input_width=input_width,
+        input_height=input_height,
+        sigma=sigma,
+        batch_size=args.batch,
+        workers=args.workers,
+    )
+    threshold_candidates = [candidate for candidate in candidates if candidate.score >= args.threshold]
+    tracks = filter_temporal_tracks(
+        candidates,
+        min_score=args.threshold,
+        min_track_length=args.min_track_length,
+        max_frame_gap=args.max_frame_gap,
+        max_motion_px=args.max_motion_px,
+    )
+    write_stats = write_pseudo_outputs(
+        tracks=tracks,
+        candidates=threshold_candidates,
+        images_root=images_root,
+        base_labels_root=base_labels_root,
+        output_root=output_root,
+        input_width=input_width,
+        input_height=input_height,
+        box_width=box_width,
+        box_height=box_height,
+        max_pseudo=args.max_pseudo,
+    )
+
+    report_lines = [
+        f"# Temporal Pseudo-Label Mining Result - {datetime.now().strftime('%Y-%m-%d')}",
+        "",
+        "## Settings",
+        "",
+        f"- Checkpoint: `{checkpoint_path}`",
+        f"- Output: `{output_root}`",
+        f"- Images root: `{images_root}`",
+        f"- Base labels root: `{base_labels_root}`",
+        f"- Window: `{window}`",
+        f"- Input: `{input_width}x{input_height}`",
+        f"- Device: `{device}`",
+        f"- Include tokens: `{args.include}`",
+        f"- Exclude tokens: `{args.exclude}`",
+        f"- Score threshold: `{args.threshold}`",
+        f"- Min track length: `{args.min_track_length}`",
+        f"- Max frame gap: `{args.max_frame_gap}`",
+        f"- Max motion px/frame: `{args.max_motion_px}`",
+        f"- Box size: `{box_width:.6f}x{box_height:.6f}`",
+        "",
+        "## Result",
+        "",
+        "| item | count |",
+        "|---|---:|",
+        f"| scanned windows | {len(samples)} |",
+        f"| candidates above threshold | {len(threshold_candidates)} |",
+        f"| accepted tracks | {write_stats['tracks']} |",
+        f"| accepted candidates | {write_stats['accepted_candidates']} |",
+        f"| copied base label files | {write_stats['copied_labels']} |",
+        f"| written pseudo labels | {write_stats['written']} |",
+        f"| skipped existing positives | {write_stats['skipped_existing']} |",
+        "",
+        "## Files",
+        "",
+        f"- Labels root: `{output_root / 'labels'}`",
+        f"- Manifest: `{output_root / 'manifest.csv'}`",
+        f"- Candidate audit: `{output_root / 'candidates.csv'}`",
+    ]
+    report = "\n".join(report_lines)
+    (output_root / "report.md").write_text(report + "\n", encoding="utf-8")
+    if args.output_markdown is not None:
+        args.output_markdown.parent.mkdir(parents=True, exist_ok=True)
+        args.output_markdown.write_text(report + "\n", encoding="utf-8")
+    print(report)
+    return 0
+
+
 def add_temporal_heatmap_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     parser_kwargs = {"formatter_class": argparse.ArgumentDefaultsHelpFormatter}
     temporal = subparsers.add_parser("temporal-heatmap", help="训练连续帧 heatmap 搜索 teacher。", **parser_kwargs)
@@ -1004,3 +1447,30 @@ def add_temporal_heatmap_parser(subparsers: argparse._SubParsersAction[argparse.
     train.add_argument("--latency-repeats", type=int, default=30, help="训练后延迟测量次数")
     train.add_argument("--seed", type=int, default=20260704, help="随机种子")
     train.set_defaults(func=cmd_temporal_heatmap_train)
+
+    mine = temporal_subparsers.add_parser("mine-pseudo", help="用 temporal heatmap teacher 挖掘带时序一致性过滤的伪标签。", **parser_kwargs)
+    mine.add_argument("--checkpoint", type=Path, required=True, help="temporal heatmap checkpoint，通常使用 best_recall.pt")
+    mine.add_argument("--images-root", type=Path, default=DEFAULT_IMAGES_ROOT, help="图片根目录")
+    mine.add_argument("--base-labels-root", type=Path, default=DEFAULT_LABELS_ROOT, help="原始 YOLO 标签根目录，会复制到输出 labels")
+    mine.add_argument("--output-root", type=Path, default=None, help="伪标签 run 输出目录")
+    mine.add_argument("--output-markdown", type=Path, default=None, help="写入 Markdown 结果")
+    mine.add_argument("--name", default=f"temporal_pseudo_{datetime.now().strftime('%Y%m%d')}", help="默认 run 名称")
+    mine.add_argument("--include", default="", help="只挖掘包含这些逗号分隔 token 的图片")
+    mine.add_argument("--exclude", default=DEFAULT_VAL_TOKEN, help="排除这些逗号分隔 token，默认排除验证序列")
+    mine.add_argument("--threshold", type=float, default=0.70, help="teacher peak score 阈值")
+    mine.add_argument("--min-track-length", type=int, default=3, help="至少连续多少个候选才写伪标签")
+    mine.add_argument("--max-frame-gap", type=int, default=1, help="同一 track 相邻候选允许的最大帧间隔")
+    mine.add_argument("--max-motion-px", type=float, default=48.0, help="输入尺度下同一 track 每帧最大位移")
+    mine.add_argument("--max-pseudo", type=int, default=0, help="最多写多少个伪标签；0 表示不限")
+    mine.add_argument("--max-samples", type=int, default=0, help="最多扫描多少个窗口；0 表示不限，用于快速试跑")
+    mine.add_argument("--box-width", type=float, default=0.0, help="伪标签 box 归一化宽度；0 表示从真实标签估计")
+    mine.add_argument("--box-height", type=float, default=0.0, help="伪标签 box 归一化高度；0 表示从真实标签估计")
+    mine.add_argument("--window", type=int, default=0, help="checkpoint 缺少 window 时使用")
+    mine.add_argument("--input-width", type=int, default=0, help="checkpoint 缺少 input_width 时使用")
+    mine.add_argument("--input-height", type=int, default=0, help="checkpoint 缺少 input_height 时使用")
+    mine.add_argument("--sigma", type=float, default=4.0, help="checkpoint 缺少 sigma 时使用")
+    mine.add_argument("--batch", type=int, default=8, help="推理 batch size")
+    mine.add_argument("--workers", type=int, default=4, help="DataLoader workers")
+    mine.add_argument("--device", default="auto", help="cuda:0、cpu 或 auto")
+    mine.add_argument("--overwrite", action="store_true", help="允许覆盖已有输出目录")
+    mine.set_defaults(func=cmd_temporal_heatmap_mine_pseudo)
