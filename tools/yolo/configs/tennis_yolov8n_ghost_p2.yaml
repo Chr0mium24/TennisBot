@@ -1,0 +1,57 @@
+# Ultralytics YOLOv8n-Ghost-P2 TennisBot detector.
+#
+# Experiment goal:
+# - compare a GhostConv/C3Ghost lightweight P2 model against YOLO26-derived
+#   variants;
+# - test whether Ghost modules reduce CPU cost enough to justify weaker
+#   pretrained transfer;
+# - keep P2/P3/P4/P5 outputs for small-object recall screening.
+#
+# This config follows the official Ultralytics YOLOv8-Ghost-P2 architecture
+# shape with `nc: 1` and the nano scale selected for the TennisBot dataset.
+
+nc: 1
+scale: n
+scales:
+  # [depth, width, max_channels]
+  n: [0.33, 0.25, 1024]
+
+backbone:
+  # [from, repeats, module, args]
+  - [-1, 1, Conv, [64, 3, 2]] # 0-P1/2
+  - [-1, 1, GhostConv, [128, 3, 2]] # 1-P2/4
+  - [-1, 3, C3Ghost, [128, True]]
+  - [-1, 1, GhostConv, [256, 3, 2]] # 3-P3/8
+  - [-1, 6, C3Ghost, [256, True]]
+  - [-1, 1, GhostConv, [512, 3, 2]] # 5-P4/16
+  - [-1, 6, C3Ghost, [512, True]]
+  - [-1, 1, GhostConv, [1024, 3, 2]] # 7-P5/32
+  - [-1, 3, C3Ghost, [1024, True]]
+  - [-1, 1, SPPF, [1024, 5]] # 9
+
+head:
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]
+  - [[-1, 6], 1, Concat, [1]] # cat backbone P4
+  - [-1, 3, C3Ghost, [512]] # 12
+
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]
+  - [[-1, 4], 1, Concat, [1]] # cat backbone P3
+  - [-1, 3, C3Ghost, [256]] # 15 (P3/8-small)
+
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]
+  - [[-1, 2], 1, Concat, [1]] # cat backbone P2
+  - [-1, 3, C3Ghost, [128]] # 18 (P2/4-xsmall)
+
+  - [-1, 1, GhostConv, [128, 3, 2]]
+  - [[-1, 15], 1, Concat, [1]] # cat head P3
+  - [-1, 3, C3Ghost, [256]] # 21 (P3/8-small)
+
+  - [-1, 1, GhostConv, [256, 3, 2]]
+  - [[-1, 12], 1, Concat, [1]] # cat head P4
+  - [-1, 3, C3Ghost, [512]] # 24 (P4/16-medium)
+
+  - [-1, 1, GhostConv, [512, 3, 2]]
+  - [[-1, 9], 1, Concat, [1]] # cat head P5
+  - [-1, 3, C3Ghost, [1024]] # 27 (P5/32-large)
+
+  - [[18, 21, 24, 27], 1, Detect, [nc]] # Detect(P2, P3, P4, P5)
