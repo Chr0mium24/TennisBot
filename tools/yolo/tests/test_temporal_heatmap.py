@@ -8,6 +8,7 @@ from tennisbot_yolo.temporal_heatmap import (
     SyntheticTemporalHeatmapDataset,
     build_temporal_samples,
     collect_synthetic_backgrounds,
+    collect_synthetic_sprites,
     compute_peak_metrics,
     frame_sort_key,
 )
@@ -121,6 +122,17 @@ def test_collect_synthetic_backgrounds_skips_positive_and_validation(tmp_path: P
     assert backgrounds == (images / train_negative,)
 
 
+def test_collect_synthetic_sprites_excludes_validation_token(tmp_path: Path) -> None:
+    keep = tmp_path / "train_sprite.png"
+    skip = tmp_path / "20260701_155008_cam1_sprite.png"
+    write_rgba_sprite(keep)
+    write_rgba_sprite(skip)
+
+    sprites = collect_synthetic_sprites(tmp_path, exclude_tokens=("20260701_155008",))
+
+    assert sprites == (keep,)
+
+
 def test_synthetic_temporal_dataset_returns_positive_heatmap(tmp_path: Path) -> None:
     background = tmp_path / "background.jpg"
     sprite = tmp_path / "sprite.png"
@@ -141,6 +153,7 @@ def test_synthetic_temporal_dataset_returns_positive_heatmap(tmp_path: Path) -> 
             motion_px_min=1.0,
             motion_px_max=2.0,
             blur_probability=0.0,
+            max_sprite_px=16,
         )
     )
 

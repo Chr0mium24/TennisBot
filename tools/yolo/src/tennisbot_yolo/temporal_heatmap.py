@@ -81,6 +81,7 @@ class SyntheticConfig:
     motion_px_min: float
     motion_px_max: float
     blur_probability: float
+    max_sprite_px: int
 
 
 def frame_sort_key(path: Path) -> tuple[str, int, str]:
@@ -252,13 +253,14 @@ def collect_synthetic_backgrounds(
     return tuple(backgrounds)
 
 
-def collect_synthetic_sprites(sprites_root: Path) -> tuple[Path, ...]:
+def collect_synthetic_sprites(sprites_root: Path, exclude_tokens: tuple[str, ...] = ()) -> tuple[Path, ...]:
     if not sprites_root.exists():
         return ()
     sprites = [
         path
         for path in sorted(sprites_root.glob("*.png"))
         if path.is_file() and not path.name.endswith("_crop.png")
+        and not any(token in path.name for token in exclude_tokens)
     ]
     return tuple(sprites)
 
@@ -368,6 +370,17 @@ class SyntheticTemporalHeatmapDataset:
         scale = rng.uniform(cfg.sprite_scale_min, cfg.sprite_scale_max)
         sprite_width = max(1, int(round(sprite.shape[1] * scale)))
         sprite_height = max(1, int(round(sprite.shape[0] * scale)))
+        max_sprite_px = max(2, int(cfg.max_sprite_px))
+        cap_scale = min(
+            1.0,
+            max_sprite_px / sprite_width,
+            max_sprite_px / sprite_height,
+            max(1, cfg.input_width - 2) / sprite_width,
+            max(1, cfg.input_height - 2) / sprite_height,
+        )
+        if cap_scale < 1.0:
+            sprite_width = max(1, int(round(sprite_width * cap_scale)))
+            sprite_height = max(1, int(round(sprite_height * cap_scale)))
         sprite = cv2.resize(sprite, (sprite_width, sprite_height), interpolation=cv2.INTER_AREA)
         if cfg.blur_probability > 0.0 and rng.random() < cfg.blur_probability:
             kernel = rng.choice([3, 5, 7])
@@ -727,7 +740,7 @@ def cmd_temporal_heatmap_train(args: argparse.Namespace) -> int:
             labels_root=labels_root,
             exclude_tokens=train_exclude,
         )
-        sprites = collect_synthetic_sprites(args.sprites_root.resolve())
+        sprites = collect_synthetic_sprites(args.sprites_root.resolve(), exclude_tokens=val_include)
         synthetic_dataset = SyntheticTemporalHeatmapDataset(
             SyntheticConfig(
                 backgrounds=backgrounds,
@@ -743,6 +756,7 @@ def cmd_temporal_heatmap_train(args: argparse.Namespace) -> int:
                 motion_px_min=args.synthetic_motion_px_min,
                 motion_px_max=args.synthetic_motion_px_max,
                 blur_probability=args.synthetic_blur_probability,
+                max_sprite_px=args.synthetic_max_sprite_px,
             )
         )
         train_dataset = ConcatDataset([train_dataset, synthetic_dataset])
@@ -895,6 +909,7 @@ def add_temporal_heatmap_parser(subparsers: argparse._SubParsersAction[argparse.
     train.add_argument("--synthetic-motion-px-min", type=float, default=1.0, help="合成球每帧最小位移，输入尺度像素")
     train.add_argument("--synthetic-motion-px-max", type=float, default=16.0, help="合成球每帧最大位移，输入尺度像素")
     train.add_argument("--synthetic-blur-probability", type=float, default=0.25, help="合成 sprite 模糊概率")
+    train.add_argument("--synthetic-max-sprite-px", type=int, default=48, help="合成 sprite 输入尺度最大宽/高像素")
     train.add_argument("--epochs", type=int, default=40, help="最大训练轮数")
     train.add_argument("--patience", type=int, default=10, help="验证 F1 无提升 early stop 轮数")
     train.add_argument("--batch", type=int, default=8, help="batch size")
