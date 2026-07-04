@@ -11,7 +11,7 @@ import time
 from typing import Any
 
 from .dataset import IMAGE_SUFFIXES, read_yolo_labels
-from .paths import DEFAULT_IMAGES_ROOT, DEFAULT_LABELS_ROOT, DEFAULT_RUNS_ROOT
+from .paths import DEFAULT_IMAGES_ROOT, DEFAULT_LABELS_ROOT, DEFAULT_RUNS_ROOT, DEFAULT_SPRITES_ROOT
 
 
 FRAME_RE = re.compile(r"(?P<prefix>.+)_frame_(?P<frame>\d+)$")
@@ -64,6 +64,23 @@ class PeakMetrics:
     f1: float
     mean_tp_distance: float | None
     oracle_recall: float
+
+
+@dataclass(frozen=True)
+class SyntheticConfig:
+    backgrounds: tuple[Path, ...]
+    sprites: tuple[Path, ...]
+    count: int
+    window: int
+    input_width: int
+    input_height: int
+    sigma: float
+    seed: int
+    sprite_scale_min: float
+    sprite_scale_max: float
+    motion_px_min: float
+    motion_px_max: float
+    blur_probability: float
 
 
 def frame_sort_key(path: Path) -> tuple[str, int, str]:
@@ -210,6 +227,42 @@ def summarize_samples(samples: list[HeatmapSample]) -> tuple[int, int, int]:
     return len(samples), positives, negatives
 
 
+def collect_synthetic_backgrounds(
+    *,
+    images_root: Path,
+    labels_root: Path,
+    exclude_tokens: tuple[str, ...],
+) -> tuple[Path, ...]:
+    backgrounds: list[Path] = []
+    for image_path in sorted(
+        (
+            path
+            for path in images_root.rglob("*")
+            if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES
+        ),
+        key=frame_sort_key,
+    ):
+        haystack = image_path.relative_to(images_root).as_posix()
+        if exclude_tokens and any(token in haystack for token in exclude_tokens):
+            continue
+        label_path = label_path_for_image(image_path, images_root, labels_root)
+        if label_path.is_file() and read_yolo_labels(label_path):
+            continue
+        backgrounds.append(image_path)
+    return tuple(backgrounds)
+
+
+def collect_synthetic_sprites(sprites_root: Path) -> tuple[Path, ...]:
+    if not sprites_root.exists():
+        return ()
+    sprites = [
+        path
+        for path in sorted(sprites_root.glob("*.png"))
+        if path.is_file() and not path.name.endswith("_crop.png")
+    ]
+    return tuple(sprites)
+
+
 def make_heatmap_tensor(
     *,
     torch_module: Any,
@@ -278,6 +331,99 @@ class TemporalHeatmapDataset:
         else:
             target = torch.zeros((1, self.input_height, self.input_width), dtype=torch.float32)
             meta = torch.tensor([0.0, 0.0, 0.0], dtype=torch.float32)
+        return image_tensor, target, meta
+
+
+class SyntheticTemporalHeatmapDataset:
+    def __init__(self, config: SyntheticConfig) -> None:
+        if config.count < 0:
+            raise ValueError("synthetic count must be non-negative")
+        if not config.backgrounds:
+            raise ValueError("synthetic backgrounds must not be empty")
+        if not config.sprites:
+            raise ValueError("synthetic sprites must not be empty")
+        self.config = config
+
+    def __len__(self) -> int:
+        return self.config.count
+
+    def __getitem__(self, index: int) -> tuple[Any, Any, Any]:
+        import cv2
+        import numpy as np
+        import torch
+
+        cfg = self.config
+        rng = random.Random(cfg.seed + index * 9973)
+        background_path = rng.choice(cfg.backgrounds)
+        sprite_path = rng.choice(cfg.sprites)
+
+        background = cv2.imread(str(background_path), cv2.IMREAD_COLOR)
+        if background is None:
+            raise FileNotFoundError(f"could not read synthetic background: {background_path}")
+        background = cv2.resize(background, (cfg.input_width, cfg.input_height), interpolation=cv2.INTER_AREA)
+
+        sprite = cv2.imread(str(sprite_path), cv2.IMREAD_UNCHANGED)
+        if sprite is None or sprite.ndim != 3 or sprite.shape[2] != 4:
+            raise FileNotFoundError(f"could not read synthetic sprite: {sprite_path}")
+        scale = rng.uniform(cfg.sprite_scale_min, cfg.sprite_scale_max)
+        sprite_width = max(1, int(round(sprite.shape[1] * scale)))
+        sprite_height = max(1, int(round(sprite.shape[0] * scale)))
+        sprite = cv2.resize(sprite, (sprite_width, sprite_height), interpolation=cv2.INTER_AREA)
+        if cfg.blur_probability > 0.0 and rng.random() < cfg.blur_probability:
+            kernel = rng.choice([3, 5, 7])
+            sprite = cv2.GaussianBlur(sprite, (kernel, kernel), 0)
+
+        max_x = max(0, cfg.input_width - sprite_width - 1)
+        max_y = max(0, cfg.input_height - sprite_height - 1)
+        center_x = rng.uniform(sprite_width * 0.5, cfg.input_width - sprite_width * 0.5)
+        center_y = rng.uniform(sprite_height * 0.5, cfg.input_height - sprite_height * 0.5)
+        motion = rng.uniform(cfg.motion_px_min, cfg.motion_px_max)
+        angle = rng.uniform(0.0, 2.0 * np.pi)
+        dx = np.cos(angle) * motion
+        dy = np.sin(angle) * motion
+        radius = cfg.window // 2
+        frames = []
+        center_frame_x = center_x
+        center_frame_y = center_y
+        alpha_base = sprite[:, :, 3].astype(np.float32) / 255.0
+        sprite_rgb = sprite[:, :, :3].astype(np.float32)
+        for offset in range(-radius, radius + 1):
+            frame = background.copy().astype(np.float32)
+            gain = rng.uniform(0.90, 1.10)
+            bias = rng.uniform(-12.0, 12.0)
+            frame = np.clip(frame * gain + bias, 0.0, 255.0)
+            cx = center_x + offset * dx
+            cy = center_y + offset * dy
+            x = int(round(cx - sprite_width * 0.5))
+            y = int(round(cy - sprite_height * 0.5))
+            x = max(0, min(max_x, x))
+            y = max(0, min(max_y, y))
+            if offset == 0:
+                center_frame_x = x + sprite_width * 0.5
+                center_frame_y = y + sprite_height * 0.5
+            region = frame[y : y + sprite_height, x : x + sprite_width]
+            alpha = alpha_base[:, :, None]
+            frame[y : y + sprite_height, x : x + sprite_width] = sprite_rgb * alpha + region * (1.0 - alpha)
+            rgb = cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB)
+            frames.append(torch.from_numpy(rgb).permute(2, 0, 1).float().div_(255.0))
+
+        image_tensor = torch.cat(frames, dim=0)
+        target = make_heatmap_tensor(
+            torch_module=torch,
+            width=cfg.input_width,
+            height=cfg.input_height,
+            x_center=center_frame_x / max(1, cfg.input_width - 1),
+            y_center=center_frame_y / max(1, cfg.input_height - 1),
+            sigma=cfg.sigma,
+        )
+        meta = torch.tensor(
+            [
+                1.0,
+                center_frame_x / max(1, cfg.input_width - 1),
+                center_frame_y / max(1, cfg.input_height - 1),
+            ],
+            dtype=torch.float32,
+        )
         return image_tensor, target, meta
 
 
@@ -452,6 +598,8 @@ def format_report(
     args: argparse.Namespace,
     output_dir: Path,
     train_count: tuple[int, int, int],
+    real_train_count: tuple[int, int, int],
+    synthetic_count: int,
     val_count: tuple[int, int, int],
     best_epoch: int,
     best_loss: float,
@@ -482,12 +630,15 @@ def format_report(
             f"- Device: `{args.device}`",
             f"- Epochs requested: `{args.epochs}`",
             f"- Batch: `{args.batch}`",
+            f"- Synthetic train samples: `{synthetic_count}`",
             "",
             "## Data",
             "",
             "| split | samples | positives | negatives |",
             "|---|---:|---:|---:|",
             f"| train | {train_count[0]} | {train_count[1]} | {train_count[2]} |",
+            f"| train_real | {real_train_count[0]} | {real_train_count[1]} | {real_train_count[2]} |",
+            f"| train_synthetic | {synthetic_count} | {synthetic_count} | 0 |",
             f"| val | {val_count[0]} | {val_count[1]} | {val_count[2]} |",
             "",
             "## Best Validation",
@@ -517,7 +668,7 @@ def format_report(
 def cmd_temporal_heatmap_train(args: argparse.Namespace) -> int:
     import torch
     import torch.nn.functional as functional
-    from torch.utils.data import DataLoader
+    from torch.utils.data import ConcatDataset, DataLoader
 
     if args.threads > 0:
         torch.set_num_threads(args.threads)
@@ -561,6 +712,7 @@ def cmd_temporal_heatmap_train(args: argparse.Namespace) -> int:
     if not val_samples:
         raise SystemExit("no validation samples found")
 
+    real_train_count = summarize_samples(train_samples)
     train_dataset = TemporalHeatmapDataset(
         samples=train_samples,
         input_width=args.input_width,
@@ -568,6 +720,32 @@ def cmd_temporal_heatmap_train(args: argparse.Namespace) -> int:
         sigma=args.sigma,
         augment=True,
     )
+    synthetic_count = int(args.synthetic_count)
+    if synthetic_count > 0:
+        backgrounds = collect_synthetic_backgrounds(
+            images_root=images_root,
+            labels_root=labels_root,
+            exclude_tokens=train_exclude,
+        )
+        sprites = collect_synthetic_sprites(args.sprites_root.resolve())
+        synthetic_dataset = SyntheticTemporalHeatmapDataset(
+            SyntheticConfig(
+                backgrounds=backgrounds,
+                sprites=sprites,
+                count=synthetic_count,
+                window=args.window,
+                input_width=args.input_width,
+                input_height=args.input_height,
+                sigma=args.sigma,
+                seed=seed + 100_000,
+                sprite_scale_min=args.synthetic_sprite_scale_min,
+                sprite_scale_max=args.synthetic_sprite_scale_max,
+                motion_px_min=args.synthetic_motion_px_min,
+                motion_px_max=args.synthetic_motion_px_max,
+                blur_probability=args.synthetic_blur_probability,
+            )
+        )
+        train_dataset = ConcatDataset([train_dataset, synthetic_dataset])
     val_dataset = TemporalHeatmapDataset(
         samples=val_samples,
         input_width=args.input_width,
@@ -669,7 +847,13 @@ def cmd_temporal_heatmap_train(args: argparse.Namespace) -> int:
     report = format_report(
         args=args,
         output_dir=output_dir,
-        train_count=summarize_samples(train_samples),
+        train_count=(
+            real_train_count[0] + synthetic_count,
+            real_train_count[1] + synthetic_count,
+            real_train_count[2],
+        ),
+        real_train_count=real_train_count,
+        synthetic_count=synthetic_count,
         val_count=summarize_samples(val_samples),
         best_epoch=best_epoch,
         best_loss=best_loss,
@@ -704,6 +888,13 @@ def add_temporal_heatmap_parser(subparsers: argparse._SubParsersAction[argparse.
     train.add_argument("--train-exclude", default=DEFAULT_VAL_TOKEN, help="训练排除的逗号分隔 token")
     train.add_argument("--val-include", default=DEFAULT_VAL_TOKEN, help="验证包含的逗号分隔 token")
     train.add_argument("--max-negative-ratio", type=float, default=1.0, help="训练负样本最多为正样本的几倍")
+    train.add_argument("--synthetic-count", type=int, default=0, help="额外在线合成 temporal 正样本数量")
+    train.add_argument("--sprites-root", type=Path, default=DEFAULT_SPRITES_ROOT / "approved", help="合成样本使用的 approved sprite 目录")
+    train.add_argument("--synthetic-sprite-scale-min", type=float, default=0.45, help="合成 sprite 最小缩放")
+    train.add_argument("--synthetic-sprite-scale-max", type=float, default=1.35, help="合成 sprite 最大缩放")
+    train.add_argument("--synthetic-motion-px-min", type=float, default=1.0, help="合成球每帧最小位移，输入尺度像素")
+    train.add_argument("--synthetic-motion-px-max", type=float, default=16.0, help="合成球每帧最大位移，输入尺度像素")
+    train.add_argument("--synthetic-blur-probability", type=float, default=0.25, help="合成 sprite 模糊概率")
     train.add_argument("--epochs", type=int, default=40, help="最大训练轮数")
     train.add_argument("--patience", type=int, default=10, help="验证 F1 无提升 early stop 轮数")
     train.add_argument("--batch", type=int, default=8, help="batch size")
