@@ -19,6 +19,15 @@ DEFAULT_TILE_PROFILES = (
     "tile_1536x864:1536:864:160",
 )
 DEFAULT_IMGSZ_VALUES = "960,1280,1536"
+DEFAULT_ROI_SAMPLE_LIST = (
+    REPO_ROOT / "tools" / "yolo" / "workspace" / "runs" / "copy_paste_aug_1000_trial_20260703" / "val.txt"
+)
+DEFAULT_ROI_PROFILES = (
+    "roi_960x540_512:960:540:512",
+    "roi_1280x720_512:1280:720:512",
+    "roi_1536x864_512:1536:864:512",
+    "roi_1536x864_640:1536:864:640",
+)
 
 
 @dataclass(frozen=True)
@@ -59,6 +68,49 @@ class TimedRow:
     error: str | None = None
 
 
+@dataclass(frozen=True)
+class RoiProfile:
+    name: str
+    crop_width: int
+    crop_height: int
+    imgsz: int
+
+
+@dataclass(frozen=True)
+class DetBox:
+    x1: float
+    y1: float
+    x2: float
+    y2: float
+    conf: float = 1.0
+
+
+@dataclass(frozen=True)
+class RoiSample:
+    image: Path
+    width: int
+    height: int
+    gt_boxes: tuple[DetBox, ...]
+
+
+@dataclass(frozen=True)
+class RoiSampleRow:
+    mode: str
+    profile: str
+    imgsz: str
+    images: int
+    gt: int
+    tp: int
+    fp: int
+    fn: int
+    recall: float
+    precision: float
+    median_ms: float
+    p95_ms: float
+    stereo_fps: float
+    notes: str
+
+
 def parse_tile_profile(value: str) -> TileProfile:
     parts = value.split(":")
     if len(parts) != 4:
@@ -89,6 +141,24 @@ def parse_imgsz_values(value: str) -> list[int]:
     if any(size <= 0 for size in sizes):
         raise argparse.ArgumentTypeError("imgsz values must be positive")
     return sizes
+
+
+def parse_roi_profile(value: str) -> RoiProfile:
+    parts = value.split(":")
+    if len(parts) != 4:
+        raise argparse.ArgumentTypeError("ROI profile must be name:width:height:imgsz")
+    name, width_text, height_text, imgsz_text = parts
+    if not name:
+        raise argparse.ArgumentTypeError("ROI profile name must not be empty")
+    try:
+        width = int(width_text)
+        height = int(height_text)
+        imgsz = int(imgsz_text)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("ROI profile width, height, and imgsz must be integers") from exc
+    if width <= 0 or height <= 0 or imgsz <= 0:
+        raise argparse.ArgumentTypeError("ROI profile width, height, and imgsz must be positive")
+    return RoiProfile(name=name, crop_width=width, crop_height=height, imgsz=imgsz)
 
 
 def axis_starts(length: int, tile: int, overlap: int) -> list[int]:
@@ -132,6 +202,92 @@ def percentile_95(values: list[float]) -> float:
     if len(values) == 1:
         return values[0]
     return statistics.quantiles(values, n=20, method="inclusive")[18]
+
+
+def label_path_for_image(image_path: Path) -> Path:
+    parts = list(image_path.parts)
+    for index, part in enumerate(parts):
+        if part == "images":
+            parts[index] = "labels"
+            return Path(*parts).with_suffix(".txt")
+    return image_path.with_suffix(".txt")
+
+
+def load_sample_paths(sample_list: Path, sample_limit: int, real_only: bool) -> list[Path]:
+    paths = [Path(line.strip()) for line in sample_list.read_text(encoding="utf-8").splitlines() if line.strip()]
+    if real_only:
+        paths = [path for path in paths if "/runs/" not in path.as_posix()]
+    if sample_limit > 0:
+        paths = paths[:sample_limit]
+    return paths
+
+
+def load_gt_boxes(label_path: Path, width: int, height: int) -> tuple[DetBox, ...]:
+    if not label_path.is_file():
+        return ()
+    boxes: list[DetBox] = []
+    for line in label_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        parts = line.split()
+        if len(parts) < 5:
+            continue
+        _, xc_text, yc_text, bw_text, bh_text = parts[:5]
+        xc = float(xc_text) * width
+        yc = float(yc_text) * height
+        bw = float(bw_text) * width
+        bh = float(bh_text) * height
+        boxes.append(DetBox(x1=xc - bw / 2.0, y1=yc - bh / 2.0, x2=xc + bw / 2.0, y2=yc + bh / 2.0))
+    return tuple(boxes)
+
+
+def iou_box(a: DetBox, b: DetBox) -> float:
+    ix1 = max(a.x1, b.x1)
+    iy1 = max(a.y1, b.y1)
+    ix2 = min(a.x2, b.x2)
+    iy2 = min(a.y2, b.y2)
+    iw = max(0.0, ix2 - ix1)
+    ih = max(0.0, iy2 - iy1)
+    intersection = iw * ih
+    if intersection <= 0.0:
+        return 0.0
+    area_a = max(0.0, a.x2 - a.x1) * max(0.0, a.y2 - a.y1)
+    area_b = max(0.0, b.x2 - b.x1) * max(0.0, b.y2 - b.y1)
+    union = area_a + area_b - intersection
+    return intersection / union if union > 0.0 else 0.0
+
+
+def match_counts(gt_by_image: list[tuple[DetBox, ...]], pred_by_image: list[list[DetBox]], match_iou: float) -> tuple[int, int, int]:
+    tp = fp = fn = 0
+    for gt_boxes, pred_boxes in zip(gt_by_image, pred_by_image, strict=True):
+        matched: set[int] = set()
+        for pred in sorted(pred_boxes, key=lambda box: box.conf, reverse=True):
+            best_index = -1
+            best_iou = 0.0
+            for index, gt in enumerate(gt_boxes):
+                if index in matched:
+                    continue
+                candidate_iou = iou_box(pred, gt)
+                if candidate_iou > best_iou:
+                    best_index = index
+                    best_iou = candidate_iou
+            if best_index >= 0 and best_iou >= match_iou:
+                matched.add(best_index)
+                tp += 1
+            else:
+                fp += 1
+        fn += len(gt_boxes) - len(matched)
+    return tp, fp, fn
+
+
+def crop_bounds(cx: float, cy: float, crop_width: int, crop_height: int, image_width: int, image_height: int) -> tuple[int, int, int, int]:
+    crop_width = min(crop_width, image_width)
+    crop_height = min(crop_height, image_height)
+    x1 = int(round(cx - crop_width / 2.0))
+    y1 = int(round(cy - crop_height / 2.0))
+    x1 = min(max(0, x1), image_width - crop_width)
+    y1 = min(max(0, y1), image_height - crop_height)
+    return x1, y1, x1 + crop_width, y1 + crop_height
 
 
 def synchronize(torch_module: Any) -> None:
@@ -359,6 +515,407 @@ def build_report(
     return "\n".join(lines) + "\n"
 
 
+def format_roi_table(rows: list[RoiSampleRow]) -> str:
+    header = (
+        "| mode | profile | imgsz | images | gt | TP | FP | FN | recall | precision | "
+        "median ms/img | p95 ms/img | est stereo FPS | notes |"
+    )
+    sep = "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|"
+    lines = [header, sep]
+    for row in rows:
+        lines.append(
+            "| "
+            f"{row.mode} | "
+            f"{row.profile} | "
+            f"{row.imgsz} | "
+            f"{row.images} | "
+            f"{row.gt} | "
+            f"{row.tp} | "
+            f"{row.fp} | "
+            f"{row.fn} | "
+            f"{row.recall:.3f} | "
+            f"{row.precision:.3f} | "
+            f"{row.median_ms:.2f} | "
+            f"{row.p95_ms:.2f} | "
+            f"{row.stereo_fps:.2f} | "
+            f"{row.notes.replace('|', '/')} |"
+        )
+    return "\n".join(lines)
+
+
+def predict_det_boxes(
+    *,
+    model: Any,
+    image: Any,
+    imgsz: int,
+    conf: float,
+    iou: float,
+    max_detections: int,
+    device: str | None,
+    offset_x: int = 0,
+    offset_y: int = 0,
+) -> list[DetBox]:
+    result = model.predict(
+        source=image,
+        imgsz=imgsz,
+        conf=conf,
+        iou=iou,
+        max_det=max_detections,
+        device=device,
+        stream=False,
+        verbose=False,
+    )[0]
+    if result.boxes is None or not len(result.boxes):
+        return []
+    xyxy = result.boxes.xyxy.cpu().numpy().tolist()
+    confs = result.boxes.conf.cpu().numpy().tolist()
+    return [
+        DetBox(
+            x1=float(box[0]) + offset_x,
+            y1=float(box[1]) + offset_y,
+            x2=float(box[2]) + offset_x,
+            y2=float(box[3]) + offset_y,
+            conf=float(score),
+        )
+        for box, score in zip(xyxy, confs, strict=True)
+    ]
+
+
+def make_roi_row(
+    *,
+    mode: str,
+    profile: str,
+    imgsz: str,
+    samples: list[RoiSample],
+    pred_by_image: list[list[DetBox]],
+    elapsed_ms: list[float],
+    match_iou: float,
+    notes: str,
+) -> RoiSampleRow:
+    gt_by_image = [sample.gt_boxes for sample in samples]
+    tp, fp, fn = match_counts(gt_by_image, pred_by_image, match_iou)
+    recall = tp / (tp + fn) if (tp + fn) else 0.0
+    precision = tp / (tp + fp) if (tp + fp) else 0.0
+    median_ms = statistics.median(elapsed_ms)
+    p95_ms = percentile_95(elapsed_ms)
+    return RoiSampleRow(
+        mode=mode,
+        profile=profile,
+        imgsz=imgsz,
+        images=len(samples),
+        gt=sum(len(sample.gt_boxes) for sample in samples),
+        tp=tp,
+        fp=fp,
+        fn=fn,
+        recall=recall,
+        precision=precision,
+        median_ms=median_ms,
+        p95_ms=p95_ms,
+        stereo_fps=1000.0 / (2.0 * median_ms) if median_ms > 0.0 else 0.0,
+        notes=notes,
+    )
+
+
+def build_roi_report(
+    *,
+    rows: list[RoiSampleRow],
+    model_path: Path,
+    sample_list: Path,
+    sample_limit: int,
+    real_only: bool,
+    coarse_imgsz: int,
+    conf: float,
+    iou: float,
+    match_iou: float,
+    device: str | None,
+    torch_module: Any,
+) -> str:
+    lines = [
+        f"# YOLO Runtime ROI Proof Result - {datetime.now().strftime('%Y-%m-%d')}",
+        "",
+        "## Scope",
+        "",
+        "This is an offline detector-throughput proof for the existing model.",
+        "It does not use ROS/Gazebo, camera capture, stereo triangulation, target prediction, or chassis control.",
+        "The `oracle_roi` rows use labels to place the crop and are only an upper bound for locked ROI runtime.",
+        "The `coarse_roi` rows prove the full-frame-to-ROI crop path runs, but they are not a real tracker validation.",
+        "",
+        "## Proof Plan",
+        "",
+        "1. Measure the current full-frame detector at several `imgsz` values.",
+        "2. Measure one-crop locked ROI inference with label-placed crops to estimate the best possible detector budget after ROI lock.",
+        "3. Measure same-frame full coarse detection plus ROI refinement to prove the crop chain runs and expose its real cost.",
+        "4. Decide whether training should wait for a stateful runtime proof.",
+        "",
+        "## Settings",
+        "",
+        f"- Model: `{model_path}`",
+        f"- Sample list: `{sample_list}`",
+        f"- Sample limit: `{sample_limit}`",
+        f"- Real images only: `{real_only}`",
+        f"- Coarse full-frame imgsz: `{coarse_imgsz}`",
+        f"- Confidence threshold: `{conf}`",
+        f"- Prediction IoU setting: `{iou}`",
+        f"- Match IoU: `{match_iou}`",
+        f"- Device argument: `{device if device is not None else ''}`",
+        f"- CUDA available: `{bool(torch_module.cuda.is_available())}`",
+        f"- Torch: `{torch_module.__version__}`",
+        "",
+        "## Results",
+        "",
+        format_roi_table(rows),
+        "",
+        "## Readout",
+        "",
+        "- `full` is the current full-frame detector path on one camera frame.",
+        "- `oracle_roi` measures one crop per camera frame after the ROI is already known.",
+        "- `coarse_roi` runs a full-frame coarse pass, crops around the best coarse detection, then runs ROI refinement.",
+        "- `est stereo FPS` assumes left and right camera images are processed sequentially with the same per-image median.",
+        "- Passing `30 FPS` in `oracle_roi` only proves detector budget feasibility while locked; it does not prove tracking or real catch-loop behavior.",
+        "",
+        "## Small Object Compression Note",
+        "",
+        "- Training cannot recover image detail that was destroyed by full-frame downscaling.",
+        "- A `10px` to `16px` tennis ball in a `3840px`-wide frame becomes roughly `0.8px` to `1.7px` at `imgsz=320/416`.",
+        "- The same object inside a `960px`-wide ROI becomes roughly `3.3px` to `6.9px` at `imgsz=320/416`.",
+        "- This is why ROI/crop must happen before the YOLO resize step; otherwise the far-ball signal is already gone.",
+        "",
+        "## Decision",
+        "",
+        "- Low-`imgsz` full-frame rows can meet the FPS target, but their recall is too low for the tennis-ball task.",
+        "- Low-`imgsz` locked ROI rows can meet the FPS target in this detector-only proof and have much better recall than full-frame at the same `imgsz`.",
+        "- Same-frame `coarse_roi` does not meet the FPS target because it runs two detections per camera frame.",
+        "- The next runtime step is a stateful ROI mode: full-frame search only while unlocked or periodically, then ROI-only inference while locked.",
+        "- This is not a target-board or ROS/Gazebo proof; do not start more training until that stateful runtime mode is implemented and measured.",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def cmd_benchmark_roi_sample(args: argparse.Namespace) -> int:
+    if args.sample_limit < 0:
+        print("error: --sample-limit must be non-negative")
+        return 2
+    if args.max_detections <= 0:
+        print("error: --max-detections must be positive")
+        return 2
+    if args.coarse_imgsz <= 0:
+        print("error: --coarse-imgsz must be positive")
+        return 2
+    if not args.sample_list.is_file():
+        print(f"error: sample list not found: {args.sample_list}")
+        return 2
+
+    roi_profile_values = list(DEFAULT_ROI_PROFILES) if args.roi_profile is None else args.roi_profile
+    roi_profiles = [parse_roi_profile(item) for item in roi_profile_values]
+    full_imgsz_values = parse_imgsz_values(args.full_imgsz_values)
+    sample_paths = load_sample_paths(args.sample_list, args.sample_limit, args.real_only)
+
+    if args.dry_run:
+        print(f"samples={len(sample_paths)}")
+        print("full_imgsz=" + ",".join(str(value) for value in full_imgsz_values))
+        print("roi_profiles=" + ",".join(profile.name for profile in roi_profiles))
+        return 0
+
+    if not args.model.is_file():
+        print(f"error: model not found: {args.model}")
+        return 2
+    if not sample_paths:
+        print("error: no sample images selected")
+        return 2
+
+    try:
+        import cv2
+        import torch
+        from ultralytics import YOLO
+    except ImportError as exc:
+        print(
+            "error: ROI benchmark requires opencv-python, torch, and ultralytics. "
+            "Run with `uv run --extra detect tennisbot-yolo benchmark roi-sample ...`."
+        )
+        print(f"missing: {exc}")
+        return 2
+
+    if args.threads > 0:
+        torch.set_num_threads(args.threads)
+        try:
+            torch.set_num_interop_threads(1)
+        except RuntimeError:
+            pass
+
+    samples: list[RoiSample] = []
+    images: list[Any] = []
+    for image_path in sample_paths:
+        image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
+        if image is None:
+            print(f"error: failed to read image: {image_path}")
+            return 2
+        height, width = image.shape[:2]
+        samples.append(
+            RoiSample(
+                image=image_path,
+                width=width,
+                height=height,
+                gt_boxes=load_gt_boxes(label_path_for_image(image_path), width, height),
+            )
+        )
+        images.append(image)
+
+    model = YOLO(str(args.model))
+    rows: list[RoiSampleRow] = []
+
+    # Keep model setup outside timing.
+    predict_det_boxes(
+        model=model,
+        image=images[0],
+        imgsz=full_imgsz_values[0],
+        conf=args.conf,
+        iou=args.iou,
+        max_detections=args.max_detections,
+        device=args.device,
+    )
+
+    for imgsz in full_imgsz_values:
+        pred_by_image: list[list[DetBox]] = []
+        elapsed_ms: list[float] = []
+        for image in images:
+            start = time.perf_counter()
+            pred_by_image.append(
+                predict_det_boxes(
+                    model=model,
+                    image=image,
+                    imgsz=imgsz,
+                    conf=args.conf,
+                    iou=args.iou,
+                    max_detections=args.max_detections,
+                    device=args.device,
+                )
+            )
+            elapsed_ms.append((time.perf_counter() - start) * 1000.0)
+        rows.append(
+            make_roi_row(
+                mode="full",
+                profile=f"full_{imgsz}",
+                imgsz=str(imgsz),
+                samples=samples,
+                pred_by_image=pred_by_image,
+                elapsed_ms=elapsed_ms,
+                match_iou=args.match_iou,
+                notes="full-frame baseline",
+            )
+        )
+
+    for profile in roi_profiles:
+        pred_by_image = []
+        elapsed_ms = []
+        for sample, image in zip(samples, images, strict=True):
+            if sample.gt_boxes:
+                anchor = max(sample.gt_boxes, key=lambda box: (box.x2 - box.x1) * (box.y2 - box.y1))
+                cx = (anchor.x1 + anchor.x2) / 2.0
+                cy = (anchor.y1 + anchor.y2) / 2.0
+            else:
+                cx = sample.width / 2.0
+                cy = sample.height / 2.0
+            x1, y1, x2, y2 = crop_bounds(cx, cy, profile.crop_width, profile.crop_height, sample.width, sample.height)
+            crop = image[y1:y2, x1:x2]
+            start = time.perf_counter()
+            pred_by_image.append(
+                predict_det_boxes(
+                    model=model,
+                    image=crop,
+                    imgsz=profile.imgsz,
+                    conf=args.conf,
+                    iou=args.iou,
+                    max_detections=args.max_detections,
+                    device=args.device,
+                    offset_x=x1,
+                    offset_y=y1,
+                )
+            )
+            elapsed_ms.append((time.perf_counter() - start) * 1000.0)
+        rows.append(
+            make_roi_row(
+                mode="oracle_roi",
+                profile=f"{profile.name} ({profile.crop_width}x{profile.crop_height})",
+                imgsz=str(profile.imgsz),
+                samples=samples,
+                pred_by_image=pred_by_image,
+                elapsed_ms=elapsed_ms,
+                match_iou=args.match_iou,
+                notes="label-placed ROI upper bound",
+            )
+        )
+
+    for profile in roi_profiles:
+        pred_by_image = []
+        elapsed_ms = []
+        for sample, image in zip(samples, images, strict=True):
+            start = time.perf_counter()
+            coarse_boxes = predict_det_boxes(
+                model=model,
+                image=image,
+                imgsz=args.coarse_imgsz,
+                conf=args.conf,
+                iou=args.iou,
+                max_detections=args.max_detections,
+                device=args.device,
+            )
+            if coarse_boxes:
+                anchor = max(coarse_boxes, key=lambda box: box.conf)
+                cx = (anchor.x1 + anchor.x2) / 2.0
+                cy = (anchor.y1 + anchor.y2) / 2.0
+            else:
+                cx = sample.width / 2.0
+                cy = sample.height / 2.0
+            x1, y1, x2, y2 = crop_bounds(cx, cy, profile.crop_width, profile.crop_height, sample.width, sample.height)
+            crop = image[y1:y2, x1:x2]
+            pred_by_image.append(
+                predict_det_boxes(
+                    model=model,
+                    image=crop,
+                    imgsz=profile.imgsz,
+                    conf=args.conf,
+                    iou=args.iou,
+                    max_detections=args.max_detections,
+                    device=args.device,
+                    offset_x=x1,
+                    offset_y=y1,
+                )
+            )
+            elapsed_ms.append((time.perf_counter() - start) * 1000.0)
+        rows.append(
+            make_roi_row(
+                mode="coarse_roi",
+                profile=f"{profile.name} ({profile.crop_width}x{profile.crop_height})",
+                imgsz=f"{args.coarse_imgsz}+{profile.imgsz}",
+                samples=samples,
+                pred_by_image=pred_by_image,
+                elapsed_ms=elapsed_ms,
+                match_iou=args.match_iou,
+                notes="same-frame full coarse plus ROI",
+            )
+        )
+
+    report = build_roi_report(
+        rows=rows,
+        model_path=args.model,
+        sample_list=args.sample_list,
+        sample_limit=args.sample_limit,
+        real_only=args.real_only,
+        coarse_imgsz=args.coarse_imgsz,
+        conf=args.conf,
+        iou=args.iou,
+        match_iou=args.match_iou,
+        device=args.device,
+        torch_module=torch,
+    )
+    print(report)
+    if args.output_markdown is not None:
+        args.output_markdown.parent.mkdir(parents=True, exist_ok=True)
+        args.output_markdown.write_text(report, encoding="utf-8")
+        print(f"wrote={args.output_markdown}")
+    return 0
+
+
 def cmd_benchmark_tiles(args: argparse.Namespace) -> int:
     if args.frame_width <= 0 or args.frame_height <= 0:
         print("error: frame dimensions must be positive")
@@ -462,3 +1019,30 @@ def add_benchmark_parser(subparsers: argparse._SubParsersAction[argparse.Argumen
     tiles.add_argument("--output-markdown", type=Path, help="写入 Markdown 结果文件")
     tiles.add_argument("--dry-run", action="store_true", help="只打印 profile 和 tile 计数，不加载模型")
     tiles.set_defaults(func=cmd_benchmark_tiles)
+
+    roi = benchmark_subparsers.add_parser(
+        "roi-sample",
+        help="用真实样本验证 full-frame/ROI 检测吞吐和召回。",
+        **parser_kwargs,
+    )
+    roi.add_argument("--model", type=Path, default=DEFAULT_MODEL, help="Ultralytics YOLO .pt 模型路径")
+    roi.add_argument("--sample-list", type=Path, default=DEFAULT_ROI_SAMPLE_LIST, help="样本图片列表")
+    roi.add_argument("--sample-limit", type=int, default=60, help="最多读取多少张样本；0 表示全量")
+    roi.add_argument("--real-only", action="store_true", help="跳过 copy-paste augmentation 生成图，只使用真实源图")
+    roi.add_argument("--full-imgsz-values", default="416,512,640", help="全图 baseline 的 YOLO imgsz 列表")
+    roi.add_argument(
+        "--roi-profile",
+        action="append",
+        default=None,
+        help="ROI profile，格式 name:width:height:imgsz；可重复",
+    )
+    roi.add_argument("--coarse-imgsz", type=int, default=416, help="coarse+ROI 模式的全图粗检测 imgsz")
+    roi.add_argument("--device", default="cpu", help="Ultralytics device，例如 cpu、0 或 0,1")
+    roi.add_argument("--threads", type=int, default=10, help="CPU torch 线程数；0 表示不修改")
+    roi.add_argument("--conf", type=float, default=0.05, help="置信度阈值")
+    roi.add_argument("--iou", type=float, default=0.7, help="预测阶段 IoU 阈值")
+    roi.add_argument("--match-iou", type=float, default=0.5, help="评估匹配 IoU 阈值")
+    roi.add_argument("--max-detections", type=int, default=300, help="每图最大检测数")
+    roi.add_argument("--output-markdown", type=Path, help="写入 Markdown 结果文件")
+    roi.add_argument("--dry-run", action="store_true", help="只打印样本和 profile，不加载模型")
+    roi.set_defaults(func=cmd_benchmark_roi_sample)

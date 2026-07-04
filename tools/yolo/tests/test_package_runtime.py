@@ -43,6 +43,7 @@ def test_cli_help_exposes_package_create_and_verify() -> None:
     sprites_help = run_cli("sprites", "--help")
     augment_help = run_cli("augment", "--help")
     benchmark_help = run_cli("benchmark", "--help")
+    benchmark_roi_help = run_cli("benchmark", "roi-sample", "--help")
 
     assert help_result.returncode == 0
     assert "package" in help_result.stdout
@@ -62,6 +63,9 @@ def test_cli_help_exposes_package_create_and_verify() -> None:
     assert "copy-paste" in augment_help.stdout
     assert benchmark_help.returncode == 0
     assert "tiles" in benchmark_help.stdout
+    assert "roi-sample" in benchmark_help.stdout
+    assert benchmark_roi_help.returncode == 0
+    assert "--roi-profile" in benchmark_roi_help.stdout
 
 
 def test_benchmark_tiles_dry_run_does_not_require_model_or_detector_dependencies() -> None:
@@ -84,6 +88,30 @@ def test_benchmark_tiles_dry_run_does_not_require_model_or_detector_dependencies
     assert "960" in result.stdout
     assert "1280" in result.stdout
     assert "9 (3x3)" in result.stdout
+
+
+def test_benchmark_roi_sample_dry_run_does_not_require_model_or_detector_dependencies(tmp_path: Path) -> None:
+    sample_list = tmp_path / "val.txt"
+    sample_list.write_text("/tmp/frame_000001.jpg\n/tmp/frame_000002.jpg\n", encoding="utf-8")
+
+    result = run_cli(
+        "benchmark",
+        "roi-sample",
+        "--dry-run",
+        "--sample-list",
+        str(sample_list),
+        "--sample-limit",
+        "1",
+        "--full-imgsz-values",
+        "416,512",
+        "--roi-profile",
+        "roi_test:960:540:512",
+    )
+
+    assert result.returncode == 0
+    assert "samples=1" in result.stdout
+    assert "416,512" in result.stdout
+    assert "roi_test" in result.stdout
 
 
 def test_detect_gui_dry_run_does_not_require_camera_or_detector_dependencies(tmp_path: Path) -> None:
