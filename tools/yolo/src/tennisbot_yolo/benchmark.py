@@ -3,12 +3,15 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 from datetime import datetime
+from glob import glob
 from pathlib import Path
+import re
 import statistics
 import time
 from typing import Any
 
 from .paths import REPO_ROOT
+from .roi_tracking import RoiTrackConfig, StatefulRoiTracker
 
 
 DEFAULT_MODEL = REPO_ROOT / "artifacts" / "models" / "tennis_ball_yolo" / "model.pt"
@@ -28,6 +31,10 @@ DEFAULT_ROI_PROFILES = (
     "roi_1536x864_512:1536:864:512",
     "roi_1536x864_640:1536:864:640",
 )
+DEFAULT_ROI_TRACK_GLOB = (
+    REPO_ROOT / "tools" / "yolo" / "workspace" / "dataset" / "images" / "0260701" / "20260701_154019_cam1_frame_*.jpg"
+)
+FRAME_NUMBER_RE = re.compile(r"_frame_(?P<frame>\d+)$")
 
 
 @dataclass(frozen=True)
@@ -217,6 +224,20 @@ def load_sample_paths(sample_list: Path, sample_limit: int, real_only: bool) -> 
     paths = [Path(line.strip()) for line in sample_list.read_text(encoding="utf-8").splitlines() if line.strip()]
     if real_only:
         paths = [path for path in paths if "/runs/" not in path.as_posix()]
+    if sample_limit > 0:
+        paths = paths[:sample_limit]
+    return paths
+
+
+def frame_sort_key(path: Path) -> tuple[str, int, str]:
+    match = FRAME_NUMBER_RE.search(path.stem)
+    frame = int(match.group("frame")) if match else -1
+    prefix = path.stem[: match.start()] if match else path.stem
+    return prefix, frame, str(path)
+
+
+def load_sequence_paths(sequence_glob: str, sample_limit: int) -> list[Path]:
+    paths = sorted((Path(item) for item in glob(sequence_glob)), key=frame_sort_key)
     if sample_limit > 0:
         paths = paths[:sample_limit]
     return paths
@@ -916,6 +937,230 @@ def cmd_benchmark_roi_sample(args: argparse.Namespace) -> int:
     return 0
 
 
+def build_roi_track_report(
+    *,
+    row: RoiSampleRow,
+    model_path: Path,
+    sequence_glob: str,
+    config: RoiTrackConfig,
+    mode_counts: dict[str, int],
+    conf: float,
+    iou: float,
+    match_iou: float,
+    device: str | None,
+    torch_module: Any,
+) -> str:
+    lines = [
+        f"# YOLO Stateful ROI Replay Result - {datetime.now().strftime('%Y-%m-%d')}",
+        "",
+        "## Scope",
+        "",
+        "This replay exercises a stateful visual ROI tracker on an ordered real-frame sequence.",
+        "It decides whether each frame runs full-frame search or ROI-only inference.",
+        "It does not use ROS/Gazebo, stereo triangulation, target prediction, or chassis control.",
+        "",
+        "## Settings",
+        "",
+        f"- Model: `{model_path}`",
+        f"- Sequence glob: `{sequence_glob}`",
+        f"- Search imgsz: `{config.search_imgsz}`",
+        f"- ROI: `{config.roi_width}x{config.roi_height}` at imgsz `{config.roi_imgsz}`",
+        f"- Expanded ROI: `{config.expanded_width}x{config.expanded_height}`",
+        f"- Lost after misses: `{config.lost_after_misses}`",
+        f"- Expand after misses: `{config.expand_after_misses}`",
+        f"- Edge margin ratio: `{config.edge_margin_ratio}`",
+        f"- Confidence threshold: `{conf}`",
+        f"- Prediction IoU setting: `{iou}`",
+        f"- Match IoU: `{match_iou}`",
+        f"- Device argument: `{device if device is not None else ''}`",
+        f"- CUDA available: `{bool(torch_module.cuda.is_available())}`",
+        f"- Torch: `{torch_module.__version__}`",
+        "",
+        "## Mode Counts",
+        "",
+        f"- Search frames: `{mode_counts.get('search', 0)}`",
+        f"- ROI frames: `{mode_counts.get('roi', 0)}`",
+        f"- Expanded ROI frames: `{mode_counts.get('expanded', 0)}`",
+        f"- Lock acquisitions: `{mode_counts.get('acquired', 0)}`",
+        f"- Lost events: `{mode_counts.get('lost', 0)}`",
+        f"- Detection updates used by tracker: `{mode_counts.get('updates', 0)}`",
+        "",
+        "## Result",
+        "",
+        format_roi_table([row]),
+        "",
+        "## Readout",
+        "",
+        "- This is closer to the intended runtime than `coarse_roi`, because locked frames do not also run full-frame search.",
+        "- The result still uses one monocular image sequence and estimates stereo FPS as sequential left+right processing.",
+        "- If the tracker locks onto false positives, precision and recall will expose that in this replay.",
+        "- Full ROS/Gazebo catch-loop validation is still separate and must use the real backend pose/control chain.",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def cmd_benchmark_roi_track(args: argparse.Namespace) -> int:
+    if args.sample_limit < 0:
+        print("error: --sample-limit must be non-negative")
+        return 2
+    if args.max_detections <= 0:
+        print("error: --max-detections must be positive")
+        return 2
+    if args.threads < 0:
+        print("error: --threads must be nonnegative")
+        return 2
+
+    sequence_glob = str(args.sequence_glob)
+    sample_paths = load_sequence_paths(sequence_glob, args.sample_limit)
+    if args.dry_run:
+        print(f"samples={len(sample_paths)}")
+        if sample_paths:
+            print(f"first={sample_paths[0]}")
+            print(f"last={sample_paths[-1]}")
+        return 0
+
+    if not args.model.is_file():
+        print(f"error: model not found: {args.model}")
+        return 2
+    if not sample_paths:
+        print(f"error: no images matched sequence glob: {sequence_glob}")
+        return 2
+
+    try:
+        import cv2
+        import torch
+        from ultralytics import YOLO
+    except ImportError as exc:
+        print(
+            "error: ROI track benchmark requires opencv-python, torch, and ultralytics. "
+            "Run with `uv run --extra detect tennisbot-yolo benchmark roi-track ...`."
+        )
+        print(f"missing: {exc}")
+        return 2
+
+    if args.threads > 0:
+        torch.set_num_threads(args.threads)
+        try:
+            torch.set_num_interop_threads(1)
+        except RuntimeError:
+            pass
+
+    samples: list[RoiSample] = []
+    images: list[Any] = []
+    for image_path in sample_paths:
+        image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
+        if image is None:
+            print(f"error: failed to read image: {image_path}")
+            return 2
+        height, width = image.shape[:2]
+        samples.append(
+            RoiSample(
+                image=image_path,
+                width=width,
+                height=height,
+                gt_boxes=load_gt_boxes(label_path_for_image(image_path), width, height),
+            )
+        )
+        images.append(image)
+
+    config = RoiTrackConfig(
+        roi_width=args.roi_width,
+        roi_height=args.roi_height,
+        expanded_width=args.expanded_width,
+        expanded_height=args.expanded_height,
+        search_imgsz=args.search_imgsz,
+        roi_imgsz=args.roi_imgsz,
+        lost_after_misses=args.lost_after_misses,
+        expand_after_misses=args.expand_after_misses,
+        edge_margin_ratio=args.edge_margin_ratio,
+        velocity_alpha=args.velocity_alpha,
+        min_lock_confidence=args.min_lock_confidence,
+    )
+    tracker = StatefulRoiTracker(config)
+    model = YOLO(str(args.model))
+    predict_det_boxes(
+        model=model,
+        image=images[0],
+        imgsz=config.search_imgsz,
+        conf=args.conf,
+        iou=args.iou,
+        max_detections=args.max_detections,
+        device=args.device,
+    )
+
+    pred_by_image: list[list[DetBox]] = []
+    elapsed_ms: list[float] = []
+    mode_counts = {"search": 0, "roi": 0, "expanded": 0, "acquired": 0, "lost": 0, "updates": 0}
+    for sample, image in zip(samples, images, strict=True):
+        window = tracker.window(sample.width, sample.height)
+        mode_counts[window.mode] += 1
+        if window.expanded:
+            mode_counts["expanded"] += 1
+        if window.mode == "search":
+            source = image
+            offset_x = 0
+            offset_y = 0
+        else:
+            source = image[window.y1 : window.y2, window.x1 : window.x2]
+            offset_x = window.x1
+            offset_y = window.y1
+
+        start = time.perf_counter()
+        detections = predict_det_boxes(
+            model=model,
+            image=source,
+            imgsz=window.imgsz,
+            conf=args.conf,
+            iou=args.iou,
+            max_detections=args.max_detections,
+            device=args.device,
+            offset_x=offset_x,
+            offset_y=offset_y,
+        )
+        elapsed_ms.append((time.perf_counter() - start) * 1000.0)
+        update = tracker.update(detections, frame_width=sample.width, frame_height=sample.height, window=window)
+        if update.acquired:
+            mode_counts["acquired"] += 1
+        if update.lost:
+            mode_counts["lost"] += 1
+        if update.detection_used:
+            mode_counts["updates"] += 1
+        pred_by_image.append(detections)
+
+    notes = (
+        f"search={mode_counts['search']} roi={mode_counts['roi']} expanded={mode_counts['expanded']} "
+        f"acquired={mode_counts['acquired']} lost={mode_counts['lost']}"
+    )
+    row = make_roi_row(
+        mode="stateful_roi",
+        profile=f"{config.roi_width}x{config.roi_height}->{config.expanded_width}x{config.expanded_height}",
+        imgsz=f"{config.search_imgsz}/{config.roi_imgsz}",
+        samples=samples,
+        pred_by_image=pred_by_image,
+        elapsed_ms=elapsed_ms,
+        match_iou=args.match_iou,
+        notes=notes,
+    )
+    report = build_roi_track_report(
+        row=row,
+        model_path=args.model,
+        sequence_glob=sequence_glob,
+        config=config,
+        mode_counts=mode_counts,
+        conf=args.conf,
+        iou=args.iou,
+        match_iou=args.match_iou,
+        device=args.device,
+        torch_module=torch,
+    )
+    print(report)
+    if args.output_markdown is not None:
+        args.output_markdown.parent.mkdir(parents=True, exist_ok=True)
+        args.output_markdown.write_text(report, encoding="utf-8")
+        print(f"wrote={args.output_markdown}")
+    return 0
+
+
 def cmd_benchmark_tiles(args: argparse.Namespace) -> int:
     if args.frame_width <= 0 or args.frame_height <= 0:
         print("error: frame dimensions must be positive")
@@ -1046,3 +1291,32 @@ def add_benchmark_parser(subparsers: argparse._SubParsersAction[argparse.Argumen
     roi.add_argument("--output-markdown", type=Path, help="写入 Markdown 结果文件")
     roi.add_argument("--dry-run", action="store_true", help="只打印样本和 profile，不加载模型")
     roi.set_defaults(func=cmd_benchmark_roi_sample)
+
+    track = benchmark_subparsers.add_parser(
+        "roi-track",
+        help="按有序真实帧 replay stateful ROI 搜索/锁定逻辑。",
+        **parser_kwargs,
+    )
+    track.add_argument("--model", type=Path, default=DEFAULT_MODEL, help="Ultralytics YOLO .pt 模型路径")
+    track.add_argument("--sequence-glob", default=str(DEFAULT_ROI_TRACK_GLOB), help="有序帧 glob")
+    track.add_argument("--sample-limit", type=int, default=0, help="最多读取多少张样本；0 表示全量")
+    track.add_argument("--search-imgsz", type=int, default=320, help="SEARCH 全图检测 imgsz")
+    track.add_argument("--roi-imgsz", type=int, default=320, help="LOCKED ROI 检测 imgsz")
+    track.add_argument("--roi-width", type=int, default=960, help="LOCKED 正常 ROI 宽度")
+    track.add_argument("--roi-height", type=int, default=540, help="LOCKED 正常 ROI 高度")
+    track.add_argument("--expanded-width", type=int, default=1280, help="miss/靠边后的扩展 ROI 宽度")
+    track.add_argument("--expanded-height", type=int, default=720, help="miss/靠边后的扩展 ROI 高度")
+    track.add_argument("--lost-after-misses", type=int, default=3, help="连续 miss 多少帧后回到 SEARCH")
+    track.add_argument("--expand-after-misses", type=int, default=1, help="连续 miss 多少帧后先扩窗")
+    track.add_argument("--edge-margin-ratio", type=float, default=0.20, help="检测靠 ROI 边缘多少比例内则下一帧扩窗")
+    track.add_argument("--velocity-alpha", type=float, default=0.60, help="像素速度 EMA 权重")
+    track.add_argument("--min-lock-confidence", type=float, default=0.05, help="用于锁定/更新 ROI 的最低置信度")
+    track.add_argument("--device", default="cpu", help="Ultralytics device，例如 cpu、0 或 0,1")
+    track.add_argument("--threads", type=int, default=10, help="CPU torch 线程数；0 表示不修改")
+    track.add_argument("--conf", type=float, default=0.05, help="置信度阈值")
+    track.add_argument("--iou", type=float, default=0.7, help="预测阶段 IoU 阈值")
+    track.add_argument("--match-iou", type=float, default=0.5, help="评估匹配 IoU 阈值")
+    track.add_argument("--max-detections", type=int, default=300, help="每图最大检测数")
+    track.add_argument("--output-markdown", type=Path, help="写入 Markdown 结果文件")
+    track.add_argument("--dry-run", action="store_true", help="只打印匹配的序列帧，不加载模型")
+    track.set_defaults(func=cmd_benchmark_roi_track)

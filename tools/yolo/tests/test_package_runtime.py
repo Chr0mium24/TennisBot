@@ -44,6 +44,7 @@ def test_cli_help_exposes_package_create_and_verify() -> None:
     augment_help = run_cli("augment", "--help")
     benchmark_help = run_cli("benchmark", "--help")
     benchmark_roi_help = run_cli("benchmark", "roi-sample", "--help")
+    benchmark_roi_track_help = run_cli("benchmark", "roi-track", "--help")
 
     assert help_result.returncode == 0
     assert "package" in help_result.stdout
@@ -64,8 +65,11 @@ def test_cli_help_exposes_package_create_and_verify() -> None:
     assert benchmark_help.returncode == 0
     assert "tiles" in benchmark_help.stdout
     assert "roi-sample" in benchmark_help.stdout
+    assert "roi-track" in benchmark_help.stdout
     assert benchmark_roi_help.returncode == 0
     assert "--roi-profile" in benchmark_roi_help.stdout
+    assert benchmark_roi_track_help.returncode == 0
+    assert "--roi-width" in benchmark_roi_track_help.stdout
 
 
 def test_benchmark_tiles_dry_run_does_not_require_model_or_detector_dependencies() -> None:
@@ -112,6 +116,25 @@ def test_benchmark_roi_sample_dry_run_does_not_require_model_or_detector_depende
     assert "samples=1" in result.stdout
     assert "416,512" in result.stdout
     assert "roi_test" in result.stdout
+
+
+def test_benchmark_roi_track_dry_run_does_not_require_model_or_detector_dependencies(tmp_path: Path) -> None:
+    (tmp_path / "session_cam1_frame_000002.jpg").write_bytes(b"not an image")
+    (tmp_path / "session_cam1_frame_000001.jpg").write_bytes(b"not an image")
+
+    result = run_cli(
+        "benchmark",
+        "roi-track",
+        "--dry-run",
+        "--sequence-glob",
+        str(tmp_path / "session_cam1_frame_*.jpg"),
+        "--sample-limit",
+        "1",
+    )
+
+    assert result.returncode == 0
+    assert "samples=1" in result.stdout
+    assert "session_cam1_frame_000001.jpg" in result.stdout
 
 
 def test_detect_gui_dry_run_does_not_require_camera_or_detector_dependencies(tmp_path: Path) -> None:
