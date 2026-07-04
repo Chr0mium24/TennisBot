@@ -36,6 +36,17 @@ This training run was produced before the trainer saved a separate
 the highest observed validation recall was `0.731` at epoch 21, with precision
 `0.504` and F1 `0.596`.
 
+Post-hoc recall-threshold evaluation on saved checkpoints:
+
+| checkpoint | selected by | threshold | TP | FP | FN | recall | precision | F1 | oracle recall |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| best.pt | F1 | 0.70 | 62 | 19 | 31 | 0.667 | 0.765 | 0.713 | 0.699 |
+| best.pt | recall | 0.30 | 65 | 165 | 28 | 0.699 | 0.283 | 0.402 | 0.699 |
+| last.pt | F1/recall | 0.70 | 64 | 77 | 29 | 0.688 | 0.454 | 0.547 | 0.688 |
+
+So the saved checkpoints do not reach `0.90` recall even under recall-first
+threshold selection.
+
 | epoch | loss | threshold | TP | FP | FN | recall | precision | F1 | oracle recall | mean TP dist px |
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | 11 | 0.00755 | 0.70 | 62 | 19 | 31 | 0.667 | 0.765 | 0.713 | 0.699 | 1.42 |
