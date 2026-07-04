@@ -1,4 +1,4 @@
-# YOLO Tile Positive Crop Training Plan - 2026-07-04
+# YOLO Tile Positive Crop Training and Recognition Plan - 2026-07-04
 
 ## Goal
 
@@ -31,7 +31,47 @@ Accuracy escalation profile:
 
 Training should prioritize the primary profile first. The fallback and escalation profiles are for runtime experiments after a crop-trained model exists.
 
-## Data Generation Strategy
+## New Training Scheme
+
+Train the next model primarily on runtime-shaped tile crops, not full 4K frames.
+
+Training stages:
+
+1. Generate a positive-jitter crop dataset from existing 4K labeled images.
+2. Mix in controlled negative crops from real image regions without tennis balls.
+3. Optionally add a second pass of copy-paste augmentation only after the real crop dataset works.
+4. Train with `imgsz=1280` first, using a tile-shaped dataset generated for `1536x864`.
+5. Validate on tile-shaped validation images, not only on full-frame validation images.
+6. Promote the model only after runtime tiled recognition improves far-field recall.
+
+Initial training command shape:
+
+```bash
+uv run --project tools/yolo --extra detect python - <<'PY'
+from pathlib import Path
+from ultralytics import YOLO
+
+project = Path("tools/yolo/workspace/runs/training").resolve()
+model = YOLO("artifacts/models/tennis_ball_yolo/model.pt")
+model.train(
+    data="tools/yolo/workspace/runs/positive_crop_1536x864_20260704/data.yaml",
+    epochs=40,
+    imgsz=1280,
+    batch=8,
+    device="0",
+    workers=8,
+    patience=10,
+    project=str(project),
+    name="positive_crop_1536x864_imgsz1280_20260704",
+    seed=44,
+    exist_ok=True,
+)
+PY
+```
+
+The exact `batch` can be adjusted after checking GPU memory. If `imgsz=1280` recall is still weak for far-field balls, run a second training trial with `imgsz=1536`.
+
+## Positive Crop Data Generation
 
 Use positive crop jitter rather than full-frame-only training or blind sliding-window enumeration.
 
@@ -97,6 +137,83 @@ Recommended initial limits:
 
 The cap prevents a few easy center-ball frames from dominating the dataset.
 
+## New Recognition Scheme
+
+Use tiled YOLO recognition at runtime so the model sees image content at the same scale used during training.
+
+Primary stereo GUI command:
+
+```bash
+bun scripts/stereo.ts gui \
+  --tile \
+  --tile-width 1536 \
+  --tile-height 864 \
+  --tile-overlap 160 \
+  --imgsz 1280 \
+  --max-depth-m 25.0
+```
+
+Primary ROS vision runtime command:
+
+```bash
+bun scripts/vision-runtime.ts run \
+  --tile \
+  --param tile_width:=1536 \
+  --param tile_height:=864 \
+  --param tile_overlap:=160 \
+  --param imgsz:=1280 \
+  --param max_depth_m:=25.0
+```
+
+Fast fallback recognition profile:
+
+```bash
+bun scripts/stereo.ts gui \
+  --tile \
+  --tile-width 2048 \
+  --tile-height 1152 \
+  --tile-overlap 160 \
+  --imgsz 1280 \
+  --max-depth-m 25.0
+```
+
+Accuracy escalation recognition profile:
+
+```bash
+bun scripts/stereo.ts gui \
+  --tile \
+  --tile-width 1536 \
+  --tile-height 864 \
+  --tile-overlap 160 \
+  --imgsz 1536 \
+  --max-depth-m 25.0
+```
+
+Runtime flow:
+
+1. Capture left and right 4K frames.
+2. Split each frame into overlapping tiles using the same tile size used for training.
+3. Run YOLO on tiles.
+4. Convert tile-local detections back to full-frame coordinates.
+5. Merge duplicate detections from overlapping tiles.
+6. Keep the best per-camera detections after confidence sorting and NMS.
+7. Run the existing stereo pairing and triangulation path.
+8. Publish only through the ROS vision runtime path for real closed-loop use.
+
+Boundary handling:
+
+- `tile_overlap=160` should be larger than the expected tennis-ball bbox diameter, so a ball cut by one tile edge should appear fully in a neighboring tile.
+- Detections near tile borders are acceptable but should be de-duplicated in full-frame coordinates.
+- Current NMS is IoU-based. If small-box duplicates are not merged reliably, add center-distance merging for detections with similar size and class.
+- Do not add local catch substitute logic for no-ROS testing. No-ROS tests can validate image recognition, tile projection, and stereo visualization only.
+
+Performance path:
+
+- Baseline first: use the existing tiled implementation in `tools/stereo` and `vision_runtime`.
+- If FPS is too low, batch left and right camera tiles into one YOLO call instead of calling tiled prediction separately per camera.
+- If FPS is still too low, test the `2048x1152` fallback profile.
+- After baseline recognition is proven, consider ROI-limited tiled inference from recent visual detections, but keep a periodic full-frame tiled scan to recover from missed tracks.
+
 ## Implementation Plan
 
 1. Add a crop dataset generator under `tools/yolo`.
@@ -115,14 +232,15 @@ The cap prevents a few easy center-ball frames from dominating the dataset.
    - Anchor bbox remains fully visible.
    - Label coordinate rewrite.
    - Negative crop exclusion.
-5. Train a baseline crop model.
+5. Train a baseline crop model using the new training scheme.
    - Start with `imgsz=1280`, `batch` based on available GPU memory.
    - Compare against the current full-frame-trained model.
-6. Run runtime validation.
+6. Run runtime validation using the new recognition scheme.
    - Test `1536x864 overlap=160 imgsz=1280`.
    - Record detection recall, false positives, and FPS.
    - If recall is insufficient, test `imgsz=1536`.
    - If FPS is insufficient, test `2048x1152 overlap=160 imgsz=1280`.
+7. Promote the selected model package only after both training and recognition results are documented.
 
 ## Experiment Outputs To Save
 
@@ -136,6 +254,8 @@ Each run should save a Markdown result document under `docs/current` or `docs/ar
 - Training metrics.
 - Runtime command.
 - Runtime FPS and observed recall notes.
+- Runtime profile: primary, fast fallback, or accuracy escalation.
+- Whether the result came from stereo GUI, ROS vision runtime, or offline replay.
 - Failure samples or screenshots if available.
 
 ## Acceptance Criteria
