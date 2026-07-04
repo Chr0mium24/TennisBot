@@ -120,7 +120,7 @@ Rules:
 - Crop must stay fully inside the real source image.
 - Crop must not overlap any existing bbox beyond a low IoU threshold, for example `0.01`.
 - Negative labels are empty `.txt` files.
-- Avoid producing large numbers of near-duplicate negatives from the same image.
+- Avoid producing large numbers of near-identical negatives from the same image.
 
 ## Dataset Controls
 
@@ -133,7 +133,7 @@ Recommended initial limits:
 - Positive crops per image: cap at `16` to `24`
 - Negative crop ratio: `0.5`
 - Random jitter around desired ratios: optional `+/- 0.03`, only if crop remains valid
-- Deduplicate crop origins by rounding to a small grid, for example `16` px
+- Avoid repeated crop origins by rounding to a small grid, for example `16` px
 
 The cap prevents a few easy center-ball frames from dominating the dataset.
 
@@ -151,18 +151,6 @@ bun scripts/stereo.ts gui \
   --tile-overlap 160 \
   --imgsz 1280 \
   --max-depth-m 25.0
-```
-
-Primary ROS vision runtime command:
-
-```bash
-bun scripts/vision-runtime.ts run \
-  --tile \
-  --param tile_width:=1536 \
-  --param tile_height:=864 \
-  --param tile_overlap:=160 \
-  --param imgsz:=1280 \
-  --param max_depth_m:=25.0
 ```
 
 Fast fallback recognition profile:
@@ -189,30 +177,27 @@ bun scripts/stereo.ts gui \
   --max-depth-m 25.0
 ```
 
-Runtime flow:
+First-pass recognition test flow:
 
 1. Capture left and right 4K frames.
 2. Split each frame into overlapping tiles using the same tile size used for training.
 3. Run YOLO on tiles.
 4. Convert tile-local detections back to full-frame coordinates.
-5. Merge duplicate detections from overlapping tiles.
-6. Keep the best per-camera detections after confidence sorting and NMS.
-7. Run the existing stereo pairing and triangulation path.
-8. Publish only through the ROS vision runtime path for real closed-loop use.
+5. Keep the current per-camera NMS behavior unchanged for the first test.
+6. Run the existing stereo pairing and triangulation path.
+7. Record FPS, far-field recall, obvious false positives, and failure frames.
 
 Boundary handling:
 
 - `tile_overlap=160` should be larger than the expected tennis-ball bbox diameter, so a ball cut by one tile edge should appear fully in a neighboring tile.
-- Detections near tile borders are acceptable but should be de-duplicated in full-frame coordinates.
-- Current NMS is IoU-based. If small-box duplicates are not merged reliably, add center-distance merging for detections with similar size and class.
-- Do not add local catch substitute logic for no-ROS testing. No-ROS tests can validate image recognition, tile projection, and stereo visualization only.
+- Detections near tile borders are acceptable during the first test as long as recall improves and false positives remain understandable.
+- Do not add new post-processing before the first test. Record border-related failure frames as experiment observations.
 
 Performance path:
 
-- Baseline first: use the existing tiled implementation in `tools/stereo` and `vision_runtime`.
-- If FPS is too low, batch left and right camera tiles into one YOLO call instead of calling tiled prediction separately per camera.
-- If FPS is still too low, test the `2048x1152` fallback profile.
-- After baseline recognition is proven, consider ROI-limited tiled inference from recent visual detections, but keep a periodic full-frame tiled scan to recover from missed tracks.
+- Baseline first: use the existing tiled implementation in `tools/stereo`.
+- If FPS is too low, test the `2048x1152` fallback profile.
+- Do not change the recognition pipeline before the first crop-trained model test.
 
 ## Implementation Plan
 
@@ -255,7 +240,7 @@ Each run should save a Markdown result document under `docs/current` or `docs/ar
 - Runtime command.
 - Runtime FPS and observed recall notes.
 - Runtime profile: primary, fast fallback, or accuracy escalation.
-- Whether the result came from stereo GUI, ROS vision runtime, or offline replay.
+- Whether the result came from stereo GUI or offline replay.
 - Failure samples or screenshots if available.
 
 ## Acceptance Criteria
@@ -266,4 +251,4 @@ Minimum first-pass criteria:
 
 - 4K tiled runtime can detect tennis balls at materially smaller pixel sizes than the current full-frame-trained model.
 - Runtime profile and training profile are documented together.
-- No result claims real closed-loop catching success without ROS/Gazebo backend validation.
+- First-pass conclusions are limited to YOLO recognition quality and runtime speed.
