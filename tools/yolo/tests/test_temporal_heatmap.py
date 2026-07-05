@@ -193,6 +193,12 @@ def test_synthetic_temporal_dataset_returns_positive_heatmap(tmp_path: Path) -> 
             sprite_scale_max=1.0,
             motion_px_min=1.0,
             motion_px_max=2.0,
+            motion_angle_deg_min=0.0,
+            motion_angle_deg_max=360.0,
+            center_x_min=0.0,
+            center_x_max=1.0,
+            center_y_min=0.0,
+            center_y_max=1.0,
             blur_probability=0.0,
             max_sprite_px=16,
         )
@@ -204,3 +210,39 @@ def test_synthetic_temporal_dataset_returns_positive_heatmap(tmp_path: Path) -> 
     assert tuple(target.shape) == (1, 48, 64)
     assert float(target.max()) > 0.9
     assert meta[0].item() == 1.0
+
+
+def test_synthetic_temporal_dataset_respects_center_range(tmp_path: Path) -> None:
+    background = tmp_path / "background.jpg"
+    sprite = tmp_path / "sprite.png"
+    write_rgb_image(background, width=100, height=80)
+    write_rgba_sprite(sprite)
+    dataset = SyntheticTemporalHeatmapDataset(
+        SyntheticConfig(
+            backgrounds=(background,),
+            sprites=(sprite,),
+            count=3,
+            window=3,
+            input_width=100,
+            input_height=80,
+            sigma=2.0,
+            seed=456,
+            sprite_scale_min=1.0,
+            sprite_scale_max=1.0,
+            motion_px_min=0.0,
+            motion_px_max=0.0,
+            motion_angle_deg_min=240.0,
+            motion_angle_deg_max=300.0,
+            center_x_min=0.45,
+            center_x_max=0.55,
+            center_y_min=0.50,
+            center_y_max=0.65,
+            blur_probability=0.0,
+            max_sprite_px=16,
+        )
+    )
+
+    for index in range(len(dataset)):
+        _image, _target, meta = dataset[index]
+        assert 0.45 <= meta[1].item() <= 0.55
+        assert 0.50 <= meta[2].item() <= 0.65

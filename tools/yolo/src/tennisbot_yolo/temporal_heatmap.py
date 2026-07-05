@@ -97,6 +97,12 @@ class SyntheticConfig:
     sprite_scale_max: float
     motion_px_min: float
     motion_px_max: float
+    motion_angle_deg_min: float
+    motion_angle_deg_max: float
+    center_x_min: float
+    center_x_max: float
+    center_y_min: float
+    center_y_max: float
     blur_probability: float
     max_sprite_px: int
 
@@ -342,6 +348,22 @@ def make_heatmap_tensor(
     return heatmap.unsqueeze(0).clamp_(0.0, 1.0)
 
 
+def bounded_center_range(*, limit: int, size: int, min_norm: float, max_norm: float) -> tuple[float, float]:
+    fallback_min = size * 0.5
+    fallback_max = max(fallback_min, limit - size * 0.5)
+    lower = max(fallback_min, clamp_unit(min_norm) * limit)
+    upper = min(fallback_max, clamp_unit(max_norm) * limit)
+    if lower > upper:
+        return fallback_min, fallback_max
+    return lower, upper
+
+
+def sample_motion_angle_degrees(rng: random.Random, min_deg: float, max_deg: float) -> float:
+    if max_deg < min_deg:
+        max_deg += 360.0
+    return rng.uniform(min_deg, max_deg) % 360.0
+
+
 class TemporalHeatmapDataset:
     def __init__(
         self,
@@ -448,10 +470,22 @@ class SyntheticTemporalHeatmapDataset:
 
         max_x = max(0, cfg.input_width - sprite_width - 1)
         max_y = max(0, cfg.input_height - sprite_height - 1)
-        center_x = rng.uniform(sprite_width * 0.5, cfg.input_width - sprite_width * 0.5)
-        center_y = rng.uniform(sprite_height * 0.5, cfg.input_height - sprite_height * 0.5)
+        center_x_min, center_x_max = bounded_center_range(
+            limit=cfg.input_width,
+            size=sprite_width,
+            min_norm=cfg.center_x_min,
+            max_norm=cfg.center_x_max,
+        )
+        center_y_min, center_y_max = bounded_center_range(
+            limit=cfg.input_height,
+            size=sprite_height,
+            min_norm=cfg.center_y_min,
+            max_norm=cfg.center_y_max,
+        )
+        center_x = rng.uniform(center_x_min, center_x_max)
+        center_y = rng.uniform(center_y_min, center_y_max)
         motion = rng.uniform(cfg.motion_px_min, cfg.motion_px_max)
-        angle = rng.uniform(0.0, 2.0 * np.pi)
+        angle = np.deg2rad(sample_motion_angle_degrees(rng, cfg.motion_angle_deg_min, cfg.motion_angle_deg_max))
         dx = np.cos(angle) * motion
         dy = np.sin(angle) * motion
         radius = cfg.window // 2
@@ -1098,6 +1132,12 @@ def cmd_temporal_heatmap_train(args: argparse.Namespace) -> int:
                 sprite_scale_max=args.synthetic_sprite_scale_max,
                 motion_px_min=args.synthetic_motion_px_min,
                 motion_px_max=args.synthetic_motion_px_max,
+                motion_angle_deg_min=args.synthetic_motion_angle_deg_min,
+                motion_angle_deg_max=args.synthetic_motion_angle_deg_max,
+                center_x_min=args.synthetic_center_x_min,
+                center_x_max=args.synthetic_center_x_max,
+                center_y_min=args.synthetic_center_y_min,
+                center_y_max=args.synthetic_center_y_max,
                 blur_probability=args.synthetic_blur_probability,
                 max_sprite_px=args.synthetic_max_sprite_px,
             )
@@ -1432,6 +1472,12 @@ def add_temporal_heatmap_parser(subparsers: argparse._SubParsersAction[argparse.
     train.add_argument("--synthetic-sprite-scale-max", type=float, default=1.35, help="合成 sprite 最大缩放")
     train.add_argument("--synthetic-motion-px-min", type=float, default=1.0, help="合成球每帧最小位移，输入尺度像素")
     train.add_argument("--synthetic-motion-px-max", type=float, default=16.0, help="合成球每帧最大位移，输入尺度像素")
+    train.add_argument("--synthetic-motion-angle-deg-min", type=float, default=0.0, help="合成球运动角度最小值，0 向右、90 向下")
+    train.add_argument("--synthetic-motion-angle-deg-max", type=float, default=360.0, help="合成球运动角度最大值，可小于最小值表示跨 360 度")
+    train.add_argument("--synthetic-center-x-min", type=float, default=0.0, help="合成球中心 x 最小归一化位置")
+    train.add_argument("--synthetic-center-x-max", type=float, default=1.0, help="合成球中心 x 最大归一化位置")
+    train.add_argument("--synthetic-center-y-min", type=float, default=0.0, help="合成球中心 y 最小归一化位置")
+    train.add_argument("--synthetic-center-y-max", type=float, default=1.0, help="合成球中心 y 最大归一化位置")
     train.add_argument("--synthetic-blur-probability", type=float, default=0.25, help="合成 sprite 模糊概率")
     train.add_argument("--synthetic-max-sprite-px", type=int, default=48, help="合成 sprite 输入尺度最大宽/高像素")
     train.add_argument("--epochs", type=int, default=40, help="最大训练轮数")
