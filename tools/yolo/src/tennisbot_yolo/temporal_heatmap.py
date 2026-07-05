@@ -84,6 +84,20 @@ class PseudoTrack:
 
 
 @dataclass(frozen=True)
+class HardNegativeCandidate:
+    image: str
+    label: str
+    sequence: str
+    frame: int
+    score: float
+    x_px: float
+    y_px: float
+    x_norm: float
+    y_norm: float
+    preexisting_empty: bool
+
+
+@dataclass(frozen=True)
 class SyntheticConfig:
     backgrounds: tuple[Path, ...]
     sprites: tuple[Path, ...]
@@ -942,6 +956,118 @@ def write_pseudo_outputs(
     }
 
 
+def select_hard_negative_candidates(
+    *,
+    candidates_csv: Path,
+    base_labels_root: Path,
+    threshold: float,
+    input_width: int,
+    input_height: int,
+    x_min: float,
+    x_max: float,
+    y_min: float,
+    y_max: float,
+    max_count: int,
+) -> list[HardNegativeCandidate]:
+    selected: list[HardNegativeCandidate] = []
+    seen_images: set[str] = set()
+    with candidates_csv.open(encoding="utf-8", newline="") as candidates_file:
+        rows = sorted(csv.DictReader(candidates_file), key=lambda row: float(row["score"]), reverse=True)
+        for row in rows:
+            image = row["image"]
+            if image in seen_images:
+                continue
+            score = float(row["score"])
+            x_px = float(row["x_px"])
+            y_px = float(row["y_px"])
+            x_norm = x_px / max(1, input_width - 1)
+            y_norm = y_px / max(1, input_height - 1)
+            if score < threshold:
+                continue
+            if not (x_min <= x_norm <= x_max and y_min <= y_norm <= y_max):
+                continue
+            rel_label = Path(image).with_suffix(".txt")
+            label_path = base_labels_root / rel_label
+            if label_path.is_file() and read_yolo_labels(label_path):
+                continue
+            selected.append(
+                HardNegativeCandidate(
+                    image=image,
+                    label=rel_label.as_posix(),
+                    sequence=row.get("sequence", ""),
+                    frame=int(row.get("frame", "0")),
+                    score=score,
+                    x_px=x_px,
+                    y_px=y_px,
+                    x_norm=x_norm,
+                    y_norm=y_norm,
+                    preexisting_empty=label_path.is_file(),
+                )
+            )
+            seen_images.add(image)
+            if max_count > 0 and len(selected) >= max_count:
+                break
+    return selected
+
+
+def write_hard_negative_outputs(
+    *,
+    selected: list[HardNegativeCandidate],
+    base_labels_root: Path,
+    output_root: Path,
+) -> dict[str, int]:
+    output_labels_root = output_root / "labels"
+    output_labels_root.mkdir(parents=True, exist_ok=True)
+    copied_labels = copy_base_labels(base_labels_root, output_labels_root)
+    written_empty = 0
+    preexisting_empty = 0
+    manifest_path = output_root / "manifest.csv"
+    with manifest_path.open("w", encoding="utf-8", newline="") as manifest_file:
+        writer = csv.writer(manifest_file)
+        writer.writerow(
+            [
+                "image",
+                "label",
+                "sequence",
+                "frame",
+                "score",
+                "x_px",
+                "y_px",
+                "x_norm",
+                "y_norm",
+                "preexisting_empty",
+            ]
+        )
+        for candidate in selected:
+            label_path = output_labels_root / candidate.label
+            label_path.parent.mkdir(parents=True, exist_ok=True)
+            if candidate.preexisting_empty:
+                preexisting_empty += 1
+            elif not label_path.exists():
+                label_path.write_text("", encoding="utf-8")
+                written_empty += 1
+            writer.writerow(
+                [
+                    candidate.image,
+                    candidate.label,
+                    candidate.sequence,
+                    candidate.frame,
+                    f"{candidate.score:.6f}",
+                    f"{candidate.x_px:.2f}",
+                    f"{candidate.y_px:.2f}",
+                    f"{candidate.x_norm:.6f}",
+                    f"{candidate.y_norm:.6f}",
+                    int(candidate.preexisting_empty),
+                ]
+            )
+    return {
+        "copied_labels": copied_labels,
+        "selected": len(selected),
+        "written_empty": written_empty,
+        "preexisting_empty": preexisting_empty,
+    }
+
+
 def benchmark_latency(model: Any, *, device: str, input_channels: int, height: int, width: int, repeats: int) -> float:
     import torch
 
@@ -1446,6 +1572,76 @@ def cmd_temporal_heatmap_mine_pseudo(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_temporal_heatmap_hard_negatives(args: argparse.Namespace) -> int:
+    if args.input_width <= 0 or args.input_height <= 0:
+        raise SystemExit("--input-width and --input-height must be positive")
+    if args.max_count < 0:
+        raise SystemExit("--max-count must be non-negative")
+    base_labels_root = args.base_labels_root.resolve()
+    output_root = args.output_root
+    if output_root is None:
+        output_root = DEFAULT_RUNS_ROOT / "temporal_hard_negatives" / args.name
+    output_root = output_root.resolve()
+    if output_root.exists():
+        if not args.overwrite:
+            raise SystemExit(f"output already exists: {output_root}")
+        shutil.rmtree(output_root)
+    output_root.mkdir(parents=True, exist_ok=True)
+
+    selected = select_hard_negative_candidates(
+        candidates_csv=args.candidates_csv.resolve(),
+        base_labels_root=base_labels_root,
+        threshold=args.threshold,
+        input_width=args.input_width,
+        input_height=args.input_height,
+        x_min=args.x_min,
+        x_max=args.x_max,
+        y_min=args.y_min,
+        y_max=args.y_max,
+        max_count=args.max_count,
+    )
+    stats = write_hard_negative_outputs(
+        selected=selected,
+        base_labels_root=base_labels_root,
+        output_root=output_root,
+    )
+    report_lines = [
+        f"# Temporal Hard-Negative Mining Result - {datetime.now().strftime('%Y-%m-%d')}",
+        "",
+        "## Settings",
+        "",
+        f"- Candidates CSV: `{args.candidates_csv.resolve()}`",
+        f"- Output: `{output_root}`",
+        f"- Base labels root: `{base_labels_root}`",
+        f"- Input: `{args.input_width}x{args.input_height}`",
+        f"- Score threshold: `{args.threshold}`",
+        f"- X range: `{args.x_min}-{args.x_max}`",
+        f"- Y range: `{args.y_min}-{args.y_max}`",
+        f"- Max count: `{args.max_count}`",
+        "",
+        "## Result",
+        "",
+        "| item | count |",
+        "|---|---:|",
+        f"| copied base label files | {stats['copied_labels']} |",
+        f"| selected hard negatives | {stats['selected']} |",
+        f"| written empty label files | {stats['written_empty']} |",
+        f"| already-empty selected labels | {stats['preexisting_empty']} |",
+        "",
+        "## Files",
+        "",
+        f"- Labels root: `{output_root / 'labels'}`",
+        f"- Manifest: `{output_root / 'manifest.csv'}`",
+    ]
+    report = "\n".join(report_lines)
+    (output_root / "report.md").write_text(report + "\n", encoding="utf-8")
+    if args.output_markdown is not None:
+        args.output_markdown.parent.mkdir(parents=True, exist_ok=True)
+        args.output_markdown.write_text(report + "\n", encoding="utf-8")
+    print(report)
+    return 0
+
+
 def add_temporal_heatmap_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     parser_kwargs = {"formatter_class": argparse.ArgumentDefaultsHelpFormatter}
     temporal = subparsers.add_parser("temporal-heatmap", help="训练连续帧 heatmap 搜索 teacher。", **parser_kwargs)
@@ -1520,3 +1716,20 @@ def add_temporal_heatmap_parser(subparsers: argparse._SubParsersAction[argparse.
     mine.add_argument("--device", default="auto", help="cuda:0、cpu 或 auto")
     mine.add_argument("--overwrite", action="store_true", help="允许覆盖已有输出目录")
     mine.set_defaults(func=cmd_temporal_heatmap_mine_pseudo)
+
+    hard = temporal_subparsers.add_parser("hard-negatives", help="从 teacher candidate CSV 生成高分背景干扰空标签。", **parser_kwargs)
+    hard.add_argument("--candidates-csv", type=Path, required=True, help="mine-pseudo 生成的 candidates.csv")
+    hard.add_argument("--base-labels-root", type=Path, default=DEFAULT_LABELS_ROOT, help="原始 YOLO 标签根目录，会复制到输出 labels")
+    hard.add_argument("--output-root", type=Path, default=None, help="hard-negative run 输出目录")
+    hard.add_argument("--output-markdown", type=Path, default=None, help="写入 Markdown 结果")
+    hard.add_argument("--name", default=f"temporal_hard_negatives_{datetime.now().strftime('%Y%m%d')}", help="默认 run 名称")
+    hard.add_argument("--input-width", type=int, default=960, help="candidate x_px 对应的输入宽度")
+    hard.add_argument("--input-height", type=int, default=540, help="candidate y_px 对应的输入高度")
+    hard.add_argument("--threshold", type=float, default=0.95, help="candidate score 阈值")
+    hard.add_argument("--x-min", type=float, default=0.10, help="candidate x 归一化最小值")
+    hard.add_argument("--x-max", type=float, default=0.40, help="candidate x 归一化最大值")
+    hard.add_argument("--y-min", type=float, default=0.25, help="candidate y 归一化最小值")
+    hard.add_argument("--y-max", type=float, default=0.75, help="candidate y 归一化最大值")
+    hard.add_argument("--max-count", type=int, default=0, help="最多选择多少 hard negatives；0 表示不限")
+    hard.add_argument("--overwrite", action="store_true", help="允许覆盖已有输出目录")
+    hard.set_defaults(func=cmd_temporal_heatmap_hard_negatives)

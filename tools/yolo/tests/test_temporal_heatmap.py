@@ -15,6 +15,7 @@ from tennisbot_yolo.temporal_heatmap import (
     compute_peak_metrics,
     filter_temporal_tracks,
     frame_sort_key,
+    select_hard_negative_candidates,
 )
 
 
@@ -119,6 +120,47 @@ def test_filter_temporal_tracks_requires_consistent_motion() -> None:
 
     assert len(tracks) == 1
     assert [item.sample.frame_index for item in tracks[0].candidates] == [1, 2, 3]
+
+
+def test_select_hard_negative_candidates_skips_positive_labels(tmp_path: Path) -> None:
+    candidates = tmp_path / "candidates.csv"
+    labels = tmp_path / "labels"
+    write_label(labels / "seq/positive_frame_000001.txt", "0 0.500000 0.500000 0.100000 0.100000\n")
+    write_label(labels / "seq/empty_frame_000002.txt", "")
+    candidates.write_text(
+        "\n".join(
+            [
+                "image,sequence,frame,score,x_px,y_px,status,track_id,track_length",
+                "seq/positive_frame_000001.jpg,seq/positive,1,0.990000,200,200,track_rejected,,",
+                "seq/empty_frame_000002.jpg,seq/empty,2,0.980000,220,220,track_rejected,,",
+                "seq/missing_frame_000003.jpg,seq/missing,3,0.970000,230,230,track_rejected,,",
+                "seq/low_frame_000004.jpg,seq/low,4,0.700000,230,230,track_rejected,,",
+                "seq/out_frame_000005.jpg,seq/out,5,0.990000,900,20,track_rejected,,",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    selected = select_hard_negative_candidates(
+        candidates_csv=candidates,
+        base_labels_root=labels,
+        threshold=0.95,
+        input_width=1000,
+        input_height=1000,
+        x_min=0.1,
+        x_max=0.4,
+        y_min=0.1,
+        y_max=0.4,
+        max_count=0,
+    )
+
+    assert [candidate.image for candidate in selected] == [
+        "seq/empty_frame_000002.jpg",
+        "seq/missing_frame_000003.jpg",
+    ]
+    assert selected[0].preexisting_empty is True
+    assert selected[1].preexisting_empty is False
 
 
 def test_compute_peak_metrics_counts_bad_localization_as_fp_and_fn() -> None:
