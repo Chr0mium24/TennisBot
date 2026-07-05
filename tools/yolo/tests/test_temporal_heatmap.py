@@ -12,9 +12,11 @@ from tennisbot_yolo.temporal_heatmap import (
     build_temporal_samples,
     collect_synthetic_backgrounds,
     collect_synthetic_sprites,
+    compose_temporal_input,
     compute_peak_metrics,
     filter_temporal_tracks,
     frame_sort_key,
+    input_channels_for_mode,
     select_hard_negative_candidates,
 )
 
@@ -183,6 +185,23 @@ def test_compute_peak_metrics_counts_bad_localization_as_fp_and_fn() -> None:
     assert metrics.fn == 1
     assert metrics.recall == 0.5
     assert round(metrics.precision, 3) == 0.333
+
+
+def test_rgb_diff_input_appends_frame_difference_maps() -> None:
+    import torch
+
+    frames = [
+        torch.zeros((3, 4, 5), dtype=torch.float32),
+        torch.full((3, 4, 5), 0.25, dtype=torch.float32),
+        torch.full((3, 4, 5), 1.00, dtype=torch.float32),
+    ]
+
+    tensor = compose_temporal_input(frames, "rgb-diff")
+
+    assert input_channels_for_mode(3, "rgb-diff") == 11
+    assert tuple(tensor.shape) == (11, 4, 5)
+    assert torch.allclose(tensor[9], torch.full((4, 5), 0.25))
+    assert torch.allclose(tensor[10], torch.full((4, 5), 0.75))
 
 
 def test_collect_synthetic_backgrounds_skips_positive_and_validation(tmp_path: Path) -> None:

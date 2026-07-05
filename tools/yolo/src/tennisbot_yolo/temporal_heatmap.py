@@ -20,6 +20,7 @@ from .paths import DEFAULT_IMAGES_ROOT, DEFAULT_LABELS_ROOT, DEFAULT_RUNS_ROOT, 
 FRAME_RE = re.compile(r"(?P<prefix>.+)_frame_(?P<frame>\d+)$")
 DEFAULT_VAL_TOKEN = "20260701_155008"
 DEFAULT_RUN_NAME = "search_s3_temporal_heatmap_20260704"
+INPUT_MODES = ("rgb", "rgb-diff")
 
 
 @dataclass(frozen=True)
@@ -119,6 +120,7 @@ class SyntheticConfig:
     center_y_max: float
     blur_probability: float
     max_sprite_px: int
+    input_mode: str = "rgb"
 
 
 def frame_sort_key(path: Path) -> tuple[str, int, str]:
@@ -362,6 +364,33 @@ def make_heatmap_tensor(
     return heatmap.unsqueeze(0).clamp_(0.0, 1.0)
 
 
+def input_channels_for_mode(window: int, input_mode: str) -> int:
+    if window <= 0:
+        raise ValueError("window must be positive")
+    if input_mode == "rgb":
+        return window * 3
+    if input_mode == "rgb-diff":
+        return window * 3 + max(0, window - 1)
+    raise ValueError(f"unsupported input mode: {input_mode}")
+
+
+def compose_temporal_input(frames: list[Any], input_mode: str) -> Any:
+    import torch
+
+    if not frames:
+        raise ValueError("frames must not be empty")
+    rgb = torch.cat(frames, dim=0)
+    if input_mode == "rgb":
+        return rgb
+    if input_mode == "rgb-diff":
+        diffs = [
+            (frames[index] - frames[index - 1]).abs().mean(dim=0, keepdim=True)
+            for index in range(1, len(frames))
+        ]
+        return torch.cat([rgb, *diffs], dim=0)
+    raise ValueError(f"unsupported input mode: {input_mode}")
+
+
 def bounded_center_range(*, limit: int, size: int, min_norm: float, max_norm: float) -> tuple[float, float]:
     fallback_min = size * 0.5
     fallback_max = max(fallback_min, limit - size * 0.5)
@@ -387,12 +416,16 @@ class TemporalHeatmapDataset:
         input_height: int,
         sigma: float,
         augment: bool,
+        input_mode: str = "rgb",
     ) -> None:
         self.samples = samples
         self.input_width = input_width
         self.input_height = input_height
         self.sigma = sigma
         self.augment = augment
+        if samples:
+            input_channels_for_mode(len(samples[0].window_paths), input_mode)
+        self.input_mode = input_mode
 
     def __len__(self) -> int:
         return len(self.samples)
@@ -411,7 +444,7 @@ class TemporalHeatmapDataset:
             rgb = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
             tensor = torch.from_numpy(rgb).permute(2, 0, 1).float().div_(255.0)
             frames.append(tensor)
-        image_tensor = torch.cat(frames, dim=0)
+        image_tensor = compose_temporal_input(frames, self.input_mode)
         if self.augment:
             gain = 0.85 + random.random() * 0.30
             bias = (random.random() - 0.5) * 0.08
@@ -528,7 +561,7 @@ class SyntheticTemporalHeatmapDataset:
             rgb = cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB)
             frames.append(torch.from_numpy(rgb).permute(2, 0, 1).float().div_(255.0))
 
-        image_tensor = torch.cat(frames, dim=0)
+        image_tensor = compose_temporal_input(frames, cfg.input_mode)
         target = make_heatmap_tensor(
             torch_module=torch,
             width=cfg.input_width,
@@ -717,6 +750,7 @@ def collect_peak_candidates(
     input_width: int,
     input_height: int,
     sigma: float,
+    input_mode: str,
     batch_size: int,
     workers: int,
 ) -> list[TemporalPeakCandidate]:
@@ -729,6 +763,7 @@ def collect_peak_candidates(
         input_height=input_height,
         sigma=sigma,
         augment=False,
+        input_mode=input_mode,
     )
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=workers)
     candidates: list[TemporalPeakCandidate] = []
@@ -1127,6 +1162,7 @@ def format_report(
             f"- Labels root: `{args.labels_root}`",
             f"- Window: `{args.window}` frames",
             f"- Input: `{args.input_width}x{args.input_height}`",
+            f"- Input mode: `{args.input_mode}`",
             f"- Sigma: `{args.sigma}` px",
             f"- Validation token: `{args.val_include}`",
             f"- Train exclude: `{args.train_exclude}`",
@@ -1172,7 +1208,7 @@ def format_report(
             "",
             "| device | input | median ms/frame | estimated stereo FPS |",
             "|---|---|---:|---:|",
-            f"| {args.device} | {args.window}xRGB {args.input_width}x{args.input_height} | {latency_ms:.2f} | {stereo_fps:.2f} |",
+            f"| {args.device} | {args.input_mode} {args.input_width}x{args.input_height} | {latency_ms:.2f} | {stereo_fps:.2f} |",
             "",
             "## Decision",
             "",
@@ -1235,6 +1271,7 @@ def cmd_temporal_heatmap_train(args: argparse.Namespace) -> int:
         input_height=args.input_height,
         sigma=args.sigma,
         augment=True,
+        input_mode=args.input_mode,
     )
     synthetic_count = int(args.synthetic_count)
     if synthetic_count > 0:
@@ -1266,6 +1303,7 @@ def cmd_temporal_heatmap_train(args: argparse.Namespace) -> int:
                 center_y_max=args.synthetic_center_y_max,
                 blur_probability=args.synthetic_blur_probability,
                 max_sprite_px=args.synthetic_max_sprite_px,
+                input_mode=args.input_mode,
             )
         )
         train_dataset = ConcatDataset([train_dataset, synthetic_dataset])
@@ -1275,6 +1313,7 @@ def cmd_temporal_heatmap_train(args: argparse.Namespace) -> int:
         input_height=args.input_height,
         sigma=args.sigma,
         augment=False,
+        input_mode=args.input_mode,
     )
     train_loader = DataLoader(train_dataset, batch_size=args.batch, shuffle=True, num_workers=args.workers)
     val_loader = DataLoader(val_dataset, batch_size=args.batch, shuffle=False, num_workers=args.workers)
@@ -1284,7 +1323,8 @@ def cmd_temporal_heatmap_train(args: argparse.Namespace) -> int:
         output_dir = DEFAULT_RUNS_ROOT / "temporal_heatmap" / args.name
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    model = build_model(input_channels=args.window * 3).to(device)
+    input_channels = input_channels_for_mode(args.window, args.input_mode)
+    model = build_model(input_channels=input_channels).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     thresholds = [float(value) for value in args.thresholds.split(",") if value.strip()]
     best_score: tuple[float, float, float] = (-1.0, -1.0, -1.0)
@@ -1357,6 +1397,7 @@ def cmd_temporal_heatmap_train(args: argparse.Namespace) -> int:
                     "input_height": args.input_height,
                     "window": args.window,
                     "sigma": args.sigma,
+                    "input_mode": args.input_mode,
                     "metrics": metrics.__dict__,
                 },
                 output_dir / "best.pt",
@@ -1374,6 +1415,7 @@ def cmd_temporal_heatmap_train(args: argparse.Namespace) -> int:
                     "input_height": args.input_height,
                     "window": args.window,
                     "sigma": args.sigma,
+                    "input_mode": args.input_mode,
                     "metrics": recall_metrics.__dict__,
                 },
                 output_dir / "best_recall.pt",
@@ -1393,6 +1435,7 @@ def cmd_temporal_heatmap_train(args: argparse.Namespace) -> int:
             "input_height": args.input_height,
             "window": args.window,
             "sigma": args.sigma,
+            "input_mode": args.input_mode,
         },
         output_dir / "last.pt",
     )
@@ -1404,7 +1447,7 @@ def cmd_temporal_heatmap_train(args: argparse.Namespace) -> int:
     latency_ms = benchmark_latency(
         model,
         device=device,
-        input_channels=args.window * 3,
+        input_channels=input_channels,
         height=args.input_height,
         width=args.input_width,
         repeats=args.latency_repeats,
@@ -1449,6 +1492,7 @@ def cmd_temporal_heatmap_mine_pseudo(args: argparse.Namespace) -> int:
     window = int(checkpoint.get("window", args.window or 0))
     input_width = int(checkpoint.get("input_width", args.input_width or 0))
     input_height = int(checkpoint.get("input_height", args.input_height or 0))
+    input_mode = str(checkpoint.get("input_mode", "rgb"))
     sigma = float(checkpoint.get("sigma", args.sigma))
     if window <= 0 or window % 2 != 1:
         raise SystemExit("checkpoint does not define a valid odd window")
@@ -1491,7 +1535,7 @@ def cmd_temporal_heatmap_mine_pseudo(args: argparse.Namespace) -> int:
     if box_width <= 0.0 or box_height <= 0.0:
         box_width, box_height = estimate_box_size(base_labels_root, exclude_tokens=exclude_tokens)
 
-    model = build_model(input_channels=window * 3)
+    model = build_model(input_channels=input_channels_for_mode(window, input_mode))
     model.load_state_dict(checkpoint["model_state"])
     model.to(device)
     candidates = collect_peak_candidates(
@@ -1501,6 +1545,7 @@ def cmd_temporal_heatmap_mine_pseudo(args: argparse.Namespace) -> int:
         input_width=input_width,
         input_height=input_height,
         sigma=sigma,
+        input_mode=input_mode,
         batch_size=args.batch,
         workers=args.workers,
     )
@@ -1536,6 +1581,7 @@ def cmd_temporal_heatmap_mine_pseudo(args: argparse.Namespace) -> int:
         f"- Base labels root: `{base_labels_root}`",
         f"- Window: `{window}`",
         f"- Input: `{input_width}x{input_height}`",
+        f"- Input mode: `{input_mode}`",
         f"- Device: `{device}`",
         f"- Include tokens: `{args.include}`",
         f"- Exclude tokens: `{args.exclude}`",
@@ -1656,6 +1702,7 @@ def add_temporal_heatmap_parser(subparsers: argparse._SubParsersAction[argparse.
     train.add_argument("--window", type=int, default=3, help="连续帧窗口，必须为奇数")
     train.add_argument("--input-width", type=int, default=640, help="网络输入宽度")
     train.add_argument("--input-height", type=int, default=360, help="网络输入高度")
+    train.add_argument("--input-mode", choices=INPUT_MODES, default="rgb", help="输入通道模式；rgb-diff 追加相邻帧差分灰度图")
     train.add_argument("--sigma", type=float, default=3.0, help="heatmap 高斯半径")
     train.add_argument("--radius-px", type=float, default=8.0, help="验证峰值距离阈值，输入尺度像素")
     train.add_argument("--train-include", default="", help="训练样本必须包含的逗号分隔 token；空表示不限制")
