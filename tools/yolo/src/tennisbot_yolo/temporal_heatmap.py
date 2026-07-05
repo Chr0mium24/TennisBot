@@ -380,6 +380,28 @@ def make_heatmap_tensor(
     return heatmap.unsqueeze(0).clamp_(0.0, 1.0)
 
 
+def load_sample_weight_manifests(
+    manifest_paths: tuple[Path, ...],
+    *,
+    labels_root: Path,
+    sample_weight: float,
+) -> dict[Path, float]:
+    if sample_weight < 0.0:
+        raise ValueError("sample_weight must be non-negative")
+    weights: dict[Path, float] = {}
+    for manifest_path in manifest_paths:
+        with manifest_path.open(encoding="utf-8", newline="") as manifest_file:
+            reader = csv.DictReader(manifest_file)
+            if "label" not in (reader.fieldnames or ()):
+                raise ValueError(f"manifest does not contain a label column: {manifest_path}")
+            for row in reader:
+                label = row.get("label", "").strip()
+                if not label:
+                    continue
+                weights[(labels_root / label).resolve()] = sample_weight
+    return weights
+
+
 def input_channels_for_mode(window: int, input_mode: str) -> int:
     if window <= 0:
         raise ValueError("window must be positive")
@@ -433,6 +455,7 @@ class TemporalHeatmapDataset:
         sigma: float,
         augment: bool,
         input_mode: str = "rgb",
+        sample_weights: dict[Path, float] | None = None,
     ) -> None:
         self.samples = samples
         self.input_width = input_width
@@ -442,6 +465,7 @@ class TemporalHeatmapDataset:
         if samples:
             input_channels_for_mode(len(samples[0].window_paths), input_mode)
         self.input_mode = input_mode
+        self.sample_weights = sample_weights or {}
 
     def __len__(self) -> int:
         return len(self.samples)
@@ -474,10 +498,11 @@ class TemporalHeatmapDataset:
                 y_center=sample.y_center,
                 sigma=self.sigma,
             )
-            meta = torch.tensor([1.0, sample.x_center, sample.y_center], dtype=torch.float32)
+            sample_weight = self.sample_weights.get(sample.label_path.resolve(), 1.0)
+            meta = torch.tensor([1.0, sample.x_center, sample.y_center, sample_weight], dtype=torch.float32)
         else:
             target = torch.zeros((1, self.input_height, self.input_width), dtype=torch.float32)
-            meta = torch.tensor([0.0, 0.0, 0.0], dtype=torch.float32)
+            meta = torch.tensor([0.0, 0.0, 0.0, 1.0], dtype=torch.float32)
         return image_tensor, target, meta
 
 
@@ -591,6 +616,7 @@ class SyntheticTemporalHeatmapDataset:
                 1.0,
                 center_frame_x / max(1, cfg.input_width - 1),
                 center_frame_y / max(1, cfg.input_height - 1),
+                1.0,
             ],
             dtype=torch.float32,
         )
@@ -1294,6 +1320,7 @@ def format_report(
     train_count: tuple[int, int, int],
     real_train_count: tuple[int, int, int],
     synthetic_count: int,
+    weighted_sample_count: int,
     val_count: tuple[int, int, int],
     best_epoch: int,
     best_loss: float,
@@ -1332,6 +1359,8 @@ def format_report(
             f"- Epochs requested: `{args.epochs}`",
             f"- Batch: `{args.batch}`",
             f"- Synthetic train samples: `{synthetic_count}`",
+            f"- Sample weight manifests: `{', '.join(str(path) for path in args.sample_weight_manifest) if args.sample_weight_manifest else ''}`",
+            f"- Manifest sample weight: `{args.manifest_sample_weight}`",
             "",
             "## Data",
             "",
@@ -1340,6 +1369,7 @@ def format_report(
             f"| train | {train_count[0]} | {train_count[1]} | {train_count[2]} |",
             f"| train_real | {real_train_count[0]} | {real_train_count[1]} | {real_train_count[2]} |",
             f"| train_synthetic | {synthetic_count} | {synthetic_count} | 0 |",
+            f"| train_weighted_by_manifest | {weighted_sample_count} | {weighted_sample_count} | 0 |",
             f"| val | {val_count[0]} | {val_count[1]} | {val_count[2]} |",
             "",
             "## Best Validation",
@@ -1402,6 +1432,7 @@ def cmd_temporal_heatmap_train(args: argparse.Namespace) -> int:
     train_exclude = parse_token_list(args.train_exclude)
     val_include = parse_token_list(args.val_include)
     train_include = parse_token_list(args.train_include)
+    sample_weight_manifests = tuple(path.resolve() for path in args.sample_weight_manifest)
 
     train_samples = build_temporal_samples(
         images_root=images_root,
@@ -1427,6 +1458,14 @@ def cmd_temporal_heatmap_train(args: argparse.Namespace) -> int:
         raise SystemExit("no validation samples found")
 
     real_train_count = summarize_samples(train_samples)
+    sample_weights = load_sample_weight_manifests(
+        sample_weight_manifests,
+        labels_root=labels_root,
+        sample_weight=args.manifest_sample_weight,
+    )
+    weighted_sample_count = sum(
+        1 for sample in train_samples if sample.positive and sample.label_path.resolve() in sample_weights
+    )
     train_dataset = TemporalHeatmapDataset(
         samples=train_samples,
         input_width=args.input_width,
@@ -1434,6 +1473,7 @@ def cmd_temporal_heatmap_train(args: argparse.Namespace) -> int:
         sigma=args.sigma,
         augment=True,
         input_mode=args.input_mode,
+        sample_weights=sample_weights,
     )
     synthetic_count = int(args.synthetic_count)
     if synthetic_count > 0:
@@ -1502,12 +1542,15 @@ def cmd_temporal_heatmap_train(args: argparse.Namespace) -> int:
     for epoch in range(1, args.epochs + 1):
         model.train()
         losses: list[float] = []
-        for images, targets, _metas in train_loader:
+        for images, targets, metas in train_loader:
             images = images.to(device)
             targets = targets.to(device)
+            metas = metas.to(device)
             logits = model(images)
             weights = 1.0 + targets * args.positive_weight
-            loss = functional.binary_cross_entropy_with_logits(logits, targets, weight=weights)
+            sample_weights_tensor = metas[:, 3].view(-1, 1, 1, 1)
+            loss_map = functional.binary_cross_entropy_with_logits(logits, targets, reduction="none")
+            loss = (loss_map * weights * sample_weights_tensor).mean()
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
             optimizer.step()
@@ -1624,6 +1667,7 @@ def cmd_temporal_heatmap_train(args: argparse.Namespace) -> int:
         ),
         real_train_count=real_train_count,
         synthetic_count=synthetic_count,
+        weighted_sample_count=weighted_sample_count,
         val_count=summarize_samples(val_samples),
         best_epoch=best_epoch,
         best_loss=best_loss,
@@ -1996,6 +2040,14 @@ def add_temporal_heatmap_parser(subparsers: argparse._SubParsersAction[argparse.
     train.add_argument("--lr", type=float, default=1e-3, help="AdamW learning rate")
     train.add_argument("--weight-decay", type=float, default=1e-4, help="AdamW weight decay")
     train.add_argument("--positive-weight", type=float, default=80.0, help="heatmap 正区域 loss 权重")
+    train.add_argument(
+        "--sample-weight-manifest",
+        type=Path,
+        action="append",
+        default=[],
+        help="包含 label 列的 manifest；其中的训练正样本会使用 --manifest-sample-weight",
+    )
+    train.add_argument("--manifest-sample-weight", type=float, default=1.0, help="sample-weight-manifest 中正样本的 loss 权重")
     train.add_argument("--thresholds", default="0.05,0.10,0.15,0.20,0.30,0.40,0.50,0.60,0.70", help="验证阈值扫描")
     train.add_argument("--latency-repeats", type=int, default=30, help="训练后延迟测量次数")
     train.add_argument("--seed", type=int, default=20260704, help="随机种子")

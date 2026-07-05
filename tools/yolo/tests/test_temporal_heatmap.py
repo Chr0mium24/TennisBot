@@ -8,6 +8,7 @@ from tennisbot_yolo.temporal_heatmap import (
     SyntheticConfig,
     SyntheticTemporalHeatmapDataset,
     HeatmapSample,
+    TemporalHeatmapDataset,
     build_mining_temporal_samples,
     build_temporal_samples,
     collect_synthetic_backgrounds,
@@ -17,6 +18,7 @@ from tennisbot_yolo.temporal_heatmap import (
     filter_temporal_tracks,
     frame_sort_key,
     input_channels_for_mode,
+    load_sample_weight_manifests,
     select_interpolated_label_candidates,
     select_hard_negative_candidates,
 )
@@ -99,6 +101,38 @@ def test_build_mining_temporal_samples_does_not_require_labels(tmp_path: Path) -
 
     assert [sample.frame_index for sample in samples] == [2, 3, 4]
     assert all(sample.positive is False for sample in samples)
+
+
+def test_temporal_dataset_uses_manifest_sample_weight(tmp_path: Path) -> None:
+    images = tmp_path / "images"
+    labels = tmp_path / "labels"
+    rel = Path("seq") / "train_cam1_frame_000002.jpg"
+    for frame in range(1, 4):
+        frame_rel = Path("seq") / f"train_cam1_frame_{frame:06d}.jpg"
+        write_rgb_image(images / frame_rel)
+    write_label(labels / rel.with_suffix(".txt"), "0 0.500000 0.500000 0.100000 0.100000\n")
+    manifest = tmp_path / "manifest.csv"
+    manifest.write_text(
+        "image,label\n"
+        f"{rel.as_posix()},{rel.with_suffix('.txt').as_posix()}\n",
+        encoding="utf-8",
+    )
+    samples = build_temporal_samples(images_root=images, labels_root=labels, window=3, include_empty_labels=True)
+    weights = load_sample_weight_manifests((manifest,), labels_root=labels, sample_weight=0.25)
+
+    dataset = TemporalHeatmapDataset(
+        samples=samples,
+        input_width=32,
+        input_height=24,
+        sigma=2.0,
+        augment=False,
+        sample_weights=weights,
+    )
+
+    _image, _target, meta = dataset[0]
+
+    assert meta[0].item() == 1.0
+    assert meta[3].item() == 0.25
 
 
 def test_filter_temporal_tracks_requires_consistent_motion() -> None:
