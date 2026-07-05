@@ -17,6 +17,7 @@ from tennisbot_yolo.temporal_heatmap import (
     filter_temporal_tracks,
     frame_sort_key,
     input_channels_for_mode,
+    select_interpolated_label_candidates,
     select_hard_negative_candidates,
 )
 
@@ -163,6 +164,35 @@ def test_select_hard_negative_candidates_skips_positive_labels(tmp_path: Path) -
     ]
     assert selected[0].preexisting_empty is True
     assert selected[1].preexisting_empty is False
+
+
+def test_select_interpolated_label_candidates_between_positive_anchors(tmp_path: Path) -> None:
+    images = tmp_path / "images"
+    labels = tmp_path / "labels"
+    for frame in range(1, 6):
+        rel = Path("seq") / f"train_cam1_frame_{frame:06d}.jpg"
+        write_rgb_image(images / rel)
+    write_label(labels / "seq/train_cam1_frame_000001.txt", "0 0.100000 0.200000 0.020000 0.030000\n")
+    write_label(labels / "seq/train_cam1_frame_000003.txt", "0 0.300000 0.400000 0.040000 0.050000\n")
+    write_label(labels / "seq/train_cam1_frame_000005.txt", "0 0.900000 0.900000 0.060000 0.070000\n")
+    write_label(labels / "seq/train_cam1_frame_000004.txt", "")
+
+    selected = select_interpolated_label_candidates(
+        images_root=images,
+        base_labels_root=labels,
+        exclude_tokens=(),
+        max_frame_gap=3,
+        max_motion_px=0.0,
+        input_width=100,
+        input_height=100,
+    )
+
+    assert [(item.frame, round(item.x_center, 3), round(item.y_center, 3)) for item in selected] == [
+        (2, 0.2, 0.3),
+        (4, 0.6, 0.65),
+    ]
+    assert selected[0].preexisting_empty is False
+    assert selected[1].preexisting_empty is True
 
 
 def test_compute_peak_metrics_counts_bad_localization_as_fp_and_fn() -> None:

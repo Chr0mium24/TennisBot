@@ -99,6 +99,22 @@ class HardNegativeCandidate:
 
 
 @dataclass(frozen=True)
+class InterpolatedLabelCandidate:
+    image: str
+    label: str
+    sequence: str
+    frame: int
+    left_frame: int
+    right_frame: int
+    gap: int
+    x_center: float
+    y_center: float
+    box_width: float
+    box_height: float
+    preexisting_empty: bool
+
+
+@dataclass(frozen=True)
 class SyntheticConfig:
     backgrounds: tuple[Path, ...]
     sprites: tuple[Path, ...]
@@ -1103,6 +1119,152 @@ def write_hard_negative_outputs(
     }
 
 
+def select_interpolated_label_candidates(
+    *,
+    images_root: Path,
+    base_labels_root: Path,
+    exclude_tokens: tuple[str, ...],
+    max_frame_gap: int,
+    max_motion_px: float,
+    input_width: int,
+    input_height: int,
+) -> list[InterpolatedLabelCandidate]:
+    if max_frame_gap <= 1:
+        raise ValueError("max_frame_gap must be greater than 1")
+    if input_width <= 0 or input_height <= 0:
+        raise ValueError("input dimensions must be positive")
+
+    frame_groups = collect_frame_refs(
+        images_root=images_root,
+        labels_root=base_labels_root,
+        exclude_tokens=exclude_tokens,
+    )
+    candidates: list[InterpolatedLabelCandidate] = []
+    seen: set[tuple[str, int]] = set()
+    for sequence, frames in sorted(frame_groups.items()):
+        positives: list[tuple[int, YoloBox]] = []
+        for frame_index, ref in sorted(frames.items()):
+            if not ref.label_path.exists():
+                continue
+            label = best_label(read_yolo_labels(ref.label_path))
+            if label is not None:
+                positives.append((frame_index, label))
+        for (left_frame, left_label), (right_frame, right_label) in zip(positives, positives[1:]):
+            gap = right_frame - left_frame
+            if gap <= 1 or gap > max_frame_gap:
+                continue
+            motion_px = math.hypot(
+                (right_label.x_center - left_label.x_center) * (input_width - 1),
+                (right_label.y_center - left_label.y_center) * (input_height - 1),
+            ) / gap
+            if max_motion_px > 0.0 and motion_px > max_motion_px:
+                continue
+            for frame_index in range(left_frame + 1, right_frame):
+                key = (sequence, frame_index)
+                if key in seen:
+                    continue
+                ref = frames.get(frame_index)
+                if ref is None:
+                    continue
+                existing_labels = read_yolo_labels(ref.label_path) if ref.label_path.exists() else []
+                if existing_labels:
+                    continue
+                t = (frame_index - left_frame) / gap
+                rel_image = ref.image_path.relative_to(images_root)
+                rel_label = rel_image.with_suffix(".txt")
+                candidates.append(
+                    InterpolatedLabelCandidate(
+                        image=rel_image.as_posix(),
+                        label=rel_label.as_posix(),
+                        sequence=sequence,
+                        frame=frame_index,
+                        left_frame=left_frame,
+                        right_frame=right_frame,
+                        gap=gap,
+                        x_center=clamp_unit(left_label.x_center + (right_label.x_center - left_label.x_center) * t),
+                        y_center=clamp_unit(left_label.y_center + (right_label.y_center - left_label.y_center) * t),
+                        box_width=clamp_unit(left_label.width + (right_label.width - left_label.width) * t),
+                        box_height=clamp_unit(left_label.height + (right_label.height - left_label.height) * t),
+                        preexisting_empty=ref.label_path.exists(),
+                    )
+                )
+                seen.add(key)
+    return candidates
+
+
+def write_interpolated_label_outputs(
+    *,
+    selected: list[InterpolatedLabelCandidate],
+    base_labels_root: Path,
+    output_root: Path,
+) -> dict[str, int]:
+    output_labels_root = output_root / "labels"
+    output_labels_root.mkdir(parents=True, exist_ok=True)
+    copied_labels = copy_base_labels(base_labels_root, output_labels_root)
+    written = 0
+    overwritten_empty = 0
+    skipped_existing_positive = 0
+    manifest_path = output_root / "manifest.csv"
+    with manifest_path.open("w", encoding="utf-8", newline="") as manifest_file:
+        writer = csv.writer(manifest_file)
+        writer.writerow(
+            [
+                "image",
+                "label",
+                "sequence",
+                "frame",
+                "left_frame",
+                "right_frame",
+                "gap",
+                "x_center",
+                "y_center",
+                "box_width",
+                "box_height",
+                "preexisting_empty",
+            ]
+        )
+        for candidate in selected:
+            label_path = output_labels_root / candidate.label
+            label_path.parent.mkdir(parents=True, exist_ok=True)
+            if read_yolo_labels(label_path):
+                skipped_existing_positive += 1
+                continue
+            if label_path.exists():
+                overwritten_empty += 1
+            box = YoloBox(
+                class_id=0,
+                x_center=candidate.x_center,
+                y_center=candidate.y_center,
+                width=candidate.box_width,
+                height=candidate.box_height,
+            )
+            label_path.write_text(format_yolo_box(box) + "\n", encoding="utf-8")
+            writer.writerow(
+                [
+                    candidate.image,
+                    candidate.label,
+                    candidate.sequence,
+                    candidate.frame,
+                    candidate.left_frame,
+                    candidate.right_frame,
+                    candidate.gap,
+                    f"{candidate.x_center:.6f}",
+                    f"{candidate.y_center:.6f}",
+                    f"{candidate.box_width:.6f}",
+                    f"{candidate.box_height:.6f}",
+                    int(candidate.preexisting_empty),
+                ]
+            )
+            written += 1
+    return {
+        "copied_labels": copied_labels,
+        "selected": len(selected),
+        "written": written,
+        "overwritten_empty": overwritten_empty,
+        "skipped_existing_positive": skipped_existing_positive,
+    }
+
+
 def benchmark_latency(model: Any, *, device: str, input_channels: int, height: int, width: int, repeats: int) -> float:
     import torch
 
@@ -1688,6 +1850,108 @@ def cmd_temporal_heatmap_hard_negatives(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_temporal_heatmap_interpolate_labels(args: argparse.Namespace) -> int:
+    if args.max_frame_gap <= 1:
+        raise SystemExit("--max-frame-gap must be greater than 1")
+    if args.input_width <= 0 or args.input_height <= 0:
+        raise SystemExit("--input-width and --input-height must be positive")
+    if args.max_motion_px < 0.0:
+        raise SystemExit("--max-motion-px must be non-negative")
+
+    images_root = args.images_root.resolve()
+    base_labels_root = args.base_labels_root.resolve()
+    exclude_tokens = parse_token_list(args.exclude)
+    output_root = args.output_root
+    if output_root is None:
+        output_root = DEFAULT_RUNS_ROOT / "temporal_interpolated_labels" / args.name
+    output_root = output_root.resolve()
+    if output_root.exists():
+        if not args.overwrite:
+            raise SystemExit(f"output already exists: {output_root}")
+        shutil.rmtree(output_root)
+    output_root.mkdir(parents=True, exist_ok=True)
+
+    selected = select_interpolated_label_candidates(
+        images_root=images_root,
+        base_labels_root=base_labels_root,
+        exclude_tokens=exclude_tokens,
+        max_frame_gap=args.max_frame_gap,
+        max_motion_px=args.max_motion_px,
+        input_width=args.input_width,
+        input_height=args.input_height,
+    )
+    stats = write_interpolated_label_outputs(
+        selected=selected,
+        base_labels_root=base_labels_root,
+        output_root=output_root,
+    )
+    by_camera = {
+        "cam1": sum(1 for item in selected if "cam1" in item.sequence),
+        "cam2": sum(1 for item in selected if "cam2" in item.sequence),
+        "other": sum(1 for item in selected if "cam1" not in item.sequence and "cam2" not in item.sequence),
+    }
+    by_gap: dict[int, int] = {}
+    by_sequence: dict[str, int] = {}
+    for item in selected:
+        by_gap[item.gap] = by_gap.get(item.gap, 0) + 1
+        by_sequence[item.sequence] = by_sequence.get(item.sequence, 0) + 1
+    gap_rows = [f"| {gap} | {count} |" for gap, count in sorted(by_gap.items())]
+    sequence_rows = [
+        f"| {sequence} | {count} |"
+        for sequence, count in sorted(by_sequence.items(), key=lambda pair: (-pair[1], pair[0]))[:20]
+    ]
+    report_lines = [
+        f"# Temporal Interpolated Label Generation Result - {datetime.now().strftime('%Y-%m-%d')}",
+        "",
+        "## Settings",
+        "",
+        f"- Images root: `{images_root}`",
+        f"- Base labels root: `{base_labels_root}`",
+        f"- Output: `{output_root}`",
+        f"- Exclude tokens: `{args.exclude}`",
+        f"- Max frame gap: `{args.max_frame_gap}`",
+        f"- Max motion px/frame: `{args.max_motion_px}`",
+        f"- Motion input scale: `{args.input_width}x{args.input_height}`",
+        "",
+        "## Result",
+        "",
+        "| item | count |",
+        "|---|---:|",
+        f"| copied base label files | {stats['copied_labels']} |",
+        f"| selected interpolated labels | {stats['selected']} |",
+        f"| written interpolated labels | {stats['written']} |",
+        f"| overwritten empty label files | {stats['overwritten_empty']} |",
+        f"| skipped existing positives | {stats['skipped_existing_positive']} |",
+        f"| cam1 selected | {by_camera['cam1']} |",
+        f"| cam2 selected | {by_camera['cam2']} |",
+        f"| other selected | {by_camera['other']} |",
+        "",
+        "## Gap Distribution",
+        "",
+        "| anchor gap | generated labels |",
+        "|---:|---:|",
+        *(gap_rows or ["| none | 0 |"]),
+        "",
+        "## Top Sequences",
+        "",
+        "| sequence | generated labels |",
+        "|---|---:|",
+        *(sequence_rows or ["| none | 0 |"]),
+        "",
+        "## Files",
+        "",
+        f"- Labels root: `{output_root / 'labels'}`",
+        f"- Manifest: `{output_root / 'manifest.csv'}`",
+    ]
+    report = "\n".join(report_lines)
+    (output_root / "report.md").write_text(report + "\n", encoding="utf-8")
+    if args.output_markdown is not None:
+        args.output_markdown.parent.mkdir(parents=True, exist_ok=True)
+        args.output_markdown.write_text(report + "\n", encoding="utf-8")
+    print(report)
+    return 0
+
+
 def add_temporal_heatmap_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     parser_kwargs = {"formatter_class": argparse.ArgumentDefaultsHelpFormatter}
     temporal = subparsers.add_parser("temporal-heatmap", help="训练连续帧 heatmap 搜索 teacher。", **parser_kwargs)
@@ -1780,3 +2044,21 @@ def add_temporal_heatmap_parser(subparsers: argparse._SubParsersAction[argparse.
     hard.add_argument("--max-count", type=int, default=0, help="最多选择多少 hard negatives；0 表示不限")
     hard.add_argument("--overwrite", action="store_true", help="允许覆盖已有输出目录")
     hard.set_defaults(func=cmd_temporal_heatmap_hard_negatives)
+
+    interpolate = temporal_subparsers.add_parser(
+        "interpolate-labels",
+        help="在同一序列相邻正标签之间生成小间隔线性插值标签。",
+        **parser_kwargs,
+    )
+    interpolate.add_argument("--images-root", type=Path, default=DEFAULT_IMAGES_ROOT, help="图片根目录")
+    interpolate.add_argument("--base-labels-root", type=Path, required=True, help="基础标签根目录，会复制到输出 labels")
+    interpolate.add_argument("--output-root", type=Path, default=None, help="插值标签 run 输出目录")
+    interpolate.add_argument("--output-markdown", type=Path, default=None, help="写入 Markdown 结果")
+    interpolate.add_argument("--name", default=f"temporal_interpolated_labels_{datetime.now().strftime('%Y%m%d')}", help="默认 run 名称")
+    interpolate.add_argument("--exclude", default=DEFAULT_VAL_TOKEN, help="排除这些逗号分隔 token，默认排除验证序列")
+    interpolate.add_argument("--max-frame-gap", type=int, default=5, help="相邻正标签 anchor 的最大帧间隔")
+    interpolate.add_argument("--max-motion-px", type=float, default=0.0, help="输入尺度下每帧最大 anchor 位移；0 表示不限制")
+    interpolate.add_argument("--input-width", type=int, default=960, help="max-motion-px 对应输入宽度")
+    interpolate.add_argument("--input-height", type=int, default=540, help="max-motion-px 对应输入高度")
+    interpolate.add_argument("--overwrite", action="store_true", help="允许覆盖已有输出目录")
+    interpolate.set_defaults(func=cmd_temporal_heatmap_interpolate_labels)
