@@ -240,8 +240,25 @@ class VisionRuntimeNode(Node):
             return
 
         capture_ns = sample.capture_ns
-        pose = self._closest_pose(capture_ns)
+        pose, closest_pose, pose_delta_ns = self._closest_pose_with_delta(capture_ns)
         if pose is None:
+            self._runtime_logger.record_event(
+                "dropped_frame_without_recent_pose",
+                {
+                    "frame_id": int(sample.frame_id),
+                    "capture_stamp": stamp_to_dict(sample.capture_stamp),
+                    "capture_ns": int(capture_ns),
+                    "closest_pose_ns": None if closest_pose is None else int(closest_pose.stamp_ns),
+                    "pose_delta_s": None
+                    if pose_delta_ns is None
+                    else float(pose_delta_ns / NANOSECONDS_PER_SECOND),
+                    "pose_abs_age_s": None
+                    if pose_delta_ns is None
+                    else float(abs(pose_delta_ns) / NANOSECONDS_PER_SECOND),
+                    "max_pose_age_s": float(self._max_pose_age_ns / NANOSECONDS_PER_SECOND),
+                    "pose_buffer_size": int(len(self._pose_buffer)),
+                },
+            )
             self._log_waiting("dropping frame without a recent chassis pose")
             return
 
@@ -339,11 +356,17 @@ class VisionRuntimeNode(Node):
         if self._single_task_shutdown_on_complete and rclpy.ok():
             rclpy.shutdown()
 
-    def _closest_pose(self, stamp_ns: int) -> PoseSample | None:
+    def _closest_pose_with_delta(
+        self,
+        stamp_ns: int,
+    ) -> tuple[PoseSample | None, PoseSample | None, int | None]:
         if not self._pose_buffer:
-            return None
+            return None, None, None
         closest = min(self._pose_buffer, key=lambda pose: abs(pose.stamp_ns - stamp_ns))
-        return closest if abs(closest.stamp_ns - stamp_ns) <= self._max_pose_age_ns else None
+        delta_ns = closest.stamp_ns - stamp_ns
+        if abs(delta_ns) > self._max_pose_age_ns:
+            return None, closest, delta_ns
+        return closest, closest, delta_ns
 
     def _prune_track(self, now_ns: int) -> None:
         while self._track and now_ns - self._track[0].stamp_ns > self._track_max_age_ns:
