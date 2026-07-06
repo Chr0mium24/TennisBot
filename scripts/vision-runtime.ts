@@ -31,6 +31,8 @@ type Options = {
   model?: string;
   calibrationPackage?: string;
   yoloDevice?: string;
+  allowMissingYaw: boolean;
+  fallbackYaw?: string;
   extraParams: string[];
 };
 
@@ -113,6 +115,8 @@ function buildVisionRuntimeCommand(options: Options): string[] {
     addParam(params, "calibration_package", options.calibrationPackage);
   }
   if (options.yoloDevice !== undefined) addParam(params, "yolo_device", options.yoloDevice);
+  addParam(params, "allow_missing_yaw", boolValue(options.allowMissingYaw));
+  if (options.fallbackYaw !== undefined) addParam(params, "fallback_yaw_rad", options.fallbackYaw);
   for (const item of options.extraParams) {
     params.push("-p", item);
   }
@@ -151,6 +155,7 @@ function parseOptions(args: string[]): Options {
     eventLog: true,
     autoSource: true,
     setupFiles: defaultSetupFiles(),
+    allowMissingYaw: false,
     extraParams: [],
   };
 
@@ -190,6 +195,9 @@ function parseOptions(args: string[]): Options {
     else if (arg === "--model") options.model = takeValue(args, ++index, arg);
     else if (arg === "--calibration-package") options.calibrationPackage = takeValue(args, ++index, arg);
     else if (arg === "--yolo-device") options.yoloDevice = takeValue(args, ++index, arg);
+    else if (arg === "--allow-missing-yaw") options.allowMissingYaw = true;
+    else if (arg === "--no-allow-missing-yaw") options.allowMissingYaw = false;
+    else if (arg === "--fallback-yaw") options.fallbackYaw = takeValue(args, ++index, arg);
     else if (arg === "--param") options.extraParams.push(takeValue(args, ++index, arg));
     else throw new Error(`Unknown option: ${arg}`);
   }
@@ -295,6 +303,7 @@ function printUsage(): void {
   bun scripts/vision-runtime.ts task --task-id 42 --session catch42 --tile
   bun scripts/vision-runtime.ts task --task-id 42 --no-video
   bun scripts/vision-runtime.ts run --dry-run --record --devices /dev/video0,/dev/video2
+  bun scripts/vision-runtime.ts run --allow-missing-yaw --fallback-yaw 0.0
 
 选项:
   --record / --no-record              开关 runs/vision-runtime 日志
@@ -312,6 +321,8 @@ function printUsage(): void {
   --clear-setup-files                 清空默认 setup 列表，配合 --setup-file 使用
   --tile / --no-tile                  覆盖 YOLO tiled 推理
   --devices <left,right>              覆盖双目设备
+  --allow-missing-yaw / --no-allow-missing-yaw  容忍缺失底盘 yaw，用 fallback_yaw_rad 替代
+  --fallback-yaw <rad>                 缺失 yaw 时的回退弧度，默认 0.0
   --param <name:=value>               透传 ROS 参数，可重复
 
 说明:

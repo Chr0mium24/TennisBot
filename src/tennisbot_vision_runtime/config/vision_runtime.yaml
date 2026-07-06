@@ -66,6 +66,13 @@ vision_runtime:
     max_abs_target_x: 15.0
     max_abs_target_y: 8.0
 
+    # When true, the node tolerates missing or non-finite yaw in chassis
+    # position messages and chassis position topic inactivity. A synthetic
+    # pose (x=0,y=0) with fallback_yaw_rad is used instead. This is a
+    # diagnostic mode and should not be used for closed-loop operation.
+    allow_missing_yaw: false
+    fallback_yaw_rad: 0.0
+
     runtime_log_enabled: false
     runtime_log_root: runs/vision-runtime
     runtime_log_session: ""

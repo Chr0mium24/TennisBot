@@ -109,9 +109,24 @@ This should default to disabled. It is only acceptable when the chassis heading
 is known to be fixed during the run. It should be treated as a diagnostic or
 bring-up mode, not a correct closed-loop runtime.
 
+This fallback is now implemented (2026-07-06). When `allow_missing_yaw=true`:
+- The node opens cameras without waiting for `/robot/chassis_position`.
+- Chassis position messages with non-finite yaw are accepted with
+  `fallback_yaw_rad` replacing yaw.
+- When no chassis pose is available in the buffer (empty or stale), a synthetic
+  pose `(x=0, y=0, z=0, yaw=fallback_yaw_rad)` is used to transform camera
+  points to field coordinates.
+
+CLI usage:
+```bash
+bun scripts/vision-runtime.ts run --allow-missing-yaw --fallback-yaw 0.0
+```
+
 ## Current Decision
 
 Do not silently invent yaw.
 
-Until a fallback mode is explicitly added and enabled, missing yaw blocks the
-internal pose buffer and therefore blocks `/target/raw`.
+The fallback mode is now implemented. When explicitly enabled via
+`allow_missing_yaw:=true`, the node uses `fallback_yaw_rad` as a replacement.
+This keeps the default behavior unchanged (missing yaw still blocks
+`/target/raw`), while providing an opt-in diagnostic mode for debugging.

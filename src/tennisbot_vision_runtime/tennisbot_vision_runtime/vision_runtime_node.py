@@ -99,6 +99,8 @@ class VisionRuntimeNode(Node):
         self.declare_parameter("runtime_log_targets", True)
         self.declare_parameter("runtime_log_events", True)
         self.declare_parameter("runtime_log_video_fourcc", "mp4v")
+        self.declare_parameter("allow_missing_yaw", False)
+        self.declare_parameter("fallback_yaw_rad", 0.0)
 
         self._enable_camera = bool(self.get_parameter("enable_camera").value)
         self._dry_run = bool(self.get_parameter("dry_run").value)
@@ -123,6 +125,8 @@ class VisionRuntimeNode(Node):
         self._min_sigma_m = self._nonnegative("min_sigma_m")
         self._max_abs_target_x = self._positive("max_abs_target_x")
         self._max_abs_target_y = self._positive("max_abs_target_y")
+        self._allow_missing_yaw = bool(self.get_parameter("allow_missing_yaw").value)
+        self._fallback_yaw_rad = float(self.get_parameter("fallback_yaw_rad").value)
         self._camera_transform = Transform3D(
             translation_m=self._float_vector("camera_translation_m", length=3),
             rotation_rpy_rad=self._float_vector("camera_rotation_rpy_rad", length=3),
@@ -162,11 +166,12 @@ class VisionRuntimeNode(Node):
 
         self._timer = self.create_timer(1.0 / self._runtime_rate_hz, self._on_timer)
         self.get_logger().info(
-            "vision runtime ready: rate=%.1fHz camera=%s dry_run=%s task_id=%d raw_target_topic=%s"
+            "vision runtime ready: rate=%.1fHz camera=%s dry_run=%s allow_missing_yaw=%s task_id=%d raw_target_topic=%s"
             % (
                 self._runtime_rate_hz,
                 self._enable_camera,
                 self._dry_run,
+                self._allow_missing_yaw,
                 self._task_id,
                 str(self.get_parameter("raw_target_topic").value),
             )
@@ -177,6 +182,8 @@ class VisionRuntimeNode(Node):
                 "runtime_rate_hz": self._runtime_rate_hz,
                 "enable_camera": self._enable_camera,
                 "dry_run": self._dry_run,
+                "allow_missing_yaw": self._allow_missing_yaw,
+                "fallback_yaw_rad": self._fallback_yaw_rad,
                 "initial_task_id": self._task_id,
                 "single_task_mode": self._single_task_mode,
                 "raw_target_topic": str(self.get_parameter("raw_target_topic").value),
@@ -187,7 +194,13 @@ class VisionRuntimeNode(Node):
         try:
             raw_x = finite_float(msg.x, name="chassis position x")
             raw_y = finite_float(msg.y, name="chassis position y")
-            raw_yaw = finite_float(msg.yaw, name="chassis position yaw")
+            try:
+                raw_yaw = finite_float(msg.yaw, name="chassis position yaw")
+            except ValueError:
+                if self._allow_missing_yaw:
+                    raw_yaw = self._fallback_yaw_rad
+                else:
+                    raise
             pose = PoseSample(
                 stamp_ns=time_to_nanoseconds(msg.publish_stamp),
                 x=raw_x,
@@ -219,8 +232,12 @@ class VisionRuntimeNode(Node):
             self._log_waiting("vision runtime camera disabled; no predictions published")
             return
         if not self._pose_buffer:
-            self._log_waiting("waiting for /robot/chassis_position before opening camera runtime")
-            return
+            if not self._allow_missing_yaw:
+                self._log_waiting("waiting for /robot/chassis_position before opening camera runtime")
+                return
+            self.get_logger().info(
+                "no chassis pose available; using synthetic pose (allow_missing_yaw=true)",
+            )
         if self._camera_failed:
             return
         if self._runtime is None:
@@ -242,25 +259,36 @@ class VisionRuntimeNode(Node):
         capture_ns = sample.capture_ns
         pose, closest_pose, pose_delta_ns = self._closest_pose_with_delta(capture_ns)
         if pose is None:
-            self._runtime_logger.record_event(
-                "dropped_frame_without_recent_pose",
-                {
-                    "frame_id": int(sample.frame_id),
-                    "capture_stamp": stamp_to_dict(sample.capture_stamp),
-                    "capture_ns": int(capture_ns),
-                    "closest_pose_ns": None if closest_pose is None else int(closest_pose.stamp_ns),
-                    "pose_delta_s": None
-                    if pose_delta_ns is None
-                    else float(pose_delta_ns / NANOSECONDS_PER_SECOND),
-                    "pose_abs_age_s": None
-                    if pose_delta_ns is None
-                    else float(abs(pose_delta_ns) / NANOSECONDS_PER_SECOND),
-                    "max_pose_age_s": float(self._max_pose_age_ns / NANOSECONDS_PER_SECOND),
-                    "pose_buffer_size": int(len(self._pose_buffer)),
-                },
-            )
-            self._log_waiting("dropping frame without a recent chassis pose")
-            return
+            if self._allow_missing_yaw:
+                pose = PoseSample(
+                    stamp_ns=capture_ns,
+                    x=0.0,
+                    y=0.0,
+                    z=0.0,
+                    roll=0.0,
+                    pitch=0.0,
+                    yaw=self._fallback_yaw_rad,
+                )
+            else:
+                self._runtime_logger.record_event(
+                    "dropped_frame_without_recent_pose",
+                    {
+                        "frame_id": int(sample.frame_id),
+                        "capture_stamp": stamp_to_dict(sample.capture_stamp),
+                        "capture_ns": int(capture_ns),
+                        "closest_pose_ns": None if closest_pose is None else int(closest_pose.stamp_ns),
+                        "pose_delta_s": None
+                        if pose_delta_ns is None
+                        else float(pose_delta_ns / NANOSECONDS_PER_SECOND),
+                        "pose_abs_age_s": None
+                        if pose_delta_ns is None
+                        else float(abs(pose_delta_ns) / NANOSECONDS_PER_SECOND),
+                        "max_pose_age_s": float(self._max_pose_age_ns / NANOSECONDS_PER_SECOND),
+                        "pose_buffer_size": int(len(self._pose_buffer)),
+                    },
+                )
+                self._log_waiting("dropping frame without a recent chassis pose")
+                return
 
         field_point = camera_point_to_field(
             sample.point_camera_m,
