@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -57,3 +57,4 @@ class StereoMatchDiagnostics:
     rejected_by_triangulation_count: int = 0
     rejected_by_depth_count: int = 0
     best_cost: float | None = None
+    candidates: list[dict[str, object]] = field(default_factory=list)

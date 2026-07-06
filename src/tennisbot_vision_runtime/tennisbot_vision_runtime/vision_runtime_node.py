@@ -473,6 +473,7 @@ def diagnostics_to_dict(diagnostics: Any) -> dict[str, Any]:
         "rejected_by_triangulation_count": int(diagnostics.rejected_by_triangulation_count),
         "rejected_by_depth_count": int(diagnostics.rejected_by_depth_count),
         "best_cost": None if diagnostics.best_cost is None else float(diagnostics.best_cost),
+        "candidates": list(getattr(diagnostics, "candidates", [])),
     }
 
 

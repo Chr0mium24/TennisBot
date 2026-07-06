@@ -157,7 +157,7 @@ def selected_match_payload(match: StereoBallMatch) -> dict[str, Any]:
     }
 
 
-def diagnostics_payload(diagnostics: StereoMatchDiagnostics) -> dict[str, int | float | None]:
+def diagnostics_payload(diagnostics: StereoMatchDiagnostics) -> dict[str, object]:
     return {
         "evaluated_candidate_count": diagnostics.evaluated_candidate_count,
         "rejected_by_epipolar_count": diagnostics.rejected_by_epipolar_count,
@@ -165,4 +165,5 @@ def diagnostics_payload(diagnostics: StereoMatchDiagnostics) -> dict[str, int | 
         "rejected_by_triangulation_count": diagnostics.rejected_by_triangulation_count,
         "rejected_by_depth_count": diagnostics.rejected_by_depth_count,
         "best_cost": diagnostics.best_cost,
+        "candidates": diagnostics.candidates,
     }
