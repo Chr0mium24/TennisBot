@@ -34,6 +34,19 @@ DEFAULT_ROI_PROFILES = (
 DEFAULT_ROI_TRACK_GLOB = (
     REPO_ROOT / "tools" / "yolo" / "workspace" / "dataset" / "images" / "0260701" / "20260701_154019_cam1_frame_*.jpg"
 )
+DEFAULT_S3D_CHECKPOINT = (
+    REPO_ROOT
+    / "tools"
+    / "yolo"
+    / "workspace"
+    / "runs"
+    / "temporal_heatmap"
+    / "search_s3d_temporal_heatmap_w5_960x540_pseudo989_synth500_20260705"
+    / "best_recall.pt"
+)
+DEFAULT_S3D_ROI_GLOB = (
+    REPO_ROOT / "tools" / "yolo" / "workspace" / "dataset" / "images" / "0260701" / "20260701_155008_cam*_frame_*.jpg"
+)
 FRAME_NUMBER_RE = re.compile(r"_frame_(?P<frame>\d+)$")
 
 
@@ -116,6 +129,32 @@ class RoiSampleRow:
     p95_ms: float
     stereo_fps: float
     notes: str
+
+
+@dataclass(frozen=True)
+class S3dRoiChainRow:
+    camera: str
+    frames: int
+    positives: int
+    s3d_tp: int
+    s3d_fp: int
+    s3d_fn: int
+    roi_contains: int
+    roi_yolo_tp: int
+    roi_yolo_fp: int
+    roi_yolo_fn: int
+    final_tp: int
+    final_fp: int
+    final_fn: int
+    s3d_recall: float
+    roi_contains_rate: float
+    roi_yolo_conditional_recall: float
+    final_recall: float
+    final_precision: float
+    s3d_median_ms: float
+    roi_yolo_median_ms: float
+    total_median_ms: float
+    stereo_fps: float
 
 
 def parse_tile_profile(value: str) -> TileProfile:
@@ -209,6 +248,10 @@ def percentile_95(values: list[float]) -> float:
     if len(values) == 1:
         return values[0]
     return statistics.quantiles(values, n=20, method="inclusive")[18]
+
+
+def safe_median(values: list[float]) -> float:
+    return statistics.median(values) if values else 0.0
 
 
 def label_path_for_image(image_path: Path) -> Path:
@@ -309,6 +352,27 @@ def crop_bounds(cx: float, cy: float, crop_width: int, crop_height: int, image_w
     x1 = min(max(0, x1), image_width - crop_width)
     y1 = min(max(0, y1), image_height - crop_height)
     return x1, y1, x1 + crop_width, y1 + crop_height
+
+
+def box_center(box: DetBox) -> tuple[float, float]:
+    return (box.x1 + box.x2) / 2.0, (box.y1 + box.y2) / 2.0
+
+
+def point_hits_any_box(x: float, y: float, boxes: tuple[DetBox, ...], radius_px: float) -> bool:
+    for box in boxes:
+        cx, cy = box_center(box)
+        if ((x - cx) ** 2 + (y - cy) ** 2) ** 0.5 <= radius_px:
+            return True
+    return False
+
+
+def crop_contains_any_box(crop: tuple[int, int, int, int], boxes: tuple[DetBox, ...]) -> bool:
+    x1, y1, x2, y2 = crop
+    for box in boxes:
+        cx, cy = box_center(box)
+        if x1 <= cx <= x2 and y1 <= cy <= y2:
+            return True
+    return False
 
 
 def synchronize(torch_module: Any) -> None:
@@ -1242,6 +1306,407 @@ def cmd_benchmark_roi_track(args: argparse.Namespace) -> int:
     return 0
 
 
+def camera_name_for_path(path: Path) -> str:
+    match = re.search(r"_(cam\d+)_frame_", path.stem)
+    return match.group(1) if match else "unknown"
+
+
+def load_s3d_checkpoint(checkpoint_path: Path, *, device: str) -> tuple[Any, int, int, int, str]:
+    import torch
+
+    from .temporal_heatmap import build_model, input_channels_for_mode
+
+    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    window = int(checkpoint.get("window", 0))
+    input_width = int(checkpoint.get("input_width", 0))
+    input_height = int(checkpoint.get("input_height", 0))
+    input_mode = str(checkpoint.get("input_mode", "rgb"))
+    if window <= 0 or window % 2 != 1:
+        raise ValueError("S3d checkpoint does not define a valid odd window")
+    if input_width <= 0 or input_height <= 0:
+        raise ValueError("S3d checkpoint does not define valid input dimensions")
+    model = build_model(input_channels=input_channels_for_mode(window, input_mode))
+    model.load_state_dict(checkpoint["model_state"])
+    model.to(device)
+    model.eval()
+    return model, window, input_width, input_height, input_mode
+
+
+def predict_s3d_peak(
+    *,
+    model: Any,
+    window_images: list[Any],
+    input_width: int,
+    input_height: int,
+    input_mode: str,
+    device: str,
+) -> tuple[float, float, float]:
+    import cv2
+    import torch
+
+    from .temporal_heatmap import compose_temporal_input
+
+    tensors = []
+    for image in window_images:
+        resized = cv2.resize(image, (input_width, input_height), interpolation=cv2.INTER_AREA)
+        rgb = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
+        tensor = torch.from_numpy(rgb).permute(2, 0, 1).float().div_(255.0)
+        tensors.append(tensor)
+    model_input = compose_temporal_input(tensors, input_mode).unsqueeze(0).to(device)
+    with torch.no_grad():
+        heatmap = torch.sigmoid(model(model_input))[0, 0]
+        flat_index = int(torch.argmax(heatmap).item())
+        score = float(heatmap.flatten()[flat_index].item())
+        y = flat_index // int(heatmap.shape[1])
+        x = flat_index % int(heatmap.shape[1])
+    return float(x), float(y), score
+
+
+def format_s3d_roi_chain_table(rows: list[S3dRoiChainRow]) -> str:
+    header = (
+        "| camera | frames | positives | S3d TP/FP/FN | S3d recall | ROI contains | "
+        "ROI YOLO cond recall | final TP/FP/FN | final recall | final precision | "
+        "S3d ms | ROI YOLO ms | total ms | est stereo FPS |"
+    )
+    sep = "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"
+    lines = [header, sep]
+    for row in rows:
+        lines.append(
+            "| "
+            f"{row.camera} | "
+            f"{row.frames} | "
+            f"{row.positives} | "
+            f"{row.s3d_tp}/{row.s3d_fp}/{row.s3d_fn} | "
+            f"{row.s3d_recall:.3f} | "
+            f"{row.roi_contains}/{row.s3d_tp} ({row.roi_contains_rate:.3f}) | "
+            f"{row.roi_yolo_conditional_recall:.3f} | "
+            f"{row.final_tp}/{row.final_fp}/{row.final_fn} | "
+            f"{row.final_recall:.3f} | "
+            f"{row.final_precision:.3f} | "
+            f"{row.s3d_median_ms:.2f} | "
+            f"{row.roi_yolo_median_ms:.2f} | "
+            f"{row.total_median_ms:.2f} | "
+            f"{row.stereo_fps:.2f} |"
+        )
+    return "\n".join(lines)
+
+
+def build_s3d_roi_chain_report(
+    *,
+    rows: list[S3dRoiChainRow],
+    checkpoint_path: Path,
+    roi_model_path: Path,
+    sequence_glob: str,
+    roi_width: int,
+    roi_height: int,
+    roi_imgsz: int,
+    threshold: float,
+    radius_px: float,
+    conf: float,
+    iou: float,
+    match_iou: float,
+    s3d_device: str,
+    yolo_device: str | None,
+    torch_module: Any,
+) -> str:
+    lines = [
+        f"# S3d Search + ROI YOLO Chain Result - {datetime.now().strftime('%Y-%m-%d')}",
+        "",
+        "## Scope",
+        "",
+        "This is an offline monocular replay of `S3d full-frame temporal heatmap search -> ROI crop -> ROI YOLO refinement`.",
+        "It does not use ROS/Gazebo, camera capture, stereo triangulation, target prediction, or chassis control.",
+        "It answers whether the current S3d search output can feed the existing ROI YOLO detector without losing most recall.",
+        "",
+        "## Settings",
+        "",
+        f"- S3d checkpoint: `{checkpoint_path}`",
+        f"- ROI YOLO model: `{roi_model_path}`",
+        f"- Sequence glob: `{sequence_glob}`",
+        f"- ROI crop: `{roi_width}x{roi_height}`",
+        f"- ROI YOLO imgsz: `{roi_imgsz}`",
+        f"- S3d threshold: `{threshold}`",
+        f"- S3d hit radius: `{radius_px}` px at S3d input scale",
+        f"- YOLO confidence: `{conf}`",
+        f"- YOLO prediction IoU: `{iou}`",
+        f"- YOLO match IoU: `{match_iou}`",
+        f"- S3d device: `{s3d_device}`",
+        f"- YOLO device: `{yolo_device if yolo_device is not None else ''}`",
+        f"- CUDA available: `{bool(torch_module.cuda.is_available())}`",
+        f"- Torch: `{torch_module.__version__}`",
+        "",
+        "## Results",
+        "",
+        format_s3d_roi_chain_table(rows),
+        "",
+        "## Metric Definitions",
+        "",
+        "- `S3d recall` counts a positive frame as found only when the heatmap peak is above threshold and within the radius of the labeled ball center.",
+        "- `ROI contains` counts S3d true positives whose crop contains the labeled ball center before YOLO refinement.",
+        "- `ROI YOLO cond recall` is ROI YOLO recall only on frames where S3d was a true positive and the ROI contained the ball center.",
+        "- `final recall` is the full chain recall against all labeled positives in that camera sequence.",
+        "- `est stereo FPS` assumes the same per-camera median cost is paid sequentially for left and right images.",
+        "",
+        "## Readout",
+        "",
+        "- If `ROI YOLO cond recall` is high but `final recall` is limited, the bottleneck is S3d search/localization.",
+        "- If `ROI YOLO cond recall` is low, the ROI detector or crop size needs work before runtime integration.",
+        "- This experiment still does not prove real stereo runtime; it only validates the detector chain on saved frames.",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def cmd_benchmark_s3d_roi_chain(args: argparse.Namespace) -> int:
+    if args.sample_limit < 0:
+        print("error: --sample-limit must be non-negative")
+        return 2
+    if args.roi_width <= 0 or args.roi_height <= 0 or args.roi_imgsz <= 0:
+        print("error: ROI dimensions and imgsz must be positive")
+        return 2
+    if args.max_detections <= 0:
+        print("error: --max-detections must be positive")
+        return 2
+    if not args.checkpoint.is_file():
+        print(f"error: S3d checkpoint not found: {args.checkpoint}")
+        return 2
+    if not args.roi_model.is_file():
+        print(f"error: ROI YOLO model not found: {args.roi_model}")
+        return 2
+
+    sample_paths = load_sequence_paths(str(args.sequence_glob), args.sample_limit)
+    if args.dry_run:
+        print(f"samples={len(sample_paths)}")
+        if sample_paths:
+            print(f"first={sample_paths[0]}")
+            print(f"last={sample_paths[-1]}")
+            cameras = sorted({camera_name_for_path(path) for path in sample_paths})
+            print("cameras=" + ",".join(cameras))
+        return 0
+    if not sample_paths:
+        print(f"error: no images matched sequence glob: {args.sequence_glob}")
+        return 2
+
+    try:
+        import cv2
+        import torch
+        from ultralytics import YOLO
+    except ImportError as exc:
+        print(
+            "error: S3d ROI chain benchmark requires opencv-python, torch, and ultralytics. "
+            "Run with `uv run --extra detect tennisbot-yolo benchmark s3d-roi-chain ...`."
+        )
+        print(f"missing: {exc}")
+        return 2
+
+    if args.threads > 0:
+        torch.set_num_threads(args.threads)
+        try:
+            torch.set_num_interop_threads(1)
+        except RuntimeError:
+            pass
+
+    s3d_device = args.s3d_device
+    if s3d_device == "auto":
+        s3d_device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    s3d_model, window, input_width, input_height, input_mode = load_s3d_checkpoint(
+        args.checkpoint,
+        device=s3d_device,
+    )
+    radius = window // 2
+    by_camera: dict[str, list[Path]] = {}
+    for path in sample_paths:
+        by_camera.setdefault(camera_name_for_path(path), []).append(path)
+
+    roi_model = YOLO(str(args.roi_model))
+    rows: list[S3dRoiChainRow] = []
+    for camera, paths in sorted(by_camera.items()):
+        images: list[Any] = []
+        samples: list[RoiSample] = []
+        for image_path in sorted(paths, key=frame_sort_key):
+            image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
+            if image is None:
+                print(f"error: failed to read image: {image_path}")
+                return 2
+            height, width = image.shape[:2]
+            images.append(image)
+            samples.append(
+                RoiSample(
+                    image=image_path,
+                    width=width,
+                    height=height,
+                    gt_boxes=load_gt_boxes(label_path_for_image(image_path), width, height),
+                )
+            )
+        if len(samples) <= radius * 2:
+            continue
+
+        predict_det_boxes(
+            model=roi_model,
+            image=images[radius],
+            imgsz=args.roi_imgsz,
+            conf=args.conf,
+            iou=args.iou,
+            max_detections=args.max_detections,
+            device=args.yolo_device,
+        )
+
+        positives = 0
+        s3d_tp = s3d_fp = s3d_fn = 0
+        roi_contains = 0
+        roi_cond_samples: list[RoiSample] = []
+        roi_cond_predictions: list[list[DetBox]] = []
+        final_gt_by_image: list[tuple[DetBox, ...]] = []
+        final_pred_by_image: list[list[DetBox]] = []
+        s3d_elapsed_ms: list[float] = []
+        roi_elapsed_ms: list[float] = []
+        total_elapsed_ms: list[float] = []
+
+        for index in range(radius, len(samples) - radius):
+            sample = samples[index]
+            gt_boxes = sample.gt_boxes
+            if gt_boxes:
+                positives += len(gt_boxes)
+
+            s3d_start = time.perf_counter()
+            peak_x, peak_y, score = predict_s3d_peak(
+                model=s3d_model,
+                window_images=images[index - radius : index + radius + 1],
+                input_width=input_width,
+                input_height=input_height,
+                input_mode=input_mode,
+                device=s3d_device,
+            )
+            synchronize(torch)
+            s3d_ms = (time.perf_counter() - s3d_start) * 1000.0
+            s3d_elapsed_ms.append(s3d_ms)
+
+            scale_x = sample.width / input_width
+            scale_y = sample.height / input_height
+            full_x = peak_x * scale_x
+            full_y = peak_y * scale_y
+            detected = score >= args.threshold
+            localized = bool(gt_boxes) and point_hits_any_box(
+                peak_x,
+                peak_y,
+                tuple(
+                    DetBox(
+                        x1=box.x1 / scale_x,
+                        y1=box.y1 / scale_y,
+                        x2=box.x2 / scale_x,
+                        y2=box.y2 / scale_y,
+                    )
+                    for box in gt_boxes
+                ),
+                args.radius_px,
+            )
+
+            if detected and localized:
+                s3d_tp += 1
+            elif detected:
+                s3d_fp += 1
+                if gt_boxes:
+                    s3d_fn += len(gt_boxes)
+            elif gt_boxes:
+                s3d_fn += len(gt_boxes)
+
+            frame_roi_elapsed = 0.0
+            frame_predictions: list[DetBox] = []
+            if detected:
+                crop = crop_bounds(full_x, full_y, args.roi_width, args.roi_height, sample.width, sample.height)
+                contains = crop_contains_any_box(crop, gt_boxes)
+                if localized and contains:
+                    roi_contains += 1
+                x1, y1, x2, y2 = crop
+                crop_image = images[index][y1:y2, x1:x2]
+                roi_start = time.perf_counter()
+                frame_predictions = predict_det_boxes(
+                    model=roi_model,
+                    image=crop_image,
+                    imgsz=args.roi_imgsz,
+                    conf=args.conf,
+                    iou=args.iou,
+                    max_detections=args.max_detections,
+                    device=args.yolo_device,
+                    offset_x=x1,
+                    offset_y=y1,
+                )
+                synchronize(torch)
+                frame_roi_elapsed = (time.perf_counter() - roi_start) * 1000.0
+                roi_elapsed_ms.append(frame_roi_elapsed)
+                if localized and contains:
+                    roi_cond_samples.append(sample)
+                    roi_cond_predictions.append(frame_predictions)
+
+            final_gt_by_image.append(gt_boxes)
+            final_pred_by_image.append(frame_predictions)
+            total_elapsed_ms.append(s3d_ms + frame_roi_elapsed)
+
+        roi_yolo_tp, roi_yolo_fp, roi_yolo_fn = match_counts(
+            [sample.gt_boxes for sample in roi_cond_samples],
+            roi_cond_predictions,
+            args.match_iou,
+        )
+        final_tp, final_fp, final_fn = match_counts(final_gt_by_image, final_pred_by_image, args.match_iou)
+        s3d_recall = s3d_tp / positives if positives else 0.0
+        roi_contains_rate = roi_contains / s3d_tp if s3d_tp else 0.0
+        roi_yolo_conditional_recall = (
+            roi_yolo_tp / (roi_yolo_tp + roi_yolo_fn) if (roi_yolo_tp + roi_yolo_fn) else 0.0
+        )
+        final_recall = final_tp / (final_tp + final_fn) if (final_tp + final_fn) else 0.0
+        final_precision = final_tp / (final_tp + final_fp) if (final_tp + final_fp) else 0.0
+        total_median_ms = safe_median(total_elapsed_ms)
+        rows.append(
+            S3dRoiChainRow(
+                camera=camera,
+                frames=len(total_elapsed_ms),
+                positives=positives,
+                s3d_tp=s3d_tp,
+                s3d_fp=s3d_fp,
+                s3d_fn=s3d_fn,
+                roi_contains=roi_contains,
+                roi_yolo_tp=roi_yolo_tp,
+                roi_yolo_fp=roi_yolo_fp,
+                roi_yolo_fn=roi_yolo_fn,
+                final_tp=final_tp,
+                final_fp=final_fp,
+                final_fn=final_fn,
+                s3d_recall=s3d_recall,
+                roi_contains_rate=roi_contains_rate,
+                roi_yolo_conditional_recall=roi_yolo_conditional_recall,
+                final_recall=final_recall,
+                final_precision=final_precision,
+                s3d_median_ms=safe_median(s3d_elapsed_ms),
+                roi_yolo_median_ms=safe_median(roi_elapsed_ms),
+                total_median_ms=total_median_ms,
+                stereo_fps=1000.0 / (2.0 * total_median_ms) if total_median_ms > 0.0 else 0.0,
+            )
+        )
+
+    report = build_s3d_roi_chain_report(
+        rows=rows,
+        checkpoint_path=args.checkpoint,
+        roi_model_path=args.roi_model,
+        sequence_glob=str(args.sequence_glob),
+        roi_width=args.roi_width,
+        roi_height=args.roi_height,
+        roi_imgsz=args.roi_imgsz,
+        threshold=args.threshold,
+        radius_px=args.radius_px,
+        conf=args.conf,
+        iou=args.iou,
+        match_iou=args.match_iou,
+        s3d_device=s3d_device,
+        yolo_device=args.yolo_device,
+        torch_module=torch,
+    )
+    print(report)
+    if args.output_markdown is not None:
+        args.output_markdown.parent.mkdir(parents=True, exist_ok=True)
+        args.output_markdown.write_text(report, encoding="utf-8")
+        print(f"wrote={args.output_markdown}")
+    return 0
+
+
 def cmd_benchmark_tiles(args: argparse.Namespace) -> int:
     if args.frame_width <= 0 or args.frame_height <= 0:
         print("error: frame dimensions must be positive")
@@ -1408,3 +1873,28 @@ def add_benchmark_parser(subparsers: argparse._SubParsersAction[argparse.Argumen
     track.add_argument("--output-markdown", type=Path, help="写入 Markdown 结果文件")
     track.add_argument("--dry-run", action="store_true", help="只打印匹配的序列帧，不加载模型")
     track.set_defaults(func=cmd_benchmark_roi_track)
+
+    s3d_roi = benchmark_subparsers.add_parser(
+        "s3d-roi-chain",
+        help="离线 replay S3d heatmap search 后接 ROI YOLO 的检测链路。",
+        **parser_kwargs,
+    )
+    s3d_roi.add_argument("--checkpoint", type=Path, default=DEFAULT_S3D_CHECKPOINT, help="S3d temporal heatmap checkpoint")
+    s3d_roi.add_argument("--roi-model", type=Path, default=DEFAULT_MODEL, help="ROI 阶段 YOLO .pt 模型")
+    s3d_roi.add_argument("--sequence-glob", default=str(DEFAULT_S3D_ROI_GLOB), help="有序帧 glob，可同时包含 cam1/cam2")
+    s3d_roi.add_argument("--sample-limit", type=int, default=0, help="最多读取多少张样本；0 表示全量")
+    s3d_roi.add_argument("--roi-width", type=int, default=960, help="S3d 球心周围 ROI 宽度")
+    s3d_roi.add_argument("--roi-height", type=int, default=540, help="S3d 球心周围 ROI 高度")
+    s3d_roi.add_argument("--roi-imgsz", type=int, default=320, help="ROI YOLO imgsz")
+    s3d_roi.add_argument("--threshold", type=float, default=0.40, help="S3d heatmap peak score 阈值")
+    s3d_roi.add_argument("--radius-px", type=float, default=12.0, help="S3d input 尺度下命中半径")
+    s3d_roi.add_argument("--s3d-device", default="auto", help="S3d torch device；auto/cpu/cuda:0")
+    s3d_roi.add_argument("--yolo-device", default=None, help="Ultralytics device，例如 cpu、0 或 0,1")
+    s3d_roi.add_argument("--threads", type=int, default=10, help="CPU torch 线程数；0 表示不修改")
+    s3d_roi.add_argument("--conf", type=float, default=0.05, help="ROI YOLO 置信度阈值")
+    s3d_roi.add_argument("--iou", type=float, default=0.7, help="ROI YOLO 预测阶段 IoU 阈值")
+    s3d_roi.add_argument("--match-iou", type=float, default=0.5, help="ROI YOLO bbox 评估匹配 IoU 阈值")
+    s3d_roi.add_argument("--max-detections", type=int, default=300, help="每图最大检测数")
+    s3d_roi.add_argument("--output-markdown", type=Path, help="写入 Markdown 结果文件")
+    s3d_roi.add_argument("--dry-run", action="store_true", help="只打印匹配的序列帧，不加载模型")
+    s3d_roi.set_defaults(func=cmd_benchmark_s3d_roi_chain)
