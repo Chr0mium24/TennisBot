@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { resolve } from "node:path";
+import { homedir } from "node:os";
 
 type ForwardedSignal = "SIGINT" | "SIGTERM";
 
@@ -202,7 +203,7 @@ function parseOptions(args: string[]): Options {
 function defaultSetupFiles(): string[] {
   return [
     process.env.ROS_SETUP ?? "/opt/ros/humble/setup.bash",
-    process.env.TENNISBOT_CONTROL_SETUP ?? "/home/cr/tennis_robot_ws/install/setup.bash",
+    process.env.TENNISBOT_CONTROL_SETUP ?? resolve(homedir(), "tennis_robot_ws/install/setup.bash"),
     process.env.TENNISBOT_LOCAL_SETUP ?? resolve(repoRoot, "install/setup.bash"),
   ];
 }
