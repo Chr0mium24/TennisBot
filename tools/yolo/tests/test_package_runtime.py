@@ -43,6 +43,7 @@ def test_cli_help_exposes_package_create_and_verify() -> None:
     sprites_help = run_cli("sprites", "--help")
     augment_help = run_cli("augment", "--help")
     benchmark_help = run_cli("benchmark", "--help")
+    benchmark_final_raw_split_help = run_cli("benchmark", "build-final-raw-split", "--help")
     benchmark_roi_help = run_cli("benchmark", "roi-sample", "--help")
     benchmark_roi_track_help = run_cli("benchmark", "roi-track", "--help")
 
@@ -64,6 +65,9 @@ def test_cli_help_exposes_package_create_and_verify() -> None:
     assert "copy-paste" in augment_help.stdout
     assert benchmark_help.returncode == 0
     assert "tiles" in benchmark_help.stdout
+    assert "build-final-raw-split" in benchmark_help.stdout
+    assert benchmark_final_raw_split_help.returncode == 0
+    assert "--fixed-cloudy-negative-holdout-count" in benchmark_final_raw_split_help.stdout
     assert "roi-sample" in benchmark_help.stdout
     assert "roi-track" in benchmark_help.stdout
     assert benchmark_roi_help.returncode == 0
@@ -136,6 +140,86 @@ def test_benchmark_roi_track_dry_run_does_not_require_model_or_detector_dependen
     assert result.returncode == 0
     assert "samples=1" in result.stdout
     assert "session_cam1_frame_000001.jpg" in result.stdout
+
+
+def test_benchmark_build_final_raw_split_generates_manifest_without_detector_dependencies(tmp_path: Path) -> None:
+    from PIL import Image
+
+    auto_images = tmp_path / "auto" / "images"
+    auto_labels = tmp_path / "auto" / "labels"
+    fixed_images = tmp_path / "fixed_source" / "images"
+    fixed_labels = tmp_path / "fixed_source" / "labels"
+    for directory in (auto_images, auto_labels, fixed_images, fixed_labels):
+        directory.mkdir(parents=True)
+
+    def write_image_and_label(image_path: Path, label_path: Path, label: str) -> None:
+        Image.new("RGB", (100, 100), color=(30, 40, 50)).save(image_path)
+        label_path.write_text(label, encoding="utf-8")
+
+    write_image_and_label(
+        auto_images / "indoor_ball_sample_cam1_frame_000000.jpg",
+        auto_labels / "indoor_ball_sample_cam1_frame_000000.txt",
+        "",
+    )
+    write_image_and_label(
+        auto_images / "indoor_ball_sample02_cam1_frame_000000.jpg",
+        auto_labels / "indoor_ball_sample02_cam1_frame_000000.txt",
+        "0 0.5 0.5 0.50 0.50\n",
+    )
+    write_image_and_label(
+        fixed_images / "20260707_141324_cam1_frame_000000.jpg",
+        fixed_labels / "20260707_141324_cam1_frame_000000.txt",
+        "0 0.5 0.5 0.10 0.10\n",
+    )
+    write_image_and_label(
+        fixed_images / "20260707_140826_cam1_frame_000000.jpg",
+        fixed_labels / "20260707_140826_cam1_frame_000000.txt",
+        "0 0.5 0.5 0.30 0.30\n",
+    )
+    write_image_and_label(
+        fixed_images / "cloudy_background_cam1_frame_000000.jpg",
+        fixed_labels / "cloudy_background_cam1_frame_000000.txt",
+        "",
+    )
+    write_image_and_label(
+        fixed_images / "cloudy_background_cam1_frame_000001.jpg",
+        fixed_labels / "cloudy_background_cam1_frame_000001.txt",
+        "",
+    )
+
+    output_dir = tmp_path / "split"
+    result = run_cli(
+        "benchmark",
+        "build-final-raw-split",
+        "--auto-exposure-images-root",
+        str(auto_images),
+        "--fixed-exposure-source-root",
+        str(tmp_path / "fixed_source"),
+        "--output-dir",
+        str(output_dir),
+        "--auto-benchmark-session",
+        "indoor_ball_sample_cam1",
+        "--fixed-benchmark-session",
+        "20260707_141324_cam1",
+        "--fixed-cloudy-negative-holdout-count",
+        "1",
+        "--seed",
+        "7",
+    )
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    summary = read_json(output_dir / "summary.json")
+    assert summary["split_counts"] == {"benchmark": 3, "train_pool": 3}
+    assert summary["bucket_counts"]["benchmark:auto_exposure:empty"] == 1
+    assert summary["bucket_counts"]["benchmark:fixed_exposure:small"] == 1
+    assert summary["bucket_counts"]["train_pool:auto_exposure:large"] == 1
+    assert summary["bucket_counts"]["train_pool:fixed_exposure:medium"] == 1
+
+    manifest = output_dir / "manifest.jsonl"
+    assert summary["manifest_sha256"] == hashlib.sha256(manifest.read_bytes()).hexdigest()
+    benchmark_paths = set((output_dir / "benchmark.txt").read_text(encoding="utf-8").splitlines())
+    train_pool_paths = set((output_dir / "train_pool.txt").read_text(encoding="utf-8").splitlines())
+    assert len(benchmark_paths & train_pool_paths) == 0
 
 
 def test_detect_gui_dry_run_does_not_require_camera_or_detector_dependencies(tmp_path: Path) -> None:

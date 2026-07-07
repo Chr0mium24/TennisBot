@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
 from glob import glob
+import hashlib
+import json
 from pathlib import Path
+import random
 import re
 import statistics
 import time
@@ -47,6 +51,17 @@ DEFAULT_S3D_CHECKPOINT = (
 DEFAULT_S3D_ROI_GLOB = (
     REPO_ROOT / "tools" / "yolo" / "workspace" / "dataset" / "images" / "0260701" / "20260701_155008_cam*_frame_*.jpg"
 )
+DEFAULT_AUTO_EXPOSURE_IMAGES_ROOT = (
+    REPO_ROOT / "tools" / "yolo" / "workspace" / "dataset" / "images" / "cam1" / "device_a_indoor"
+)
+DEFAULT_AUTO_EXPOSURE_IMAGE_GLOB = "indoor_ball_sample*_cam1_frame_*.jpg"
+DEFAULT_FIXED_EXPOSURE_SOURCE_ROOT = REPO_ROOT / "tools" / "yolo" / "workspace" / "runs" / "fixed_exposure_source_20260707"
+DEFAULT_FINAL_RAW_SPLIT_OUTPUT = REPO_ROOT / "tools" / "yolo" / "workspace" / "runs" / "final_raw_benchmark_v1_20260708"
+DEFAULT_AUTO_BENCHMARK_SESSIONS = ("indoor_ball_sample_cam1",)
+DEFAULT_FIXED_BENCHMARK_SESSIONS = ("20260707_141324_cam1", "20260707_141634_cam1")
+DEFAULT_CLOUDY_SESSION = "cloudy_background_cam1"
+DEFAULT_FIXED_CLOUDY_HOLDOUT_COUNT = 50
+DEFAULT_FINAL_RAW_SPLIT_SEED = 20260708
 FRAME_NUMBER_RE = re.compile(r"_frame_(?P<frame>\d+)$")
 
 
@@ -155,6 +170,38 @@ class S3dRoiChainRow:
     roi_yolo_median_ms: float
     total_median_ms: float
     stereo_fps: float
+
+
+@dataclass(frozen=True)
+class RawBenchmarkRecord:
+    box_count: int
+    dataset: str
+    height: int
+    image: str
+    label: str
+    max_box_dim_px: float | None
+    positive: bool
+    reason: str
+    session: str
+    split: str
+    target_bucket: str
+    width: int
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "box_count": self.box_count,
+            "dataset": self.dataset,
+            "height": self.height,
+            "image": self.image,
+            "label": self.label,
+            "max_box_dim_px": self.max_box_dim_px,
+            "positive": self.positive,
+            "reason": self.reason,
+            "session": self.session,
+            "split": self.split,
+            "target_bucket": self.target_bucket,
+            "width": self.width,
+        }
 
 
 def parse_tile_profile(value: str) -> TileProfile:
@@ -1707,6 +1754,290 @@ def cmd_benchmark_s3d_roi_chain(args: argparse.Namespace) -> int:
     return 0
 
 
+def repo_display_path(path: Path) -> str:
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(REPO_ROOT.resolve()).as_posix()
+    except ValueError:
+        return resolved.as_posix()
+
+
+def image_size(path: Path) -> tuple[int, int]:
+    from PIL import Image
+
+    with Image.open(path) as image:
+        return image.size
+
+
+def frame_session_name(path: Path) -> str:
+    match = FRAME_NUMBER_RE.search(path.stem)
+    if not match:
+        return path.stem
+    return path.stem[: match.start()]
+
+
+def target_bucket_for_boxes(boxes: tuple[DetBox, ...]) -> tuple[str, float | None]:
+    if not boxes:
+        return "empty", None
+    max_box_dim = max(max(box.x2 - box.x1, box.y2 - box.y1) for box in boxes)
+    if max_box_dim < 16.0:
+        return "small", max_box_dim
+    if max_box_dim < 48.0:
+        return "medium", max_box_dim
+    return "large", max_box_dim
+
+
+def iter_image_files(root: Path, pattern: str = "*") -> list[Path]:
+    suffixes = {".jpg", ".jpeg", ".png"}
+    return sorted(path for path in root.glob(pattern) if path.is_file() and path.suffix.lower() in suffixes)
+
+
+def make_raw_benchmark_record(
+    *,
+    image_path: Path,
+    dataset: str,
+    split: str,
+    reason: str,
+) -> RawBenchmarkRecord:
+    label_path = label_path_for_image(image_path)
+    if not label_path.is_file():
+        raise FileNotFoundError(f"label not found for raw benchmark image: {label_path}")
+    width, height = image_size(image_path)
+    boxes = load_gt_boxes(label_path, width, height)
+    target_bucket, max_box_dim = target_bucket_for_boxes(boxes)
+    return RawBenchmarkRecord(
+        box_count=len(boxes),
+        dataset=dataset,
+        height=height,
+        image=repo_display_path(image_path),
+        label=repo_display_path(label_path),
+        max_box_dim_px=max_box_dim,
+        positive=bool(boxes),
+        reason=reason,
+        session=frame_session_name(image_path),
+        split=split,
+        target_bucket=target_bucket,
+        width=width,
+    )
+
+
+def raw_record_sort_key(record: RawBenchmarkRecord) -> tuple[int, int, str, str]:
+    split_order = {"benchmark": 0, "train_pool": 1}
+    dataset_order = {"auto_exposure": 0, "fixed_exposure": 1}
+    return (
+        split_order.get(record.split, 99),
+        dataset_order.get(record.dataset, 99),
+        record.session,
+        record.image,
+    )
+
+
+def build_final_raw_split_records(
+    *,
+    auto_exposure_images_root: Path,
+    auto_exposure_image_glob: str,
+    fixed_exposure_source_root: Path,
+    auto_benchmark_sessions: set[str],
+    fixed_benchmark_sessions: set[str],
+    cloudy_session: str,
+    fixed_cloudy_negative_holdout_count: int,
+    seed: int,
+) -> list[RawBenchmarkRecord]:
+    fixed_images_root = fixed_exposure_source_root / "images"
+    if not auto_exposure_images_root.is_dir():
+        raise FileNotFoundError(f"auto exposure image root not found: {auto_exposure_images_root}")
+    if not fixed_images_root.is_dir():
+        raise FileNotFoundError(f"fixed exposure image root not found: {fixed_images_root}")
+    if fixed_cloudy_negative_holdout_count < 0:
+        raise ValueError("fixed cloudy negative holdout count must be non-negative")
+
+    auto_images = iter_image_files(auto_exposure_images_root, auto_exposure_image_glob)
+    fixed_images = iter_image_files(fixed_images_root)
+    cloudy_images = [path for path in fixed_images if frame_session_name(path) == cloudy_session]
+    if fixed_cloudy_negative_holdout_count > len(cloudy_images):
+        raise ValueError(
+            f"requested {fixed_cloudy_negative_holdout_count} cloudy holdout images, "
+            f"but only {len(cloudy_images)} exist"
+        )
+
+    rng = random.Random(seed)
+    cloudy_holdout = set(rng.sample(cloudy_images, fixed_cloudy_negative_holdout_count))
+    records: list[RawBenchmarkRecord] = []
+
+    for image_path in auto_images:
+        session = frame_session_name(image_path)
+        split = "benchmark" if session in auto_benchmark_sessions else "train_pool"
+        reason = "session_holdout" if split == "benchmark" else "default_train_pool"
+        records.append(
+            make_raw_benchmark_record(
+                image_path=image_path,
+                dataset="auto_exposure",
+                split=split,
+                reason=reason,
+            )
+        )
+
+    for image_path in fixed_images:
+        session = frame_session_name(image_path)
+        if session in fixed_benchmark_sessions:
+            split = "benchmark"
+            reason = "session_holdout"
+        elif image_path in cloudy_holdout:
+            split = "benchmark"
+            reason = "seeded_cloudy_negative_holdout"
+        else:
+            split = "train_pool"
+            reason = "default_train_pool"
+        records.append(
+            make_raw_benchmark_record(
+                image_path=image_path,
+                dataset="fixed_exposure",
+                split=split,
+                reason=reason,
+            )
+        )
+
+    return sorted(records, key=raw_record_sort_key)
+
+
+def final_raw_split_summary(
+    *,
+    records: list[RawBenchmarkRecord],
+    output_dir: Path,
+    manifest_sha256: str,
+    seed: int,
+    auto_benchmark_sessions: list[str],
+    fixed_benchmark_sessions: list[str],
+    fixed_cloudy_negative_holdout_count: int,
+) -> dict[str, Any]:
+    split_counts = Counter(record.split for record in records)
+    dataset_counts = Counter(f"{record.split}:{record.dataset}" for record in records)
+    bucket_counts = Counter(f"{record.split}:{record.dataset}:{record.target_bucket}" for record in records)
+    session_counts = Counter(f"{record.split}:{record.dataset}:{record.session}" for record in records)
+    return {
+        "bucket_counts": dict(sorted(bucket_counts.items())),
+        "bucket_policy": "small max_box_dim_px < 16; medium 16 <= max_box_dim_px < 48; large >= 48; empty has no boxes",
+        "dataset_counts": dict(sorted(dataset_counts.items())),
+        "manifest_sha256": manifest_sha256,
+        "run_name": output_dir.name,
+        "seed": seed,
+        "session_counts": dict(sorted(session_counts.items())),
+        "split_counts": dict(sorted(split_counts.items())),
+        "split_policy": {
+            "auto_exposure_benchmark_sessions": auto_benchmark_sessions,
+            "fixed_cloudy_negative_holdout_count": fixed_cloudy_negative_holdout_count,
+            "fixed_exposure_benchmark_sessions": fixed_benchmark_sessions,
+            "train_pool_rule": "all non-benchmark raw images; future generated/augmented data must be derived only from train_pool",
+        },
+        "total_images": len(records),
+    }
+
+
+def write_final_raw_split_outputs(
+    *,
+    records: list[RawBenchmarkRecord],
+    output_dir: Path,
+    seed: int,
+    auto_benchmark_sessions: list[str],
+    fixed_benchmark_sessions: list[str],
+    fixed_cloudy_negative_holdout_count: int,
+) -> dict[str, Any]:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    manifest_lines = [json.dumps(record.to_json_dict(), sort_keys=True) for record in records]
+    manifest_text = "\n".join(manifest_lines) + ("\n" if manifest_lines else "")
+    manifest_path = output_dir / "manifest.jsonl"
+    manifest_path.write_text(manifest_text, encoding="utf-8")
+    manifest_sha256 = hashlib.sha256(manifest_text.encode("utf-8")).hexdigest()
+
+    for split in ("benchmark", "train_pool"):
+        split_records = [record for record in records if record.split == split]
+        (output_dir / f"{split}.txt").write_text(
+            "".join(f"{record.image}\n" for record in split_records),
+            encoding="utf-8",
+        )
+        for dataset in ("auto_exposure", "fixed_exposure"):
+            dataset_records = [record for record in split_records if record.dataset == dataset]
+            (output_dir / f"{split}_{dataset}.txt").write_text(
+                "".join(f"{record.image}\n" for record in dataset_records),
+                encoding="utf-8",
+            )
+
+    summary = final_raw_split_summary(
+        records=records,
+        output_dir=output_dir,
+        manifest_sha256=manifest_sha256,
+        seed=seed,
+        auto_benchmark_sessions=auto_benchmark_sessions,
+        fixed_benchmark_sessions=fixed_benchmark_sessions,
+        fixed_cloudy_negative_holdout_count=fixed_cloudy_negative_holdout_count,
+    )
+    (output_dir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    (output_dir / "README.md").write_text(
+        "\n".join(
+            [
+                f"# Final Raw Benchmark Split - {datetime.now().strftime('%Y-%m-%d')}",
+                "",
+                "Generated by `tennisbot-yolo benchmark build-final-raw-split`.",
+                "Use `benchmark.txt` only for frozen final evaluation.",
+                "Use `train_pool.txt` as the only raw source for future training, ROI crops, and copy-paste synthesis.",
+                "",
+                "See `summary.json` and `manifest.jsonl` for the exact split and bucket counts.",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return summary
+
+
+def cmd_benchmark_build_final_raw_split(args: argparse.Namespace) -> int:
+    auto_benchmark_sessions = list(DEFAULT_AUTO_BENCHMARK_SESSIONS) if args.auto_benchmark_session is None else args.auto_benchmark_session
+    fixed_benchmark_sessions = (
+        list(DEFAULT_FIXED_BENCHMARK_SESSIONS) if args.fixed_benchmark_session is None else args.fixed_benchmark_session
+    )
+    try:
+        records = build_final_raw_split_records(
+            auto_exposure_images_root=args.auto_exposure_images_root,
+            auto_exposure_image_glob=args.auto_exposure_image_glob,
+            fixed_exposure_source_root=args.fixed_exposure_source_root,
+            auto_benchmark_sessions=set(auto_benchmark_sessions),
+            fixed_benchmark_sessions=set(fixed_benchmark_sessions),
+            cloudy_session=args.cloudy_session,
+            fixed_cloudy_negative_holdout_count=args.fixed_cloudy_negative_holdout_count,
+            seed=args.seed,
+        )
+        if args.dry_run:
+            manifest_text = "\n".join(json.dumps(record.to_json_dict(), sort_keys=True) for record in records)
+            if manifest_text:
+                manifest_text += "\n"
+            summary = final_raw_split_summary(
+                records=records,
+                output_dir=args.output_dir,
+                manifest_sha256=hashlib.sha256(manifest_text.encode("utf-8")).hexdigest(),
+                seed=args.seed,
+                auto_benchmark_sessions=auto_benchmark_sessions,
+                fixed_benchmark_sessions=fixed_benchmark_sessions,
+                fixed_cloudy_negative_holdout_count=args.fixed_cloudy_negative_holdout_count,
+            )
+        else:
+            summary = write_final_raw_split_outputs(
+                records=records,
+                output_dir=args.output_dir,
+                seed=args.seed,
+                auto_benchmark_sessions=auto_benchmark_sessions,
+                fixed_benchmark_sessions=fixed_benchmark_sessions,
+                fixed_cloudy_negative_holdout_count=args.fixed_cloudy_negative_holdout_count,
+            )
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"error: {exc}")
+        return 2
+
+    print(json.dumps(summary, indent=2))
+    if not args.dry_run:
+        print(f"wrote={args.output_dir}")
+    return 0
+
+
 def cmd_benchmark_tiles(args: argparse.Namespace) -> int:
     if args.frame_width <= 0 or args.frame_height <= 0:
         print("error: frame dimensions must be positive")
@@ -1788,6 +2119,57 @@ def add_benchmark_parser(subparsers: argparse._SubParsersAction[argparse.Argumen
     parser_kwargs = {"formatter_class": argparse.ArgumentDefaultsHelpFormatter}
     benchmark = subparsers.add_parser("benchmark", help="运行 YOLO 随机输入性能基准。", **parser_kwargs)
     benchmark_subparsers = benchmark.add_subparsers(dest="benchmark_command", required=True)
+
+    final_raw_split = benchmark_subparsers.add_parser(
+        "build-final-raw-split",
+        help="生成自动曝光/固定曝光原始图最终 benchmark 留出清单。",
+        **parser_kwargs,
+    )
+    final_raw_split.add_argument(
+        "--auto-exposure-images-root",
+        type=Path,
+        default=DEFAULT_AUTO_EXPOSURE_IMAGES_ROOT,
+        help="自动曝光原始图目录",
+    )
+    final_raw_split.add_argument(
+        "--auto-exposure-image-glob",
+        default=DEFAULT_AUTO_EXPOSURE_IMAGE_GLOB,
+        help="自动曝光原始图 glob",
+    )
+    final_raw_split.add_argument(
+        "--fixed-exposure-source-root",
+        type=Path,
+        default=DEFAULT_FIXED_EXPOSURE_SOURCE_ROOT,
+        help="固定曝光 source 根目录，下面应有 images/labels",
+    )
+    final_raw_split.add_argument(
+        "--output-dir",
+        type=Path,
+        default=DEFAULT_FINAL_RAW_SPLIT_OUTPUT,
+        help="输出 manifest/summary/list files 的目录",
+    )
+    final_raw_split.add_argument(
+        "--auto-benchmark-session",
+        action="append",
+        default=None,
+        help="自动曝光整段留作 benchmark 的 session，可重复；默认使用 v1 holdout",
+    )
+    final_raw_split.add_argument(
+        "--fixed-benchmark-session",
+        action="append",
+        default=None,
+        help="固定曝光整段留作 benchmark 的 session，可重复；默认使用 v1 holdout",
+    )
+    final_raw_split.add_argument("--cloudy-session", default=DEFAULT_CLOUDY_SESSION, help="固定曝光无球 cloudy session 名")
+    final_raw_split.add_argument(
+        "--fixed-cloudy-negative-holdout-count",
+        type=int,
+        default=DEFAULT_FIXED_CLOUDY_HOLDOUT_COUNT,
+        help="从 cloudy 无球帧中按 seed 抽出的 benchmark 负样本数量",
+    )
+    final_raw_split.add_argument("--seed", type=int, default=DEFAULT_FINAL_RAW_SPLIT_SEED, help="cloudy 负样本抽样 seed")
+    final_raw_split.add_argument("--dry-run", action="store_true", help="只打印 summary，不写文件")
+    final_raw_split.set_defaults(func=cmd_benchmark_build_final_raw_split)
 
     tiles = benchmark_subparsers.add_parser("tiles", help="对比 4K tile profile 和 imgsz 的推理成本。", **parser_kwargs)
     tiles.add_argument("--model", type=Path, default=DEFAULT_MODEL, help="Ultralytics YOLO .pt 模型路径")
