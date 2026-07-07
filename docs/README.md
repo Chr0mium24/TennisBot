@@ -14,6 +14,7 @@
 - [相机设备检查](current/camera_devices.md)
 - [YOLO 检测 GUI](current/yolo_detect_gui.md)
 - [YOLO ROI Runtime Search 计划](current/yolo_roi_runtime_search_plan_20260707.md)
+- [YOLO 增强方案复盘](current/yolo_augmentation_scheme_review_20260707.md)
 
 ## 工具入口
 
