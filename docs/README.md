@@ -16,6 +16,7 @@
 - [YOLO ROI Runtime Search 计划](current/yolo_roi_runtime_search_plan_20260707.md)
 - [YOLO 增强方案复盘](current/yolo_augmentation_scheme_review_20260707.md)
 - [YOLO 固定曝光传统 ROI 数据集](current/yolo_fixed_exposure_traditional_roi_dataset_20260707.md)
+- [YOLO 固定曝光传统 ROI 训练结果](current/yolo_fixed_exposure_traditional_roi_training_result_20260708.md)
 
 ## 工具入口
 

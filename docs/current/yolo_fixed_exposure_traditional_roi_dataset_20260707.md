@@ -115,5 +115,11 @@ The generated dataset was checked after creation:
 
 ## Upload Status
 
-The zip is ready locally. A remote `user@host:/path` upload target was not found
-in the repository or SSH config, so upload is pending an explicit target.
+The zip was uploaded to:
+
+`anilam@10.31.151.120:/home/anilam/Codes/TennisBot/tools/yolo/workspace/runs/fixed_exposure_traditional_roi_3000_20260707.zip`
+
+The uploaded SHA256 matched the local package hash. Server-side training was
+run from the extracted dataset and is recorded in:
+
+`docs/current/yolo_fixed_exposure_traditional_roi_training_result_20260708.md`
