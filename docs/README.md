@@ -19,6 +19,7 @@
 - [YOLO 固定曝光传统 ROI 训练结果](current/yolo_fixed_exposure_traditional_roi_training_result_20260708.md)
 - [YOLO 固定曝光 1024x576 单 ROI 训练结果](current/yolo_fixed_exposure_roi1024_training_result_20260708.md)
 - [YOLO 固定曝光 1024x576 ROI imgsz960 训练结果](current/yolo_fixed_exposure_roi1024_imgsz960_training_result_20260708.md)
+- [YOLO 自动曝光泛化性评估](current/yolo_auto_exposure_generalization_eval_20260708.md)
 
 ## 工具入口
 
