@@ -1889,13 +1889,12 @@
         const cy = parts[2] * h;
         const bw = parts[3] * w;
         const bh = parts[4] * h;
-        const mode = Math.abs(bw - bh) > Math.max(bw, bh) * 0.05 ? "rect" : "square";
         return normalizeBox({
           x1: cx - bw / 2,
           y1: cy - bh / 2,
           x2: cx + bw / 2,
           y2: cy + bh / 2,
-          mode,
+          mode: "rect",
         });
       }
 
