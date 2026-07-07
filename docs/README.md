@@ -13,6 +13,7 @@
 - [操作员运行手册](current/operator_runbook.md)
 - [相机设备检查](current/camera_devices.md)
 - [YOLO 检测 GUI](current/yolo_detect_gui.md)
+- [YOLO ROI Runtime Search 计划](current/yolo_roi_runtime_search_plan_20260707.md)
 
 ## 工具入口
 
