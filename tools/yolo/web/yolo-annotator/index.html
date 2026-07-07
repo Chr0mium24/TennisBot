@@ -264,6 +264,7 @@
     <button id="clear" class="tool-button tool-button-danger" type="button" title="Clear current label">Clear</button>
     <button id="exclude" class="tool-button" type="button" title="Toggle unusable sample (X)">X</button>
     <button id="autoDetect" class="tool-button" type="button" title="Auto annotate new images from motion difference and HSV (T); center current box or candidate (C)">Auto</button>
+    <button id="modelDetect" class="tool-button" type="button" title="Model annotate current view and go next (M)">Model</button>
     <button id="panMode" class="tool-button" type="button" title="Toggle one-finger pan mode">Pan</button>
     <button id="zoomOut" class="tool-button" type="button" title="Zoom out (-)">-</button>
     <button id="zoomReset" class="tool-button zoom-button" type="button" title="Fit view (0)">100%</button>
@@ -317,6 +318,7 @@
         clear: document.getElementById("clear"),
         exclude: document.getElementById("exclude"),
         autoDetect: document.getElementById("autoDetect"),
+        modelDetect: document.getElementById("modelDetect"),
         panMode: document.getElementById("panMode"),
         zoomOut: document.getElementById("zoomOut"),
         zoomReset: document.getElementById("zoomReset"),
@@ -929,6 +931,7 @@
         buttons.clear.disabled = currentIndex < 0 || !labelsAreWritable();
         buttons.exclude.disabled = currentIndex < 0 || !backendMode;
         buttons.autoDetect.disabled = !currentImage;
+        buttons.modelDetect.disabled = !currentImage || !backendMode;
         updateSidebarButton();
         updateExcludeButton();
         updateAutoAnnotateButton();
@@ -1367,6 +1370,83 @@
         focusBoxInView(detected, 0.4);
         render();
         setStatus("Auto centered on candidate; draw the ball box");
+        return true;
+      }
+
+      function currentVisibleRoi() {
+        if (!currentImage) {
+          return null;
+        }
+        const topLeft = imagePointFromCanvas({ x: 0, y: 0 });
+        const bottomRight = imagePointFromCanvas({ x: canvas.clientWidth, y: canvas.clientHeight });
+        const { w, h } = imageSize();
+        const x1 = clamp(Math.min(topLeft.x, bottomRight.x), 0, w);
+        const y1 = clamp(Math.min(topLeft.y, bottomRight.y), 0, h);
+        const x2 = clamp(Math.max(topLeft.x, bottomRight.x), 0, w);
+        const y2 = clamp(Math.max(topLeft.y, bottomRight.y), 0, h);
+        if (x2 - x1 < 2 || y2 - y1 < 2) {
+          return null;
+        }
+        return { x1, y1, x2, y2 };
+      }
+
+      function detectionToBox(detection) {
+        return normalizeBox({
+          x1: Number(detection.x1),
+          y1: Number(detection.y1),
+          x2: Number(detection.x2),
+          y2: Number(detection.y2),
+          mode: "rect",
+        });
+      }
+
+      async function modelDetectCurrent() {
+        const entry = currentEntry();
+        if (!backendMode) {
+          setStatus("Model detection needs backend mode");
+          return false;
+        }
+        if (!entry || !currentImage) {
+          setStatus("Load an image first");
+          return false;
+        }
+        const roi = currentVisibleRoi();
+        if (!roi) {
+          setStatus("Model: current view is outside the image");
+          return false;
+        }
+        setStatus("Model detecting in current view");
+        const data = await apiJson("/api/predict", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image_path: entry.path, roi, confidence: 0.05 }),
+        });
+        const detections = Array.isArray(data.detections) ? data.detections : [];
+        if (!detections.length) {
+          setStatus("Model: no ball found in current view");
+          return false;
+        }
+        const detectedBox = detectionToBox(detections[0]);
+        if (!boxIsUsable(detectedBox)) {
+          setStatus("Model: detection box is too small");
+          return false;
+        }
+        box = detectedBox;
+        focusBoxInView(box, 0.4);
+        updateUi();
+        render();
+        const saved = await saveCurrent();
+        if (!saved) {
+          return false;
+        }
+        const confidence = Number(detections[0].confidence);
+        const suffix = Number.isFinite(confidence) ? ` (${confidence.toFixed(3)})` : "";
+        if (currentIndex < images.length - 1) {
+          await go(1);
+          setStatus(`Model saved${suffix}; moved to next image`);
+        } else {
+          setStatus(`Model saved${suffix}`);
+        }
         return true;
       }
 
@@ -2435,6 +2515,12 @@
           setStatus(error.message || "Auto annotation failed");
         });
       });
+      buttons.modelDetect.addEventListener("click", () => {
+        modelDetectCurrent().catch((error) => {
+          console.error(error);
+          setStatus(error.message || "Model detection failed");
+        });
+      });
       buttons.panMode.addEventListener("click", togglePanMode);
       buttons.zoomOut.addEventListener("click", () => zoomAt(centerPoint(), 1 / ZOOM_STEP));
       buttons.zoomIn.addEventListener("click", () => zoomAt(centerPoint(), ZOOM_STEP));
@@ -2471,6 +2557,9 @@
         } else if (key === "t") {
           event.preventDefault();
           await toggleAutoAnnotate();
+        } else if (key === "m") {
+          event.preventDefault();
+          await modelDetectCurrent();
         } else if (key === "c") {
           event.preventDefault();
           await centerCurrentBoxOrAuto();

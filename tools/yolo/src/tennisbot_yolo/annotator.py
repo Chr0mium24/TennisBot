@@ -23,6 +23,7 @@ from .dataset import (
     read_excluded_paths,
     safe_relative_path,
 )
+from .model_inference import DEFAULT_CONFIDENCE, detect_tennis_ball
 from .paths import DEFAULT_EXCLUDED_FILE, DEFAULT_IMAGES_ROOT, DEFAULT_LABELS_ROOT, TOOL_ROOT
 
 FRAME_NAME_RE = re.compile(r"^(?P<video>.+)_(?P<camera>cam\d+)_frame_(?P<frame>\d+)$")
@@ -35,6 +36,19 @@ class LabelPayload(BaseModel):
 
 class ExcludedPayload(BaseModel):
     excluded: bool
+
+
+class RoiPayload(BaseModel):
+    x1: float
+    y1: float
+    x2: float
+    y2: float
+
+
+class PredictPayload(BaseModel):
+    image_path: str
+    roi: RoiPayload | None = None
+    confidence: float = DEFAULT_CONFIDENCE
 
 
 @dataclass(frozen=True)
@@ -273,6 +287,28 @@ def create_app(
             "created": created,
             "previous_status": previous_status,
             "label_status": label_status_from_text(payload.text),
+        }
+
+
+    @app.post("/api/predict")
+    async def predict(payload: PredictPayload) -> dict[str, object]:
+        try:
+            image_path = safe_relative_path(images_root, payload.image_path, IMAGE_SUFFIXES)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if not image_path.is_file():
+            raise HTTPException(status_code=404, detail="image not found")
+        roi = None
+        if payload.roi is not None:
+            roi = (payload.roi.x1, payload.roi.y1, payload.roi.x2, payload.roi.y2)
+        try:
+            detections = detect_tennis_ball(image_path, roi=roi, confidence=payload.confidence)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"model inference failed: {exc}") from exc
+        return {
+            "image_path": payload.image_path,
+            "roi": payload.roi.model_dump() if payload.roi is not None else None,
+            "detections": [detection.as_dict() for detection in detections],
         }
 
     @app.put("/api/excluded/{image_path:path}")
