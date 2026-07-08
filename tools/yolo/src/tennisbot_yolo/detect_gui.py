@@ -55,8 +55,8 @@ class YoloDetector:
             from ultralytics import YOLO
         except ImportError as exc:
             raise RuntimeError(
-                "ultralytics is required for detect-gui. Run with "
-                "`uv run --extra detect tennisbot-yolo detect-gui ...`."
+                "ultralytics is required for YOLO detection. Run with "
+                "`uv run --extra detect tennisbot-yolo <detect command> ...`."
             ) from exc
 
         self.model = YOLO(str(model_path))

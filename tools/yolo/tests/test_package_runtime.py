@@ -40,6 +40,7 @@ def test_cli_help_exposes_package_create_and_verify() -> None:
     help_result = run_cli("--help")
     package_help = run_cli("package", "--help")
     detect_help = run_cli("detect-gui", "--help")
+    detect_video_help = run_cli("detect-video", "--help")
     sprites_help = run_cli("sprites", "--help")
     augment_help = run_cli("augment", "--help")
     augment_final_trainset_help = run_cli("augment", "build-final-trainset", "--help")
@@ -52,6 +53,7 @@ def test_cli_help_exposes_package_create_and_verify() -> None:
     assert help_result.returncode == 0
     assert "package" in help_result.stdout
     assert "detect-gui" in help_result.stdout
+    assert "detect-video" in help_result.stdout
     assert "sprites" in help_result.stdout
     assert "augment" in help_result.stdout
     assert "benchmark" in help_result.stdout
@@ -60,6 +62,9 @@ def test_cli_help_exposes_package_create_and_verify() -> None:
     assert "verify" in package_help.stdout
     assert detect_help.returncode == 0
     assert "--devices" in detect_help.stdout
+    assert detect_video_help.returncode == 0
+    assert "--output" in detect_video_help.stdout
+    assert "--overwrite" in detect_video_help.stdout
     assert sprites_help.returncode == 0
     assert "extract" in sprites_help.stdout
     assert "review" in sprites_help.stdout
@@ -106,6 +111,30 @@ def test_benchmark_tiles_dry_run_does_not_require_model_or_detector_dependencies
     assert "960" in result.stdout
     assert "1280" in result.stdout
     assert "9 (3x3)" in result.stdout
+
+
+def test_detect_video_dry_run_does_not_require_model_or_detector_dependencies(tmp_path: Path) -> None:
+    source = tmp_path / "input.mp4"
+    output = tmp_path / "input_boxes.mp4"
+
+    result = run_cli(
+        "detect-video",
+        str(source),
+        "--dry-run",
+        "--output",
+        str(output),
+        "--tile",
+        "--imgsz",
+        "960",
+        "--stride",
+        "2",
+    )
+
+    assert result.returncode == 0
+    assert "detect_video=dry-run" in result.stdout
+    assert f"source={source}" in result.stdout
+    assert f"output={output}" in result.stdout
+    assert "tile=True imgsz=960 stride=2" in result.stdout
 
 
 def test_benchmark_roi_sample_dry_run_does_not_require_model_or_detector_dependencies(tmp_path: Path) -> None:

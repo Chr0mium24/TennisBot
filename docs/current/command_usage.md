@@ -399,3 +399,26 @@ uv run --extra detect tennisbot-yolo detect-gui --tile
 
 注意：`tools/yolo detect-gui` 只显示检测框；需要显示球相对相机的
 x/y/z 坐标时使用根入口 `bun scripts/stereo.ts gui`。
+
+离线导出已有视频的 YOLO 带框结果：
+
+```bash
+bun scripts/yolo.ts detect-video input.mp4 \
+  --output runs/yolo-detect/input_boxes.mp4 \
+  --tile \
+  --overwrite
+```
+
+等价的工具目录命令：
+
+```bash
+cd tools/yolo
+uv run --extra detect tennisbot-yolo detect-video ../../input.mp4 \
+  --output ../../runs/yolo-detect/input_boxes.mp4 \
+  --tile \
+  --overwrite
+```
+
+默认会保留原视频分辨率和 FPS，输出 mp4v 编码的视频，只包含检测框、中心点、
+置信度和状态 overlay，不保留音频。这个命令只验证 2D YOLO 检测效果，不验证
+双目几何、轨迹预测、ROS 发布或真实接球闭环。

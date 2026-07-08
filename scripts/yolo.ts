@@ -27,6 +27,12 @@ try {
   if (command === "benchmark") {
     process.exit(await runYolo(["benchmark", ...rest], detectExtraOptions(rest)));
   }
+  if (command === "detect-gui") {
+    process.exit(await runYolo(["detect-gui", ...rest], detectExtraOptions(rest)));
+  }
+  if (command === "detect-video") {
+    process.exit(await runYolo(["detect-video", ...rest], detectExtraOptions(rest)));
+  }
   throw new Error(`Unknown command: ${command}`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
@@ -88,6 +94,8 @@ function printUsage(): void {
   bun scripts/yolo.ts sprites review [options]
   bun scripts/yolo.ts augment copy-paste [options]
   bun scripts/yolo.ts benchmark tiles [options]
+  bun scripts/yolo.ts detect-gui [options]
+  bun scripts/yolo.ts detect-video <input-video> [options]
 
 启动 YOLO 标注前端/后端。默认值:
   图片目录   tools/yolo/workspace/dataset/images
@@ -104,10 +112,12 @@ function printUsage(): void {
   bun scripts/yolo.ts augment copy-paste --config tools/yolo/configs/augmentation.toml
   bun scripts/yolo.ts benchmark tiles --dry-run
   bun scripts/yolo.ts benchmark tiles --output-markdown docs/current/yolo_tile_inference_benchmark_result_20260704.md
+  bun scripts/yolo.ts detect-gui --tile
+  bun scripts/yolo.ts detect-video input.mp4 --output runs/yolo-detect/input_boxes.mp4 --tile --overwrite
 
 说明:
   annotate 使用 tools/yolo 的默认 uv 环境，不安装 torch、ultralytics 或 CUDA/NVIDIA Python 包。
   sprites 和 augment 使用 tools/yolo 的 augment extra，只安装 OpenCV/NumPy，不安装 torch、ultralytics 或 CUDA/NVIDIA Python 包。
-  benchmark 实跑和纯 YOLO 相机检测 GUI 使用 tools/yolo 的 detect extra。
+  benchmark 实跑、纯 YOLO 相机检测 GUI 和离线视频导出使用 tools/yolo 的 detect extra。
 `);
 }

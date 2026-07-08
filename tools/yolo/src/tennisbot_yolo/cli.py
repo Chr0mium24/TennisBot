@@ -8,6 +8,7 @@ from .annotator import serve_annotator
 from .augmentation import add_augment_parser
 from .benchmark import add_benchmark_parser
 from .detect_gui import add_detect_gui_parser
+from .detect_video import add_detect_video_parser
 from .package import PackageVerificationError, create_model_package, verify_model_package
 from .paths import DEFAULT_EXCLUDED_FILE, DEFAULT_IMAGES_ROOT, DEFAULT_LABELS_ROOT, REPO_ROOT
 from .sprites import add_sprites_parser
@@ -80,6 +81,7 @@ def build_parser() -> argparse.ArgumentParser:
     annotate.set_defaults(func=cmd_annotate)
 
     add_detect_gui_parser(subparsers)
+    add_detect_video_parser(subparsers)
     add_sprites_parser(subparsers)
     add_augment_parser(subparsers)
     add_benchmark_parser(subparsers)

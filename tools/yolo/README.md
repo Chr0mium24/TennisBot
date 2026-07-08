@@ -10,6 +10,7 @@
 - 审核后球 sprite 的 copy-paste 数据增强
 - 运行时模型包创建与验证
 - 纯 YOLO OpenCV 检测 GUI
+- 已有视频文件的 YOLO 带框视频导出
 
 它不负责标定、双目几何、轨迹预测或运行时状态。
 
@@ -214,3 +215,39 @@ uv run --extra detect tennisbot-yolo detect-gui --dry-run
 ```
 
 退出 GUI：按 `q` 或 `Esc`。
+
+## 离线视频导出带框结果
+
+对已有视频文件离线跑 YOLO，并输出带 bbox、中心点、置信度和状态信息的
+mp4：
+
+```bash
+uv run --extra detect tennisbot-yolo detect-video input.mp4 \
+  --output runs/yolo-detect/input_boxes.mp4 \
+  --tile \
+  --overwrite
+```
+
+从仓库根目录也可以用 Bun wrapper：
+
+```bash
+bun scripts/yolo.ts detect-video input.mp4 \
+  --output runs/yolo-detect/input_boxes.mp4 \
+  --tile \
+  --overwrite
+```
+
+常用参数：
+
+- `--model ../../artifacts/models/tennis_ball_yolo/model.pt`
+- `--conf 0.05`
+- `--iou 0.5`
+- `--imgsz 1280`
+- `--max-detections 6`
+- `--tile` / `--tile-width` / `--tile-height` / `--tile-overlap`
+- `--stride 1`
+- `--limit-frames 0`
+- `--no-status-overlay`
+
+这个命令只验证已有视频中的 YOLO 2D 检测效果；不会做双目标定、三角化、
+轨迹预测、ROS 发布或真实接球闭环验证。OpenCV 导出不保留原视频音频。
