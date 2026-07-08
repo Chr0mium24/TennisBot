@@ -1,6 +1,11 @@
 #!/usr/bin/env bun
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  applyDefaultCameraControls,
+  buildCameraControlCommands,
+  displayCameraControlCommand,
+} from "./camera-controls";
 
 type ForwardedSignal = "SIGINT" | "SIGTERM";
 
@@ -34,6 +39,7 @@ try {
 }
 
 async function runStereoGui(args: string[]): Promise<number> {
+  prepareCameraControls(args);
   const command = [
     "uv",
     "run",
@@ -53,6 +59,7 @@ async function runStereoGui(args: string[]): Promise<number> {
 }
 
 async function runStereoRecord(args: string[]): Promise<number> {
+  prepareCameraControls(args);
   const proc = Bun.spawn(["uv", "run", "tennisbot-stereo", "record", ...args], {
     cwd: stereoCwd,
     env: process.env,
@@ -110,6 +117,52 @@ function detectExtraArgs(args: string[]): string[] {
   return ["--extra", "detect"];
 }
 
+function prepareCameraControls(args: string[]): void {
+  if (args.includes("--help") || args.includes("-h")) return;
+  const devices = cameraDevices(args);
+  if (args.includes("--dry-run")) {
+    for (const command of buildCameraControlCommands(devices)) {
+      console.log(displayCameraControlCommand(command));
+    }
+    return;
+  }
+  applyDefaultCameraControls(devices, repoRoot);
+}
+
+function cameraDevices(args: string[]): [string, string] {
+  const devices = optionValue(args, "--devices");
+  if (devices !== undefined) return parseDevices(devices);
+  return [
+    optionValue(args, "--left-device") ?? "/dev/video0",
+    optionValue(args, "--right-device") ?? "/dev/video2",
+  ];
+}
+
+function parseDevices(value: string): [string, string] {
+  const devices = value.split(",").map((item) => item.trim()).filter(Boolean);
+  if (devices.length !== 2) {
+    throw new Error("--devices requires exactly two comma-separated devices");
+  }
+  return [devices[0], devices[1]];
+}
+
+function optionValue(args: string[], name: string): string | undefined {
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === name) return requireValue(args, index + 1, name);
+    if (arg.startsWith(`${name}=`)) return arg.slice(name.length + 1);
+  }
+  return undefined;
+}
+
+function requireValue(args: string[], index: number, option: string): string {
+  const value = args[index];
+  if (value === undefined || value.startsWith("--")) {
+    throw new Error(`${option} requires a value`);
+  }
+  return value;
+}
+
 async function waitForChild(proc: ReturnType<typeof Bun.spawn>): Promise<number> {
   const signals: ForwardedSignal[] = ["SIGINT", "SIGTERM"];
   const removers: Array<() => void> = [];
@@ -161,6 +214,7 @@ function printUsage(): void {
   bun scripts/stereo.ts replay
 
 说明:
+  GUI/record 启动相机前会对左右设备应用固定 V4L2 控制：手动曝光、白平衡、增益、锐度等。
   record 写入 runs/raw-stereo/<session>/left.mp4 和 right.mp4，不运行 YOLO。
   record 不传 --duration 时持续录制，预览窗口按 q 或 esc 停止。
   GUI 显示的是左相机坐标系：x right, y down, z forward。
