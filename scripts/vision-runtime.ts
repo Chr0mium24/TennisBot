@@ -2,6 +2,7 @@
 
 import { resolve } from "node:path";
 import { homedir } from "node:os";
+import { applyDefaultCameraControls, buildCameraControlCommands } from "./camera-controls";
 
 type ForwardedSignal = "SIGINT" | "SIGTERM";
 
@@ -58,12 +59,18 @@ async function run(options: Options): Promise<number> {
   const visionRuntime = wrapRosCommand(buildVisionRuntimeCommand(options), options);
   const managerCommand = buildManagerCommand(options);
   const manager = managerCommand === undefined ? undefined : wrapRosCommand(managerCommand, options);
+  const devices = cameraDevices(options);
 
   if (options.dryRun) {
+    for (const command of buildCameraControlCommands(devices)) {
+      console.log(displayCommand(command));
+    }
     if (manager !== undefined) console.log(displayCommand(manager));
     console.log(displayCommand(visionRuntime));
     return 0;
   }
+
+  applyDefaultCameraControls(devices, repoRoot);
 
   const procs: Array<ReturnType<typeof Bun.spawn>> = [];
   if (manager !== undefined) {
@@ -134,6 +141,11 @@ function buildVisionRuntimeCommand(options: Options): string[] {
 function buildManagerCommand(options: Options): string[] | undefined {
   if (!options.withManager) return undefined;
   return ["ros2", "launch", "target_manager", "target_manager.launch.py"];
+}
+
+function cameraDevices(options: Options): [string, string] {
+  if (options.devices !== undefined) return parseDevices(options.devices);
+  return [options.leftDevice ?? "/dev/video0", options.rightDevice ?? "/dev/video2"];
 }
 
 function parseOptions(args: string[]): Options {
@@ -326,6 +338,7 @@ function printUsage(): void {
   --param <name:=value>               透传 ROS 参数，可重复
 
 说明:
+  启动相机前会对左右设备应用固定 V4L2 控制：手动曝光、白平衡、增益、锐度等。
   运行阶段默认自动 source ROS、控制工作区和本仓库 install；构建阶段仍需 source 后 colcon build。
   默认 setup 可用 ROS_SETUP、TENNISBOT_CONTROL_SETUP、TENNISBOT_LOCAL_SETUP 环境变量覆盖。
   日志目录包含 session.json、left.mp4、right.mp4、frames.ndjson、chassis.ndjson、
