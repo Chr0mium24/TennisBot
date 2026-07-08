@@ -148,3 +148,22 @@ Each future model candidate should be evaluated on this frozen benchmark with:
 The target remains recall above `0.90` with runtime above `50 FPS`, but a model
 should not be promoted until the bucketed benchmark and FPS evidence are both
 recorded.
+
+## Evaluation Command Template
+
+Full-frame YOLO candidates can be evaluated with:
+
+```bash
+uv run --project tools/yolo --extra detect python -m tennisbot_yolo.cli benchmark eval-final-raw \
+  --manifest tools/yolo/workspace/runs/final_raw_benchmark_v1_20260708/manifest.jsonl \
+  --model path/to/model.pt \
+  --imgsz 960 \
+  --conf-values 0.05,0.25 \
+  --device 0 \
+  --output-markdown docs/current/<result-name>.md
+```
+
+The evaluator reports overall, per-dataset, per-bucket, and dataset-plus-bucket
+rows. It also records median/p95 ms per image, mono FPS, and estimated stereo
+FPS. The timing is an offline detector replay; it is not a camera or ROS/Gazebo
+closed-loop benchmark.

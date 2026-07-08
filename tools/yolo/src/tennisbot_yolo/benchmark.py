@@ -204,6 +204,26 @@ class RawBenchmarkRecord:
         }
 
 
+@dataclass(frozen=True)
+class FinalRawEvalRow:
+    conf: float
+    dataset: str
+    target_bucket: str
+    images: int
+    positives: int
+    gt: int
+    tp: int
+    fp: int
+    fn: int
+    recall: float | None
+    precision: float | None
+    empty_fp_images: int
+    median_ms: float
+    p95_ms: float
+    mono_fps: float
+    stereo_fps: float
+
+
 def parse_tile_profile(value: str) -> TileProfile:
     parts = value.split(":")
     if len(parts) != 4:
@@ -234,6 +254,18 @@ def parse_imgsz_values(value: str) -> list[int]:
     if any(size <= 0 for size in sizes):
         raise argparse.ArgumentTypeError("imgsz values must be positive")
     return sizes
+
+
+def parse_conf_values(value: str) -> list[float]:
+    try:
+        conf_values = [float(item.strip()) for item in value.split(",") if item.strip()]
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("conf values must be comma-separated numbers") from exc
+    if not conf_values:
+        raise argparse.ArgumentTypeError("provide at least one confidence value")
+    if any(conf < 0.0 or conf > 1.0 for conf in conf_values):
+        raise argparse.ArgumentTypeError("confidence values must be within [0, 1]")
+    return sorted(set(conf_values))
 
 
 def parse_roi_profile(value: str) -> RoiProfile:
@@ -2038,6 +2070,404 @@ def cmd_benchmark_build_final_raw_split(args: argparse.Namespace) -> int:
     return 0
 
 
+def repo_input_path(value: str | Path) -> Path:
+    path = Path(value)
+    return path if path.is_absolute() else REPO_ROOT / path
+
+
+def raw_record_from_json_dict(row: dict[str, Any]) -> RawBenchmarkRecord:
+    return RawBenchmarkRecord(
+        box_count=int(row["box_count"]),
+        dataset=str(row["dataset"]),
+        height=int(row["height"]),
+        image=str(row["image"]),
+        label=str(row["label"]),
+        max_box_dim_px=None if row.get("max_box_dim_px") is None else float(row["max_box_dim_px"]),
+        positive=bool(row["positive"]),
+        reason=str(row["reason"]),
+        session=str(row["session"]),
+        split=str(row["split"]),
+        target_bucket=str(row["target_bucket"]),
+        width=int(row["width"]),
+    )
+
+
+def load_final_raw_manifest(manifest_path: Path) -> list[RawBenchmarkRecord]:
+    if not manifest_path.is_file():
+        raise FileNotFoundError(f"final raw manifest not found: {manifest_path}")
+    records: list[RawBenchmarkRecord] = []
+    for line_number, line in enumerate(manifest_path.read_text(encoding="utf-8").splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+            records.append(raw_record_from_json_dict(row))
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ValueError(f"invalid manifest row {line_number}: {manifest_path}") from exc
+    return records
+
+
+def filter_final_raw_records(
+    records: list[RawBenchmarkRecord],
+    *,
+    split: str,
+    datasets: set[str] | None,
+    target_buckets: set[str] | None,
+    sample_limit: int,
+) -> list[RawBenchmarkRecord]:
+    filtered = [
+        record
+        for record in records
+        if record.split == split
+        and (datasets is None or record.dataset in datasets)
+        and (target_buckets is None or record.target_bucket in target_buckets)
+    ]
+    if sample_limit > 0:
+        filtered = filtered[:sample_limit]
+    return filtered
+
+
+def final_raw_records_summary(records: list[RawBenchmarkRecord]) -> dict[str, Any]:
+    return {
+        "records": len(records),
+        "split_counts": dict(sorted(Counter(record.split for record in records).items())),
+        "dataset_counts": dict(sorted(Counter(record.dataset for record in records).items())),
+        "bucket_counts": dict(sorted(Counter(record.target_bucket for record in records).items())),
+        "session_counts": dict(sorted(Counter(record.session for record in records).items())),
+    }
+
+
+def final_raw_group_specs(records: list[RawBenchmarkRecord]) -> list[tuple[str, str, list[int]]]:
+    datasets = sorted({record.dataset for record in records})
+    bucket_order = ["small", "medium", "large", "empty"]
+    buckets = [bucket for bucket in bucket_order if any(record.target_bucket == bucket for record in records)]
+    groups: list[tuple[str, str, list[int]]] = []
+
+    def add_group(dataset: str, target_bucket: str, indexes: list[int]) -> None:
+        if indexes:
+            groups.append((dataset, target_bucket, indexes))
+
+    add_group("all", "all", list(range(len(records))))
+    for dataset in datasets:
+        add_group(dataset, "all", [index for index, record in enumerate(records) if record.dataset == dataset])
+    for bucket in buckets:
+        add_group("all", bucket, [index for index, record in enumerate(records) if record.target_bucket == bucket])
+    for dataset in datasets:
+        for bucket in buckets:
+            add_group(
+                dataset,
+                bucket,
+                [
+                    index
+                    for index, record in enumerate(records)
+                    if record.dataset == dataset and record.target_bucket == bucket
+                ],
+            )
+    return groups
+
+
+def make_final_raw_eval_row(
+    *,
+    conf: float,
+    dataset: str,
+    target_bucket: str,
+    records: list[RawBenchmarkRecord],
+    gt_by_image: list[tuple[DetBox, ...]],
+    pred_by_image: list[list[DetBox]],
+    elapsed_ms: list[float],
+    indexes: list[int],
+    match_iou: float,
+) -> FinalRawEvalRow:
+    group_records = [records[index] for index in indexes]
+    group_gt = [gt_by_image[index] for index in indexes]
+    group_pred = [[box for box in pred_by_image[index] if box.conf >= conf] for index in indexes]
+    group_elapsed = [elapsed_ms[index] for index in indexes]
+    tp, fp, fn = match_counts(group_gt, group_pred, match_iou)
+    gt_count = sum(len(boxes) for boxes in group_gt)
+    pred_count = tp + fp
+    median_ms = safe_median(group_elapsed)
+    p95_ms = percentile_95(group_elapsed) if group_elapsed else 0.0
+    return FinalRawEvalRow(
+        conf=conf,
+        dataset=dataset,
+        target_bucket=target_bucket,
+        images=len(group_records),
+        positives=sum(1 for record in group_records if record.positive),
+        gt=gt_count,
+        tp=tp,
+        fp=fp,
+        fn=fn,
+        recall=tp / (tp + fn) if gt_count else None,
+        precision=tp / pred_count if pred_count else None,
+        empty_fp_images=sum(
+            1
+            for record, pred_boxes in zip(group_records, group_pred, strict=True)
+            if record.target_bucket == "empty" and pred_boxes
+        ),
+        median_ms=median_ms,
+        p95_ms=p95_ms,
+        mono_fps=1000.0 / median_ms if median_ms > 0.0 else 0.0,
+        stereo_fps=1000.0 / (2.0 * median_ms) if median_ms > 0.0 else 0.0,
+    )
+
+
+def final_raw_eval_rows(
+    *,
+    records: list[RawBenchmarkRecord],
+    gt_by_image: list[tuple[DetBox, ...]],
+    pred_by_image: list[list[DetBox]],
+    elapsed_ms: list[float],
+    conf_values: list[float],
+    match_iou: float,
+) -> list[FinalRawEvalRow]:
+    rows: list[FinalRawEvalRow] = []
+    group_specs = final_raw_group_specs(records)
+    for conf in conf_values:
+        for dataset, target_bucket, indexes in group_specs:
+            rows.append(
+                make_final_raw_eval_row(
+                    conf=conf,
+                    dataset=dataset,
+                    target_bucket=target_bucket,
+                    records=records,
+                    gt_by_image=gt_by_image,
+                    pred_by_image=pred_by_image,
+                    elapsed_ms=elapsed_ms,
+                    indexes=indexes,
+                    match_iou=match_iou,
+                )
+            )
+    return rows
+
+
+def format_optional_rate(value: float | None) -> str:
+    return "n/a" if value is None else f"{value:.3f}"
+
+
+def format_final_raw_eval_table(rows: list[FinalRawEvalRow]) -> str:
+    header = (
+        "| conf | dataset | bucket | images | pos imgs | gt | TP | FP | FN | recall | precision | "
+        "empty FP imgs | median ms/img | p95 ms/img | mono FPS | est stereo FPS |"
+    )
+    sep = "|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"
+    lines = [header, sep]
+    for row in rows:
+        lines.append(
+            "| "
+            f"{row.conf:.3f} | "
+            f"{row.dataset} | "
+            f"{row.target_bucket} | "
+            f"{row.images} | "
+            f"{row.positives} | "
+            f"{row.gt} | "
+            f"{row.tp} | "
+            f"{row.fp} | "
+            f"{row.fn} | "
+            f"{format_optional_rate(row.recall)} | "
+            f"{format_optional_rate(row.precision)} | "
+            f"{row.empty_fp_images} | "
+            f"{row.median_ms:.2f} | "
+            f"{row.p95_ms:.2f} | "
+            f"{row.mono_fps:.2f} | "
+            f"{row.stereo_fps:.2f} |"
+        )
+    return "\n".join(lines)
+
+
+def build_final_raw_eval_report(
+    *,
+    rows: list[FinalRawEvalRow],
+    model_path: Path,
+    manifest_path: Path,
+    split: str,
+    imgsz: int,
+    conf_values: list[float],
+    iou: float,
+    match_iou: float,
+    max_detections: int,
+    device: str | None,
+    torch_module: Any,
+    records: list[RawBenchmarkRecord],
+) -> str:
+    dataset_counts = dict(sorted(Counter(record.dataset for record in records).items()))
+    bucket_counts = dict(sorted(Counter(record.target_bucket for record in records).items()))
+    lines = [
+        f"# YOLO Final Raw Benchmark Eval - {datetime.now().strftime('%Y-%m-%d')}",
+        "",
+        "## Scope",
+        "",
+        "This evaluates a YOLO detector on the frozen raw-image benchmark manifest.",
+        "It reports detection metrics by dataset and target-size bucket.",
+        "It does not validate stereo triangulation, trajectory prediction, ROS/Gazebo, or chassis control.",
+        "",
+        "## Settings",
+        "",
+        f"- Model: `{model_path}`",
+        f"- Manifest: `{manifest_path}`",
+        f"- Split: `{split}`",
+        f"- Images: `{len(records)}`",
+        f"- Dataset counts: `{json.dumps(dataset_counts, sort_keys=True)}`",
+        f"- Bucket counts: `{json.dumps(bucket_counts, sort_keys=True)}`",
+        f"- YOLO imgsz: `{imgsz}`",
+        f"- Confidence thresholds: `{','.join(f'{conf:.3f}' for conf in conf_values)}`",
+        f"- Prediction IoU setting: `{iou}`",
+        f"- Match IoU: `{match_iou}`",
+        f"- Max detections: `{max_detections}`",
+        f"- Device argument: `{device if device is not None else ''}`",
+        f"- CUDA available: `{bool(torch_module.cuda.is_available())}`",
+        f"- Torch: `{torch_module.__version__}`",
+        "",
+        "## Results",
+        "",
+        format_final_raw_eval_table(rows),
+        "",
+        "## Timing Notes",
+        "",
+        "- Predictions are run once at the lowest confidence threshold, then filtered for higher thresholds.",
+        "- `mono FPS` is `1000 / median_ms_per_image` on this offline replay.",
+        "- `est stereo FPS` assumes left and right camera images are processed sequentially at the same median cost.",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def cmd_benchmark_eval_final_raw(args: argparse.Namespace) -> int:
+    if args.sample_limit < 0:
+        print("error: --sample-limit must be non-negative")
+        return 2
+    if args.imgsz <= 0:
+        print("error: --imgsz must be positive")
+        return 2
+    if args.max_detections <= 0:
+        print("error: --max-detections must be positive")
+        return 2
+    if args.warmup < 0:
+        print("error: --warmup must be non-negative")
+        return 2
+    if args.threads < 0:
+        print("error: --threads must be nonnegative")
+        return 2
+
+    try:
+        conf_values = parse_conf_values(args.conf_values)
+        records = filter_final_raw_records(
+            load_final_raw_manifest(args.manifest),
+            split=args.split,
+            datasets=None if args.dataset is None else set(args.dataset),
+            target_buckets=None if args.target_bucket is None else set(args.target_bucket),
+            sample_limit=args.sample_limit,
+        )
+    except (FileNotFoundError, ValueError, argparse.ArgumentTypeError) as exc:
+        print(f"error: {exc}")
+        return 2
+
+    summary = final_raw_records_summary(records)
+    if args.dry_run:
+        print(json.dumps(summary, indent=2))
+        return 0
+    if not records:
+        print("error: no manifest records selected")
+        return 2
+    if not args.model.is_file():
+        print(f"error: model not found: {args.model}")
+        return 2
+
+    try:
+        import cv2
+        import torch
+        from ultralytics import YOLO
+    except ImportError as exc:
+        print(
+            "error: final raw benchmark eval requires opencv-python, torch, and ultralytics. "
+            "Run with `uv run --extra detect tennisbot-yolo benchmark eval-final-raw ...`."
+        )
+        print(f"missing: {exc}")
+        return 2
+
+    if args.threads > 0:
+        torch.set_num_threads(args.threads)
+        try:
+            torch.set_num_interop_threads(1)
+        except RuntimeError:
+            pass
+
+    images: list[Any] = []
+    gt_by_image: list[tuple[DetBox, ...]] = []
+    for record in records:
+        image_path = repo_input_path(record.image)
+        label_path = repo_input_path(record.label)
+        if not label_path.is_file():
+            print(f"error: label not found: {label_path}")
+            return 2
+        image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
+        if image is None:
+            print(f"error: failed to read image: {image_path}")
+            return 2
+        height, width = image.shape[:2]
+        images.append(image)
+        gt_by_image.append(load_gt_boxes(label_path, width, height))
+
+    model = YOLO(str(args.model))
+    min_conf = conf_values[0]
+    for _ in range(args.warmup):
+        predict_det_boxes(
+            model=model,
+            image=images[0],
+            imgsz=args.imgsz,
+            conf=min_conf,
+            iou=args.iou,
+            max_detections=args.max_detections,
+            device=args.device,
+        )
+    synchronize(torch)
+
+    pred_by_image: list[list[DetBox]] = []
+    elapsed_ms: list[float] = []
+    for image in images:
+        start = time.perf_counter()
+        pred_by_image.append(
+            predict_det_boxes(
+                model=model,
+                image=image,
+                imgsz=args.imgsz,
+                conf=min_conf,
+                iou=args.iou,
+                max_detections=args.max_detections,
+                device=args.device,
+            )
+        )
+        synchronize(torch)
+        elapsed_ms.append((time.perf_counter() - start) * 1000.0)
+
+    rows = final_raw_eval_rows(
+        records=records,
+        gt_by_image=gt_by_image,
+        pred_by_image=pred_by_image,
+        elapsed_ms=elapsed_ms,
+        conf_values=conf_values,
+        match_iou=args.match_iou,
+    )
+    report = build_final_raw_eval_report(
+        rows=rows,
+        model_path=args.model,
+        manifest_path=args.manifest,
+        split=args.split,
+        imgsz=args.imgsz,
+        conf_values=conf_values,
+        iou=args.iou,
+        match_iou=args.match_iou,
+        max_detections=args.max_detections,
+        device=args.device,
+        torch_module=torch,
+        records=records,
+    )
+    print(report)
+    if args.output_markdown is not None:
+        args.output_markdown.parent.mkdir(parents=True, exist_ok=True)
+        args.output_markdown.write_text(report, encoding="utf-8")
+        print(f"wrote={args.output_markdown}")
+    return 0
+
+
 def cmd_benchmark_tiles(args: argparse.Namespace) -> int:
     if args.frame_width <= 0 or args.frame_height <= 0:
         print("error: frame dimensions must be positive")
@@ -2170,6 +2600,46 @@ def add_benchmark_parser(subparsers: argparse._SubParsersAction[argparse.Argumen
     final_raw_split.add_argument("--seed", type=int, default=DEFAULT_FINAL_RAW_SPLIT_SEED, help="cloudy 负样本抽样 seed")
     final_raw_split.add_argument("--dry-run", action="store_true", help="只打印 summary，不写文件")
     final_raw_split.set_defaults(func=cmd_benchmark_build_final_raw_split)
+
+    final_raw_eval = benchmark_subparsers.add_parser(
+        "eval-final-raw",
+        help="在 frozen raw benchmark manifest 上评估 YOLO recall/precision/FPS。",
+        **parser_kwargs,
+    )
+    final_raw_eval.add_argument("--model", type=Path, default=DEFAULT_MODEL, help="Ultralytics YOLO .pt 模型路径")
+    final_raw_eval.add_argument(
+        "--manifest",
+        type=Path,
+        default=DEFAULT_FINAL_RAW_SPLIT_OUTPUT / "manifest.jsonl",
+        help="build-final-raw-split 生成的 manifest.jsonl",
+    )
+    final_raw_eval.add_argument("--split", default="benchmark", choices=("benchmark", "train_pool"), help="评估哪个 split")
+    final_raw_eval.add_argument(
+        "--dataset",
+        action="append",
+        choices=("auto_exposure", "fixed_exposure"),
+        default=None,
+        help="只评估指定 dataset，可重复；默认全量",
+    )
+    final_raw_eval.add_argument(
+        "--target-bucket",
+        action="append",
+        choices=("small", "medium", "large", "empty"),
+        default=None,
+        help="只评估指定目标大小 bucket，可重复；默认全量",
+    )
+    final_raw_eval.add_argument("--sample-limit", type=int, default=0, help="最多读取多少张 manifest 图；0 表示全量")
+    final_raw_eval.add_argument("--imgsz", type=int, default=960, help="YOLO imgsz")
+    final_raw_eval.add_argument("--conf-values", default="0.05,0.25", help="逗号分隔的置信度阈值")
+    final_raw_eval.add_argument("--iou", type=float, default=0.7, help="预测阶段 NMS IoU 阈值")
+    final_raw_eval.add_argument("--match-iou", type=float, default=0.5, help="评估匹配 IoU 阈值")
+    final_raw_eval.add_argument("--max-detections", type=int, default=300, help="每图最大检测数")
+    final_raw_eval.add_argument("--warmup", type=int, default=1, help="计时前预热次数")
+    final_raw_eval.add_argument("--device", default="cpu", help="Ultralytics device，例如 cpu、0 或 0,1")
+    final_raw_eval.add_argument("--threads", type=int, default=10, help="CPU torch 线程数；0 表示不修改")
+    final_raw_eval.add_argument("--output-markdown", type=Path, help="写入 Markdown 结果文件")
+    final_raw_eval.add_argument("--dry-run", action="store_true", help="只打印 manifest 筛选 summary，不加载图片或模型")
+    final_raw_eval.set_defaults(func=cmd_benchmark_eval_final_raw)
 
     tiles = benchmark_subparsers.add_parser("tiles", help="对比 4K tile profile 和 imgsz 的推理成本。", **parser_kwargs)
     tiles.add_argument("--model", type=Path, default=DEFAULT_MODEL, help="Ultralytics YOLO .pt 模型路径")

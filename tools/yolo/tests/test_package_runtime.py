@@ -44,6 +44,7 @@ def test_cli_help_exposes_package_create_and_verify() -> None:
     augment_help = run_cli("augment", "--help")
     benchmark_help = run_cli("benchmark", "--help")
     benchmark_final_raw_split_help = run_cli("benchmark", "build-final-raw-split", "--help")
+    benchmark_final_raw_eval_help = run_cli("benchmark", "eval-final-raw", "--help")
     benchmark_roi_help = run_cli("benchmark", "roi-sample", "--help")
     benchmark_roi_track_help = run_cli("benchmark", "roi-track", "--help")
 
@@ -68,6 +69,9 @@ def test_cli_help_exposes_package_create_and_verify() -> None:
     assert "build-final-raw-split" in benchmark_help.stdout
     assert benchmark_final_raw_split_help.returncode == 0
     assert "--fixed-cloudy-negative-holdout-count" in benchmark_final_raw_split_help.stdout
+    assert "eval-final-raw" in benchmark_help.stdout
+    assert benchmark_final_raw_eval_help.returncode == 0
+    assert "--conf-values" in benchmark_final_raw_eval_help.stdout
     assert "roi-sample" in benchmark_help.stdout
     assert "roi-track" in benchmark_help.stdout
     assert benchmark_roi_help.returncode == 0
@@ -220,6 +224,59 @@ def test_benchmark_build_final_raw_split_generates_manifest_without_detector_dep
     benchmark_paths = set((output_dir / "benchmark.txt").read_text(encoding="utf-8").splitlines())
     train_pool_paths = set((output_dir / "train_pool.txt").read_text(encoding="utf-8").splitlines())
     assert len(benchmark_paths & train_pool_paths) == 0
+
+
+def test_benchmark_eval_final_raw_dry_run_does_not_require_model_or_detector_dependencies(tmp_path: Path) -> None:
+    manifest = tmp_path / "manifest.jsonl"
+    rows = [
+        {
+            "box_count": 1,
+            "dataset": "auto_exposure",
+            "height": 100,
+            "image": "/tmp/auto.jpg",
+            "label": "/tmp/auto.txt",
+            "max_box_dim_px": 60.0,
+            "positive": True,
+            "reason": "session_holdout",
+            "session": "auto_session",
+            "split": "benchmark",
+            "target_bucket": "large",
+            "width": 100,
+        },
+        {
+            "box_count": 0,
+            "dataset": "fixed_exposure",
+            "height": 100,
+            "image": "/tmp/fixed.jpg",
+            "label": "/tmp/fixed.txt",
+            "max_box_dim_px": None,
+            "positive": False,
+            "reason": "default_train_pool",
+            "session": "fixed_session",
+            "split": "train_pool",
+            "target_bucket": "empty",
+            "width": 100,
+        },
+    ]
+    manifest.write_text("\n".join(json.dumps(row, sort_keys=True) for row in rows) + "\n", encoding="utf-8")
+
+    result = run_cli(
+        "benchmark",
+        "eval-final-raw",
+        "--dry-run",
+        "--manifest",
+        str(manifest),
+        "--split",
+        "benchmark",
+        "--conf-values",
+        "0.25,0.05",
+    )
+
+    assert result.returncode == 0
+    summary = json.loads(result.stdout)
+    assert summary["records"] == 1
+    assert summary["dataset_counts"] == {"auto_exposure": 1}
+    assert summary["bucket_counts"] == {"large": 1}
 
 
 def test_detect_gui_dry_run_does_not_require_camera_or_detector_dependencies(tmp_path: Path) -> None:
