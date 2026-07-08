@@ -57,7 +57,9 @@ class VisionRuntimeNode(Node):
         self.declare_parameter("model_path", "artifacts/models/tennis_ball_yolo/model.pt")
         self.declare_parameter("conf", 0.05)
         self.declare_parameter("iou", 0.50)
-        self.declare_parameter("imgsz", 1280)
+        self.declare_parameter("imgsz", 1536)
+        self.declare_parameter("search_imgsz", 1536)
+        self.declare_parameter("roi_imgsz", 960)
         self.declare_parameter("max_detections", 6)
         self.declare_parameter("yolo_device", "")
         self.declare_parameter("class_id", 0)
@@ -65,6 +67,15 @@ class VisionRuntimeNode(Node):
         self.declare_parameter("tile_width", 2048)
         self.declare_parameter("tile_height", 1216)
         self.declare_parameter("tile_overlap", 160)
+        self.declare_parameter("roi_tracking", True)
+        self.declare_parameter("roi_width", 1024)
+        self.declare_parameter("roi_height", 576)
+        self.declare_parameter("roi_expanded_width", 1280)
+        self.declare_parameter("roi_expanded_height", 720)
+        self.declare_parameter("roi_lost_after_misses", 3)
+        self.declare_parameter("roi_expand_after_misses", 1)
+        self.declare_parameter("roi_edge_margin_ratio", 0.20)
+        self.declare_parameter("roi_velocity_alpha", 0.60)
         self.declare_parameter("max_epipolar_error_px", 6.0)
         self.declare_parameter("min_disparity_px", 1.0)
         self.declare_parameter("max_disparity_px", 1200.0)
@@ -605,7 +616,18 @@ class RuntimeRunLogger:
                 "fourcc": str(node.get_parameter("fourcc").value),
                 "model_path": str(node.get_parameter("model_path").value),
                 "calibration_package": str(node.get_parameter("calibration_package").value),
+                "conf": float(node.get_parameter("conf").value),
+                "iou": float(node.get_parameter("iou").value),
+                "imgsz": int(node.get_parameter("imgsz").value),
+                "search_imgsz": int(node.get_parameter("search_imgsz").value),
+                "roi_imgsz": int(node.get_parameter("roi_imgsz").value),
                 "tile": bool(node.get_parameter("tile").value),
+                "roi_tracking": bool(node.get_parameter("roi_tracking").value),
+                "roi_width": int(node.get_parameter("roi_width").value),
+                "roi_height": int(node.get_parameter("roi_height").value),
+                "roi_expanded_width": int(node.get_parameter("roi_expanded_width").value),
+                "roi_expanded_height": int(node.get_parameter("roi_expanded_height").value),
+                "roi_lost_after_misses": int(node.get_parameter("roi_lost_after_misses").value),
                 "chassis_position_frame": "field",
                 "initial_task_id": int(node.get_parameter("initial_task_id").value),
                 "single_task_mode": bool(node.get_parameter("single_task_mode").value),
@@ -726,6 +748,7 @@ class RuntimeRunLogger:
         right_detections: list[Any],
         match: Any | None,
         diagnostics: Any,
+        tracking_status: dict[str, object] | None,
     ) -> None:
         self._write(
             "detections",
@@ -736,6 +759,7 @@ class RuntimeRunLogger:
                 "right": [detection_to_dict(item) for item in right_detections],
                 "selected_match": None if match is None else match_to_dict(match),
                 "diagnostics": diagnostics_to_dict(diagnostics),
+                "tracking": tracking_status,
             },
         )
 
@@ -896,6 +920,23 @@ class CameraRuntime:
             tile_width=int(node.get_parameter("tile_width").value),
             tile_height=int(node.get_parameter("tile_height").value),
             tile_overlap=int(node.get_parameter("tile_overlap").value),
+            roi_tracking=bool(node.get_parameter("roi_tracking").value),
+            roi_width=int(node.get_parameter("roi_width").value),
+            roi_height=int(node.get_parameter("roi_height").value),
+            roi_expanded_width=int(node.get_parameter("roi_expanded_width").value),
+            roi_expanded_height=int(node.get_parameter("roi_expanded_height").value),
+            search_imgsz=int(node.get_parameter("search_imgsz").value),
+            roi_imgsz=int(node.get_parameter("roi_imgsz").value),
+            roi_lost_after_misses=int(node.get_parameter("roi_lost_after_misses").value),
+            roi_expand_after_misses=int(node.get_parameter("roi_expand_after_misses").value),
+            roi_edge_margin_ratio=finite_float(
+                node.get_parameter("roi_edge_margin_ratio").value,
+                name="roi_edge_margin_ratio",
+            ),
+            roi_velocity_alpha=finite_float(
+                node.get_parameter("roi_velocity_alpha").value,
+                name="roi_velocity_alpha",
+            ),
         )
 
         left = open_capture(
@@ -919,7 +960,7 @@ class CameraRuntime:
             right.read()
 
         node.get_logger().info(
-            "camera runtime opened: left=%s right=%s %dx%d@%.1f detector=%s"
+            "camera runtime opened: left=%s right=%s %dx%d@%.1f detector=%s roi_tracking=%s"
             % (
                 str(node.get_parameter("left_device").value),
                 str(node.get_parameter("right_device").value),
@@ -927,6 +968,7 @@ class CameraRuntime:
                 height,
                 fps,
                 "yolo",
+                bool(node.get_parameter("roi_tracking").value),
             )
         )
         return cls(
@@ -971,6 +1013,13 @@ class CameraRuntime:
 
         left_detections, right_detections = self.detector.detect_pair(left_frame, right_frame)
         match = self.matcher.select(left_detections, right_detections)
+        update_tracks = getattr(self.detector, "update_pair_tracks", None)
+        if callable(update_tracks):
+            update_tracks(match)
+        tracking_status = None
+        get_tracking_status = getattr(self.detector, "tracking_status", None)
+        if callable(get_tracking_status):
+            tracking_status = get_tracking_status()
         self.logger.record_yolo(
             frame_id=frame_id,
             capture_stamp=capture_time.to_msg(),
@@ -978,6 +1027,7 @@ class CameraRuntime:
             right_detections=right_detections,
             match=match,
             diagnostics=self.matcher.last_diagnostics,
+            tracking_status=tracking_status,
         )
         if match is None:
             raise RuntimeError("no valid stereo ball match")

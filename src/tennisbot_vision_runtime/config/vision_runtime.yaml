@@ -26,7 +26,14 @@ vision_runtime:
     model_path: artifacts/models/tennis_ball_yolo/model.pt
     conf: 0.05
     iou: 0.50
-    imgsz: 1280
+    # Main YOLO strategy:
+    # - unlocked: full-frame search at high input resolution
+    # - locked: one ROI per camera centered from the previous stereo match
+    # - lost: after roi_lost_after_misses frames without a valid stereo match,
+    #   return to full-frame search
+    imgsz: 1536
+    search_imgsz: 1536
+    roi_imgsz: 960
     max_detections: 6
     yolo_device: ""
     class_id: 0
@@ -34,6 +41,15 @@ vision_runtime:
     tile_width: 2048
     tile_height: 1216
     tile_overlap: 160
+    roi_tracking: true
+    roi_width: 1024
+    roi_height: 576
+    roi_expanded_width: 1280
+    roi_expanded_height: 720
+    roi_lost_after_misses: 3
+    roi_expand_after_misses: 1
+    roi_edge_margin_ratio: 0.20
+    roi_velocity_alpha: 0.60
 
     max_epipolar_error_px: 6.0
     min_disparity_px: 1.0

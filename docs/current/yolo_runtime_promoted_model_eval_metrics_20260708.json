@@ -1,0 +1,35 @@
+{
+  "dataset": {
+    "name": "final_raw_benchmark_v1_20260708",
+    "images": 381,
+    "auto_exposure_images": 72,
+    "fixed_exposure_images": 309,
+    "small_bucket_images": 112,
+    "medium_bucket_images": 35,
+    "large_bucket_images": 142,
+    "empty_images": 92
+  },
+  "model": {
+    "name": "final_trainpool_tiny_fixed_cp",
+    "source_weights": "tools/yolo/workspace/runs/training/final_trainpool_tiny_fixed_cp_imgsz960_batch32_20260708/weights/best.pt",
+    "base_weights": "tools/yolo/workspace/runs/training/final_trainpool_roi_full_imgsz960_batch32_20260708/weights/best.pt",
+    "runtime_strategy": "full-frame acquire at imgsz1536, stereo-match-driven single ROI tracking at 1024x576 imgsz960",
+    "confidence_threshold": 0.05,
+    "iou_threshold": 0.5,
+    "full_frame_imgsz": 1536,
+    "roi_imgsz": 960,
+    "roi_size": {
+      "width": 1024,
+      "height": 576
+    },
+    "overall_recall": 0.616,
+    "overall_precision": 0.459,
+    "fixed_exposure_recall": 0.511,
+    "small_bucket_recall": 0.08,
+    "estimated_stereo_fps": 80.09
+  },
+  "notes": [
+    "The promoted checkpoint is the best current deployable full-frame recall result on the frozen final raw benchmark.",
+    "Small fixed-exposure balls remain the known weak case; this promotion does not claim the final recall target is solved."
+  ]
+}

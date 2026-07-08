@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "contract": "tennisbot.yolo-model-package",
   "contract_version": "0.1.0",
-  "created_at": "2026-07-03T07:31:49Z",
+  "created_at": "2026-07-08T07:22:04Z",
   "producer": {
     "tool": "tools/yolo",
     "source": "Wave 6 YOLO tool runtime"
@@ -11,18 +11,12 @@
   "models": {
     "pt": {
       "path": "model.pt",
-      "sha256": "47bf38c131d3ae180958af0d8183a938af3b023b7c8840efe5a6f6b927f9c867",
-      "bytes": 5400133,
+      "sha256": "1357f8cce3ee0e7f703cb85e1f53b837ddc354b466b6bcfed513a1c0195ac15a",
+      "bytes": 5400069,
       "runtime": "ultralytics"
-    },
-    "onnx": {
-      "path": "model.onnx",
-      "sha256": "eb43bd068db10d32bdd07123f8a1d422712ea5ca4efd368fd55b55200cb2198d",
-      "bytes": 10308888,
-      "runtime": "onnxruntime"
     }
   },
-  "default_model": "onnx",
+  "default_model": "pt",
   "labels": "labels.json",
   "preprocessing": "preprocessing.json",
   "postprocessing": "postprocessing.json",

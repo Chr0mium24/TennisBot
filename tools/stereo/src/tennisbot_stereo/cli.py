@@ -73,6 +73,8 @@ def add_gui_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--conf", type=float, default=0.05, help="YOLO 置信度阈值")
     parser.add_argument("--iou", type=float, default=0.5, help="NMS IoU 阈值")
     parser.add_argument("--imgsz", type=int, default=1280, help="YOLO 推理输入尺寸")
+    parser.add_argument("--search-imgsz", type=int, default=1536, help="ROI tracking 未锁定时的 full-frame YOLO 输入尺寸")
+    parser.add_argument("--roi-imgsz", type=int, default=960, help="ROI tracking 锁定时的 ROI YOLO 输入尺寸")
     parser.add_argument("--max-detections", type=int, default=6, help="每路每帧最大检测数")
     parser.add_argument("--device", default=None, help="Ultralytics 设备，例如 cpu、0 或 0,1")
     parser.add_argument("--class-id", type=int, default=0, help="YOLO 类别 id；-1 表示全部类别")
@@ -80,6 +82,15 @@ def add_gui_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--tile-width", type=int, default=2048, help="tiled 推理切片宽度")
     parser.add_argument("--tile-height", type=int, default=1216, help="tiled 推理切片高度")
     parser.add_argument("--tile-overlap", type=int, default=160, help="tiled 推理切片重叠")
+    parser.add_argument("--roi-tracking", action="store_true", help="启用 full-frame 搜索 + 单 ROI 跟踪")
+    parser.add_argument("--roi-width", type=int, default=1024, help="锁定后 ROI 宽度")
+    parser.add_argument("--roi-height", type=int, default=576, help="锁定后 ROI 高度")
+    parser.add_argument("--roi-expanded-width", type=int, default=1280, help="丢帧或靠边时的扩展 ROI 宽度")
+    parser.add_argument("--roi-expanded-height", type=int, default=720, help="丢帧或靠边时的扩展 ROI 高度")
+    parser.add_argument("--roi-lost-after-misses", type=int, default=3, help="连续多少帧无 stereo match 后回到 full-frame 搜索")
+    parser.add_argument("--roi-expand-after-misses", type=int, default=1, help="连续多少帧无 stereo match 后改用扩展 ROI")
+    parser.add_argument("--roi-edge-margin-ratio", type=float, default=0.20, help="检测靠近 ROI 边缘时下一帧扩展的边缘比例")
+    parser.add_argument("--roi-velocity-alpha", type=float, default=0.60, help="ROI 中心速度指数平滑系数")
     parser.add_argument("--max-epipolar-error-px", type=float, default=6.0, help="最大 rectified y 误差")
     parser.add_argument("--min-disparity-px", type=float, default=1.0, help="最小正 disparity")
     parser.add_argument("--max-disparity-px", type=float, default=1200.0, help="最大正 disparity")
@@ -271,14 +282,37 @@ def validate_args(args: argparse.Namespace, left_device: str, right_device: str,
         raise ValueError("left and right camera devices must be non-empty")
     if len(args.fourcc) != 4:
         raise ValueError("--fourcc must contain exactly four characters, for example MJPG")
-    for name in ("width", "height", "imgsz", "display_camera_width", "tile_width", "tile_height"):
+    for name in (
+        "width",
+        "height",
+        "imgsz",
+        "search_imgsz",
+        "roi_imgsz",
+        "display_camera_width",
+        "tile_width",
+        "tile_height",
+        "roi_width",
+        "roi_height",
+        "roi_expanded_width",
+        "roi_expanded_height",
+    ):
         if getattr(args, name) <= 0:
             raise ValueError(f"--{name.replace('_', '-')} must be positive")
     for name in ("fps", "max_epipolar_error_px", "min_disparity_px", "max_disparity_px", "max_depth_m"):
         if getattr(args, name) <= 0:
             raise ValueError(f"--{name.replace('_', '-')} must be positive")
+    if args.roi_lost_after_misses <= 0:
+        raise ValueError("--roi-lost-after-misses must be positive")
+    if args.roi_expand_after_misses < 0:
+        raise ValueError("--roi-expand-after-misses must be non-negative")
+    if not 0.0 <= args.roi_edge_margin_ratio < 0.5:
+        raise ValueError("--roi-edge-margin-ratio must be in [0, 0.5)")
+    if not 0.0 <= args.roi_velocity_alpha <= 1.0:
+        raise ValueError("--roi-velocity-alpha must be in [0, 1]")
     if args.tile_overlap < 0:
         raise ValueError("--tile-overlap must be non-negative")
+    if args.tile and args.roi_tracking:
+        raise ValueError("--tile and --roi-tracking cannot be used together")
     if args.max_detections <= 0:
         raise ValueError("--max-detections must be positive")
     if mode == "run" and not args.calibration_package.is_dir():
@@ -325,6 +359,17 @@ def build_detector(args: argparse.Namespace) -> BallDetector:
         tile_width=args.tile_width,
         tile_height=args.tile_height,
         tile_overlap=args.tile_overlap,
+        roi_tracking=args.roi_tracking,
+        roi_width=args.roi_width,
+        roi_height=args.roi_height,
+        roi_expanded_width=args.roi_expanded_width,
+        roi_expanded_height=args.roi_expanded_height,
+        search_imgsz=args.search_imgsz,
+        roi_imgsz=args.roi_imgsz,
+        roi_lost_after_misses=args.roi_lost_after_misses,
+        roi_expand_after_misses=args.roi_expand_after_misses,
+        roi_edge_margin_ratio=args.roi_edge_margin_ratio,
+        roi_velocity_alpha=args.roi_velocity_alpha,
     )
 
 
@@ -363,6 +408,11 @@ def create_recorder(
                 "model": str(args.model),
                 "tile": args.tile,
                 "imgsz": args.imgsz,
+                "roi_tracking": args.roi_tracking,
+                "search_imgsz": args.search_imgsz,
+                "roi_imgsz": args.roi_imgsz,
+                "roi_width": args.roi_width,
+                "roi_height": args.roi_height,
             },
             "calibration": {
                 "package": str(args.calibration_package),
@@ -427,7 +477,18 @@ def print_dry_run(args: argparse.Namespace, left_device: str, right_device: str)
     print(f"calibration_package={args.calibration_package}")
     print(f"model={args.model}")
     print(f"capture={args.width}x{args.height}@{args.fps:g} fourcc={args.fourcc}")
-    print(f"detector=yolo tile={args.tile} imgsz={args.imgsz}")
+    print(
+        "detector=yolo tile=%s imgsz=%s roi_tracking=%s search_imgsz=%s roi=%sx%s@%s"
+        % (
+            args.tile,
+            args.imgsz,
+            args.roi_tracking,
+            args.search_imgsz,
+            args.roi_width,
+            args.roi_height,
+            args.roi_imgsz,
+        )
+    )
     print(f"limits=epipolar<={args.max_epipolar_error_px:g}px depth<={args.max_depth_m:g}m")
     print(f"record_run={args.record_run} record_root={args.record_root}")
 
