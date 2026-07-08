@@ -21,6 +21,7 @@
 - [YOLO 固定曝光 1024x576 ROI imgsz960 训练结果](current/yolo_fixed_exposure_roi1024_imgsz960_training_result_20260708.md)
 - [YOLO 自动曝光泛化性评估](current/yolo_auto_exposure_generalization_eval_20260708.md)
 - [YOLO Final Raw Benchmark v1 计划](current/yolo_final_raw_benchmark_v1_plan_20260708.md)
+- [YOLO Final Raw Benchmark packaged baseline](current/yolo_final_raw_baseline_model_pt_fullframe_imgsz960_eval_20260708.md)
 
 ## 工具入口
 
