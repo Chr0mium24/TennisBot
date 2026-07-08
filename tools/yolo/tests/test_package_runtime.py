@@ -68,6 +68,7 @@ def test_cli_help_exposes_package_create_and_verify() -> None:
     assert "build-final-trainset" in augment_help.stdout
     assert augment_final_trainset_help.returncode == 0
     assert "--roi-positive-count" in augment_final_trainset_help.stdout
+    assert "--tiny-positive-count" in augment_final_trainset_help.stdout
     assert benchmark_help.returncode == 0
     assert "tiles" in benchmark_help.stdout
     assert "build-final-raw-split" in benchmark_help.stdout
@@ -341,6 +342,12 @@ def test_augment_build_final_trainset_dry_run_does_not_require_images_or_detecto
         "5",
         "--negative-crop-count",
         "3",
+        "--tiny-positive-count",
+        "7",
+        "--tiny-min-dim",
+        "4",
+        "--tiny-max-dim",
+        "8",
     )
 
     assert result.returncode == 0
@@ -349,6 +356,10 @@ def test_augment_build_final_trainset_dry_run_does_not_require_images_or_detecto
     assert summary["planned_full_frame"] == 2
     assert summary["planned_roi_positive"] == 5
     assert summary["planned_negative_crops"] == 3
+    assert summary["planned_tiny_positive"] == 7
+    assert summary["tiny_target_max_dim_range"] == [4.0, 8.0]
+    assert summary["tiny_fixed_positive_candidates"] == 1
+    assert summary["tiny_fixed_negative_candidates"] == 1
     assert summary["bucket_counts"] == {"empty": 1, "small": 1}
 
 

@@ -484,6 +484,98 @@ def paste_rgba(background: Any, sprite: Any, x: int, y: int, threshold: int) -> 
     )
 
 
+def make_tiny_ball_sprite(
+    source_image: Any,
+    label: PixelLabel,
+    *,
+    target_max_dim: float,
+    rng: random.Random,
+) -> Any | None:
+    cv2, np = require_cv2_numpy()
+    if label.box.width <= 0.0 or label.box.height <= 0.0 or target_max_dim <= 0.0:
+        return None
+
+    image_height, image_width = source_image.shape[:2]
+    pad = max(2.0, max(label.box.width, label.box.height) * 0.35)
+    crop_x1 = max(0, int(label.box.x1 - pad))
+    crop_y1 = max(0, int(label.box.y1 - pad))
+    crop_x2 = min(image_width, int(label.box.x2 + pad) + 1)
+    crop_y2 = min(image_height, int(label.box.y2 + pad) + 1)
+    if crop_x2 <= crop_x1 or crop_y2 <= crop_y1:
+        return None
+
+    patch = source_image[crop_y1:crop_y2, crop_x1:crop_x2]
+    local_box = PixelBox(
+        x1=label.box.x1 - crop_x1,
+        y1=label.box.y1 - crop_y1,
+        x2=label.box.x2 - crop_x1,
+        y2=label.box.y2 - crop_y1,
+    )
+    scale = target_max_dim / max(local_box.width, local_box.height)
+    sprite_width = max(1, int(round(patch.shape[1] * scale)))
+    sprite_height = max(1, int(round(patch.shape[0] * scale)))
+    if sprite_width < 2 or sprite_height < 2:
+        return None
+
+    interpolation = cv2.INTER_AREA if scale < 1.0 else cv2.INTER_LINEAR
+    bgr = cv2.resize(patch, (sprite_width, sprite_height), interpolation=interpolation)
+    bgr = adjust_brightness_contrast(bgr, rng.uniform(0.80, 1.25), rng.randint(-35, 35))
+
+    scaled_box = PixelBox(
+        x1=local_box.x1 * scale,
+        y1=local_box.y1 * scale,
+        x2=local_box.x2 * scale,
+        y2=local_box.y2 * scale,
+    )
+    alpha = np.zeros((sprite_height, sprite_width), dtype=np.uint8)
+    center = (int(round(scaled_box.x_center)), int(round(scaled_box.y_center)))
+    axes = (
+        max(1, int(round(scaled_box.width * 0.5))),
+        max(1, int(round(scaled_box.height * 0.5))),
+    )
+    cv2.ellipse(alpha, center, axes, 0.0, 0.0, 360.0, 255, -1)
+    if max(axes) >= 2:
+        alpha = cv2.GaussianBlur(alpha, (3, 3), 0)
+    sprite = cv2.merge([bgr[:, :, 0], bgr[:, :, 1], bgr[:, :, 2], alpha])
+
+    for _ in range(3):
+        visible_box = alpha_bbox(sprite[:, :, 3], threshold=16)
+        if visible_box is None:
+            return None
+        visible_max_dim = max(visible_box.width, visible_box.height)
+        if visible_max_dim <= 0.0:
+            return None
+        correction_scale = target_max_dim / visible_max_dim
+        if abs(correction_scale - 1.0) <= 0.05:
+            break
+        corrected_width = max(1, int(round(sprite.shape[1] * correction_scale)))
+        corrected_height = max(1, int(round(sprite.shape[0] * correction_scale)))
+        corrected_interpolation = cv2.INTER_AREA if correction_scale < 1.0 else cv2.INTER_LINEAR
+        sprite = cv2.resize(sprite, (corrected_width, corrected_height), interpolation=corrected_interpolation)
+    return sprite
+
+
+def choose_tiny_paste_position(
+    image_width: int,
+    image_height: int,
+    sprite_width: int,
+    sprite_height: int,
+    rng: random.Random,
+) -> tuple[int, int] | None:
+    if sprite_width > image_width or sprite_height > image_height:
+        return None
+    margin = 24
+    min_x = margin if image_width - sprite_width >= margin * 2 else 0
+    min_y = margin if image_height - sprite_height >= margin * 2 else 0
+    max_x = image_width - sprite_width - min_x
+    max_y = image_height - sprite_height - min_y
+    if max_x < min_x:
+        min_x, max_x = 0, image_width - sprite_width
+    if max_y < min_y:
+        min_y, max_y = 0, image_height - sprite_height
+    return rng.randint(min_x, max_x), rng.randint(min_y, max_y)
+
+
 def write_resolved_config(path: Path, resolved: dict[str, Any]) -> None:
     def render_value(value: Any) -> str:
         if isinstance(value, Path):
@@ -749,17 +841,26 @@ def final_trainset_dry_summary(
     include_full_frame: bool,
     roi_positive_count: int,
     negative_crop_count: int,
+    tiny_positive_count: int,
+    tiny_min_dim: float,
+    tiny_max_dim: float,
     val_ratio: float,
     seed: int,
 ) -> dict[str, Any]:
     train_pool = final_trainpool_records(records)
     split_map = source_split_map(train_pool, val_ratio, seed)
+    fixed_positive_records = [record for record in train_pool if record.positive and record.dataset == "fixed_exposure"]
+    fixed_negative_records = [record for record in train_pool if not record.positive and record.dataset == "fixed_exposure"]
     return {
         "train_pool_records": len(train_pool),
         "source_images": len(split_map),
         "planned_full_frame": len(train_pool) if include_full_frame else 0,
         "planned_roi_positive": roi_positive_count,
         "planned_negative_crops": negative_crop_count,
+        "planned_tiny_positive": tiny_positive_count,
+        "tiny_target_max_dim_range": [tiny_min_dim, tiny_max_dim],
+        "tiny_fixed_positive_candidates": len(fixed_positive_records),
+        "tiny_fixed_negative_candidates": len(fixed_negative_records),
         "dataset_counts": dict(sorted(Counter(record.dataset for record in train_pool).items())),
         "bucket_counts": dict(sorted(Counter(record.target_bucket for record in train_pool).items())),
         "session_counts": dict(sorted(Counter(record.session for record in train_pool).items())),
@@ -779,6 +880,9 @@ def build_final_trainset(
     roi_height: int,
     roi_positive_count: int,
     negative_crop_count: int,
+    tiny_positive_count: int,
+    tiny_min_dim: float,
+    tiny_max_dim: float,
     val_ratio: float,
     jpeg_quality: int,
     dry_run: bool = False,
@@ -790,6 +894,10 @@ def build_final_trainset(
         raise ValueError("full and ROI dimensions must be positive")
     if roi_positive_count < 0 or negative_crop_count < 0:
         raise ValueError("generated sample counts must be non-negative")
+    if tiny_positive_count < 0:
+        raise ValueError("tiny_positive_count must be non-negative")
+    if tiny_min_dim <= 0.0 or tiny_max_dim <= 0.0 or tiny_min_dim > tiny_max_dim:
+        raise ValueError("tiny target max-dim range must be positive and ordered")
     if not 0.0 <= val_ratio < 0.5:
         raise ValueError("val_ratio must be >= 0 and < 0.5")
 
@@ -799,6 +907,9 @@ def build_final_trainset(
             include_full_frame=include_full_frame,
             roi_positive_count=roi_positive_count,
             negative_crop_count=negative_crop_count,
+            tiny_positive_count=tiny_positive_count,
+            tiny_min_dim=tiny_min_dim,
+            tiny_max_dim=tiny_max_dim,
             val_ratio=val_ratio,
             seed=seed,
         )
@@ -818,6 +929,7 @@ def build_final_trainset(
     manifest_rows: list[dict[str, Any]] = []
     kind_counts: Counter[str] = Counter()
     skipped = 0
+    skipped_tiny = 0
 
     def load_record(record: FinalManifestRecord) -> tuple[Any, list[PixelLabel]]:
         image_path = repo_input_path(record.image)
@@ -943,6 +1055,88 @@ def build_final_trainset(
             },
         )
 
+    if tiny_positive_count:
+        fixed_positive_records = [record for record in positive_records if record.dataset == "fixed_exposure"]
+        tiny_positive_records = fixed_positive_records if fixed_positive_records else positive_records
+        fixed_negative_records = [record for record in negative_records if record.dataset == "fixed_exposure"]
+        tiny_background_records = fixed_negative_records if fixed_negative_records else negative_records
+        if not tiny_positive_records:
+            raise RuntimeError("tiny_positive_count is set but train_pool has no positive records")
+        if not tiny_background_records:
+            raise RuntimeError("tiny_positive_count is set but train_pool has no negative backgrounds")
+
+        positive_by_split: dict[str, list[FinalManifestRecord]] = {"train": [], "val": []}
+        for record in tiny_positive_records:
+            positive_by_split.setdefault(split_map.get(record.image, "train"), []).append(record)
+        eligible_background_records = [
+            record
+            for record in tiny_background_records
+            if positive_by_split.get(split_map.get(record.image, "train"))
+        ]
+        if not eligible_background_records:
+            raise RuntimeError("tiny_positive_count is set but no negative backgrounds share a split with positive records")
+
+        for index in range(tiny_positive_count):
+            background_record = rng.choice(eligible_background_records)
+            split = split_map.get(background_record.image, "train")
+            split_positive_records = positive_by_split[split]
+            source_record = rng.choices(
+                split_positive_records,
+                weights=[final_positive_weight(record) for record in split_positive_records],
+                k=1,
+            )[0]
+            source_image, source_labels = load_record(source_record)
+            if not source_labels:
+                skipped_tiny += 1
+                continue
+            source_label = rng.choice(source_labels)
+            target_max_dim = rng.uniform(tiny_min_dim, tiny_max_dim)
+            sprite = make_tiny_ball_sprite(source_image, source_label, target_max_dim=target_max_dim, rng=rng)
+            if sprite is None:
+                skipped_tiny += 1
+                continue
+
+            background_image, _ = load_record(background_record)
+            image_height, image_width = background_image.shape[:2]
+            crop_x, crop_y, crop_w, crop_h = random_negative_window(image_width, image_height, roi_width, roi_height, rng)
+            crop, _ = crop_image_and_labels(background_image, [], crop_x, crop_y, crop_w, crop_h)
+            position = choose_tiny_paste_position(crop_w, crop_h, sprite.shape[1], sprite.shape[0], rng)
+            if position is None:
+                skipped_tiny += 1
+                continue
+            paste_x, paste_y = position
+            pasted_box = paste_rgba(crop, sprite, paste_x, paste_y, threshold=16)
+            if pasted_box is None:
+                skipped_tiny += 1
+                continue
+
+            tiny_labels = [PixelLabel(source_label.class_id, pasted_box)]
+            crop, tiny_labels, aug_meta = apply_final_trainset_augmentation(crop, tiny_labels, rng, enable_geometric=False)
+            if not tiny_labels:
+                skipped_tiny += 1
+                continue
+            add_sample(
+                record=background_record,
+                kind="tiny_positive",
+                index=index,
+                image=crop,
+                labels=tiny_labels,
+                extra={
+                    "crop": {"x": crop_x, "y": crop_y, "width": crop_w, "height": crop_h},
+                    "sprite_source_image": source_record.image,
+                    "sprite_source_label": source_record.label,
+                    "sprite_source_bucket": source_record.target_bucket,
+                    "target_max_dim_px": target_max_dim,
+                    "pasted_box": {
+                        "x1": pasted_box.x1,
+                        "y1": pasted_box.y1,
+                        "x2": pasted_box.x2,
+                        "y2": pasted_box.y2,
+                    },
+                    "augmentation": aug_meta,
+                },
+            )
+
     train_txt = output_root / "train.txt"
     val_txt = output_root / "val.txt"
     manifest_out = output_root / "manifest.jsonl"
@@ -962,9 +1156,11 @@ def build_final_trainset(
         f"- Train images: `{len(train_images)}`",
         f"- Val images: `{len(val_images)}`",
         f"- Skipped positive crops: `{skipped}`",
+        f"- Skipped tiny copy-paste crops: `{skipped_tiny}`",
         f"- Kind counts: `{json.dumps(dict(sorted(kind_counts.items())), sort_keys=True)}`",
         f"- Source bucket counts: `{json.dumps(dict(sorted(Counter(record.target_bucket for record in records).items())), sort_keys=True)}`",
         f"- Source dataset counts: `{json.dumps(dict(sorted(Counter(record.dataset for record in records).items())), sort_keys=True)}`",
+        f"- Tiny target max-dim range: `{tiny_min_dim:.2f}-{tiny_max_dim:.2f}px`",
         "",
         "## Policy",
         "",
@@ -972,6 +1168,7 @@ def build_final_trainset(
         "- The frozen `benchmark` split is not read for image generation.",
         "- Train/val assignment is grouped by source image, so derived samples from one raw image cannot cross train/val.",
         "- ROI crops are clamped inside the source image; no padding or synthetic border fill is used.",
+        "- Tiny copy-paste samples use only train_pool positives and train_pool negative backgrounds, with sprite source split matched to the background split.",
         "- Traditional augmentation uses brightness, contrast, saturation, value, optional horizontal flip, small rotation, blur, and Gaussian noise.",
         "",
     ]
@@ -1258,6 +1455,9 @@ def cmd_build_final_trainset(args: argparse.Namespace) -> int:
             roi_height=args.roi_height,
             roi_positive_count=args.roi_positive_count,
             negative_crop_count=args.negative_crop_count,
+            tiny_positive_count=args.tiny_positive_count,
+            tiny_min_dim=args.tiny_min_dim,
+            tiny_max_dim=args.tiny_max_dim,
             val_ratio=args.val_ratio,
             jpeg_quality=args.jpeg_quality,
             dry_run=args.dry_run,
@@ -1301,6 +1501,9 @@ def add_augment_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     final_trainset.add_argument("--roi-height", type=int, default=576, help="ROI crop 高度")
     final_trainset.add_argument("--roi-positive-count", type=int, default=5000, help="生成多少个正样本 ROI crop")
     final_trainset.add_argument("--negative-crop-count", type=int, default=1500, help="生成多少个 empty hard-negative ROI crop")
+    final_trainset.add_argument("--tiny-positive-count", type=int, default=0, help="生成多少个 4-8px tiny ball copy-paste ROI crop")
+    final_trainset.add_argument("--tiny-min-dim", type=float, default=4.0, help="tiny copy-paste 目标最大边最小像素")
+    final_trainset.add_argument("--tiny-max-dim", type=float, default=8.0, help="tiny copy-paste 目标最大边最大像素")
     final_trainset.add_argument("--val-ratio", type=float, default=0.10, help="按 source image 分组的 val 比例")
     final_trainset.add_argument("--jpeg-quality", type=int, default=92, help="输出 JPEG 质量")
     final_trainset.add_argument("--dry-run", action="store_true", help="只打印 train_pool 计数和计划，不读图片或写文件")
