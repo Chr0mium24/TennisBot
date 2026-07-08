@@ -35,8 +35,9 @@ export function applyDefaultCameraControls(devices: readonly [string, string], c
 }
 
 export function buildCameraControlCommands(devices: readonly [string, string]): string[][] {
-  const controls = defaultCameraControls.map((control) => `${control.name}=${control.value}`).join(",");
-  return devices.map((device) => ["v4l2-ctl", "-d", device, `--set-ctrl=${controls}`]);
+  return devices.flatMap((device) =>
+    defaultCameraControls.map((control) => ["v4l2-ctl", "-d", device, `--set-ctrl=${control.name}=${control.value}`]),
+  );
 }
 
 export function displayCameraControlCommand(command: string[]): string {
