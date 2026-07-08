@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import json
 import random
 import shutil
@@ -27,6 +28,8 @@ from .sprites import require_cv2_numpy
 
 DEFAULT_AUGMENT_CONFIG = TOOL_ROOT / "configs" / "augmentation.toml"
 DEFAULT_OUTPUT_ROOT = DEFAULT_RUNS_ROOT / "copy_paste_aug"
+DEFAULT_FINAL_RAW_MANIFEST = DEFAULT_RUNS_ROOT / "final_raw_benchmark_v1_20260708" / "manifest.jsonl"
+DEFAULT_FINAL_TRAINSET_OUTPUT = DEFAULT_RUNS_ROOT / "final_trainpool_roi_full_20260708"
 
 
 @dataclass(frozen=True)
@@ -58,6 +61,28 @@ class AugmentationResult:
     output_root: Path
     generated: int
     skipped: int
+    manifest: Path
+    report: Path
+
+
+@dataclass(frozen=True)
+class FinalManifestRecord:
+    image: str
+    label: str
+    split: str
+    dataset: str
+    session: str
+    target_bucket: str
+    positive: bool
+    box_count: int
+
+
+@dataclass(frozen=True)
+class FinalTrainsetResult:
+    output_root: Path
+    images: int
+    train_images: int
+    val_images: int
     manifest: Path
     report: Path
 
@@ -495,6 +520,472 @@ def write_data_yaml(output_root: Path, train_txt: Path, val_txt: Path) -> None:
     (output_root / "data.yaml").write_text(text, encoding="utf-8")
 
 
+def repo_input_path(value: str | Path) -> Path:
+    path = Path(value)
+    return path if path.is_absolute() else REPO_ROOT / path
+
+
+def load_final_manifest(path: Path) -> list[FinalManifestRecord]:
+    if not path.is_file():
+        raise FileNotFoundError(f"final raw manifest not found: {path}")
+    records: list[FinalManifestRecord] = []
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+            records.append(
+                FinalManifestRecord(
+                    image=str(row["image"]),
+                    label=str(row["label"]),
+                    split=str(row["split"]),
+                    dataset=str(row["dataset"]),
+                    session=str(row["session"]),
+                    target_bucket=str(row["target_bucket"]),
+                    positive=bool(row["positive"]),
+                    box_count=int(row["box_count"]),
+                )
+            )
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ValueError(f"invalid manifest row {line_number}: {path}") from exc
+    return records
+
+
+def final_trainpool_records(records: list[FinalManifestRecord]) -> list[FinalManifestRecord]:
+    return [record for record in records if record.split == "train_pool"]
+
+
+def resize_image_and_labels(image: Any, labels: list[PixelLabel], width: int, height: int) -> tuple[Any, list[PixelLabel]]:
+    cv2, _ = require_cv2_numpy()
+    src_height, src_width = image.shape[:2]
+    if src_width == width and src_height == height:
+        return image.copy(), labels
+    resized = cv2.resize(image, (width, height), interpolation=cv2.INTER_AREA)
+    scale_x = width / src_width
+    scale_y = height / src_height
+    resized_labels = [
+        PixelLabel(
+            label.class_id,
+            PixelBox(
+                x1=label.box.x1 * scale_x,
+                y1=label.box.y1 * scale_y,
+                x2=label.box.x2 * scale_x,
+                y2=label.box.y2 * scale_y,
+            ),
+        )
+        for label in labels
+    ]
+    return resized, resized_labels
+
+
+def crop_image_and_labels(
+    image: Any,
+    labels: list[PixelLabel],
+    x1: int,
+    y1: int,
+    width: int,
+    height: int,
+) -> tuple[Any, list[PixelLabel]]:
+    crop = image[y1 : y1 + height, x1 : x1 + width].copy()
+    crop_labels: list[PixelLabel] = []
+    for label in labels:
+        if not (x1 <= label.box.x_center <= x1 + width and y1 <= label.box.y_center <= y1 + height):
+            continue
+        clipped = PixelBox(
+            x1=max(0.0, label.box.x1 - x1),
+            y1=max(0.0, label.box.y1 - y1),
+            x2=min(float(width), label.box.x2 - x1),
+            y2=min(float(height), label.box.y2 - y1),
+        )
+        if clipped.width > 0.0 and clipped.height > 0.0:
+            crop_labels.append(PixelLabel(label.class_id, clipped))
+    return crop, crop_labels
+
+
+def roi_window_for_anchor(
+    box: PixelBox,
+    image_width: int,
+    image_height: int,
+    roi_width: int,
+    roi_height: int,
+    anchor_x: float,
+    anchor_y: float,
+) -> tuple[int, int, int, int]:
+    roi_width = min(roi_width, image_width)
+    roi_height = min(roi_height, image_height)
+    x1 = int(round(box.x_center - anchor_x * roi_width))
+    y1 = int(round(box.y_center - anchor_y * roi_height))
+    x1 = min(max(0, x1), image_width - roi_width)
+    y1 = min(max(0, y1), image_height - roi_height)
+    return x1, y1, roi_width, roi_height
+
+
+def random_negative_window(
+    image_width: int,
+    image_height: int,
+    roi_width: int,
+    roi_height: int,
+    rng: random.Random,
+) -> tuple[int, int, int, int]:
+    roi_width = min(roi_width, image_width)
+    roi_height = min(roi_height, image_height)
+    x1 = rng.randint(0, image_width - roi_width) if image_width > roi_width else 0
+    y1 = rng.randint(0, image_height - roi_height) if image_height > roi_height else 0
+    return x1, y1, roi_width, roi_height
+
+
+def maybe_flip_horizontal(image: Any, labels: list[PixelLabel], probability: float, rng: random.Random) -> tuple[Any, list[PixelLabel], bool]:
+    cv2, _ = require_cv2_numpy()
+    if rng.random() >= probability:
+        return image, labels, False
+    width = image.shape[1]
+    flipped = cv2.flip(image, 1)
+    flipped_labels = [
+        PixelLabel(
+            label.class_id,
+            PixelBox(
+                x1=width - label.box.x2,
+                y1=label.box.y1,
+                x2=width - label.box.x1,
+                y2=label.box.y2,
+            ),
+        )
+        for label in labels
+    ]
+    return flipped, flipped_labels, True
+
+
+def apply_final_trainset_augmentation(
+    image: Any,
+    labels: list[PixelLabel],
+    rng: random.Random,
+    *,
+    enable_geometric: bool,
+) -> tuple[Any, list[PixelLabel], dict[str, Any]]:
+    cv2, np = require_cv2_numpy()
+    alpha = rng.uniform(0.65, 1.45)
+    beta = rng.randint(-70, 70)
+    image = adjust_brightness_contrast(image, alpha, beta)
+
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV).astype(np.float32)
+    saturation_scale = rng.uniform(0.60, 1.55)
+    value_scale = rng.uniform(0.70, 1.40)
+    hsv[:, :, 1] = np.clip(hsv[:, :, 1] * saturation_scale, 0, 255)
+    hsv[:, :, 2] = np.clip(hsv[:, :, 2] * value_scale, 0, 255)
+    image = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
+
+    flipped = False
+    rotation_degrees = 0.0
+    if enable_geometric:
+        image, labels, flipped = maybe_flip_horizontal(image, labels, 0.25, rng)
+        if rng.random() < 0.35:
+            rotation_degrees = rng.uniform(-2.0, 2.0)
+            image, labels = rotate_frame_and_labels(image, labels, rotation_degrees)
+
+    blur_kernel = 0
+    if rng.random() < 0.12:
+        blur_kernel = odd_kernel(rng.randint(3, 5))
+        image = cv2.GaussianBlur(image, (blur_kernel, blur_kernel), 0)
+
+    noise_sigma = 0.0
+    if rng.random() < 0.20:
+        noise_sigma = rng.uniform(2.0, 8.0)
+        noise_array = np.random.default_rng(rng.randint(0, 2**31 - 1)).normal(0.0, noise_sigma, image.shape)
+        image = np.clip(image.astype(np.float32) + noise_array, 0, 255).astype(np.uint8)
+
+    return image, labels, {
+        "alpha": alpha,
+        "beta": beta,
+        "saturation_scale": saturation_scale,
+        "value_scale": value_scale,
+        "flipped": flipped,
+        "rotation_degrees": rotation_degrees,
+        "blur_kernel": blur_kernel,
+        "noise_sigma": noise_sigma,
+    }
+
+
+def labels_for_record(record: FinalManifestRecord, image_width: int, image_height: int) -> list[PixelLabel]:
+    labels = read_yolo_labels(repo_input_path(record.label))
+    return [PixelLabel(label.class_id, yolo_to_pixel_box(label, image_width, image_height)) for label in labels]
+
+
+def source_split_map(records: list[FinalManifestRecord], val_ratio: float, seed: int) -> dict[str, str]:
+    sources = sorted({record.image for record in records})
+    if not sources:
+        return {}
+    rng = random.Random(seed)
+    shuffled = list(sources)
+    rng.shuffle(shuffled)
+    val_count = max(1, round(len(shuffled) * val_ratio)) if len(shuffled) > 1 and val_ratio > 0.0 else 0
+    val_sources = set(shuffled[:val_count])
+    return {source: ("val" if source in val_sources else "train") for source in sources}
+
+
+def write_final_dataset_sample(
+    *,
+    image: Any,
+    labels: list[PixelLabel],
+    output_images_dir: Path,
+    output_labels_dir: Path,
+    stem: str,
+    jpeg_quality: int,
+) -> tuple[Path, Path]:
+    image_path = output_images_dir / f"{stem}.jpg"
+    label_path = output_labels_dir / f"{stem}.txt"
+    write_augmented_sample(image, labels, image_path, label_path, jpeg_quality=jpeg_quality)
+    return image_path, label_path
+
+
+def final_positive_weight(record: FinalManifestRecord) -> float:
+    bucket_weight = {"small": 7.0, "medium": 4.0, "large": 1.0}.get(record.target_bucket, 1.0)
+    dataset_weight = 1.25 if record.dataset == "fixed_exposure" else 0.75
+    return bucket_weight * dataset_weight
+
+
+def final_trainset_dry_summary(
+    records: list[FinalManifestRecord],
+    *,
+    include_full_frame: bool,
+    roi_positive_count: int,
+    negative_crop_count: int,
+    val_ratio: float,
+    seed: int,
+) -> dict[str, Any]:
+    train_pool = final_trainpool_records(records)
+    split_map = source_split_map(train_pool, val_ratio, seed)
+    return {
+        "train_pool_records": len(train_pool),
+        "source_images": len(split_map),
+        "planned_full_frame": len(train_pool) if include_full_frame else 0,
+        "planned_roi_positive": roi_positive_count,
+        "planned_negative_crops": negative_crop_count,
+        "dataset_counts": dict(sorted(Counter(record.dataset for record in train_pool).items())),
+        "bucket_counts": dict(sorted(Counter(record.target_bucket for record in train_pool).items())),
+        "session_counts": dict(sorted(Counter(record.session for record in train_pool).items())),
+        "source_split_counts": dict(sorted(Counter(split_map.values()).items())),
+    }
+
+
+def build_final_trainset(
+    *,
+    manifest_path: Path,
+    output_root: Path,
+    seed: int,
+    include_full_frame: bool,
+    full_width: int,
+    full_height: int,
+    roi_width: int,
+    roi_height: int,
+    roi_positive_count: int,
+    negative_crop_count: int,
+    val_ratio: float,
+    jpeg_quality: int,
+    dry_run: bool = False,
+) -> FinalTrainsetResult | dict[str, Any]:
+    records = final_trainpool_records(load_final_manifest(manifest_path))
+    if not records:
+        raise RuntimeError("final manifest does not contain train_pool records")
+    if full_width <= 0 or full_height <= 0 or roi_width <= 0 or roi_height <= 0:
+        raise ValueError("full and ROI dimensions must be positive")
+    if roi_positive_count < 0 or negative_crop_count < 0:
+        raise ValueError("generated sample counts must be non-negative")
+    if not 0.0 <= val_ratio < 0.5:
+        raise ValueError("val_ratio must be >= 0 and < 0.5")
+
+    if dry_run:
+        return final_trainset_dry_summary(
+            records,
+            include_full_frame=include_full_frame,
+            roi_positive_count=roi_positive_count,
+            negative_crop_count=negative_crop_count,
+            val_ratio=val_ratio,
+            seed=seed,
+        )
+
+    cv2, _ = require_cv2_numpy()
+    if output_root.exists():
+        shutil.rmtree(output_root)
+    images_dir = output_root / "images" / "trainset"
+    labels_dir = output_root / "labels" / "trainset"
+    images_dir.mkdir(parents=True)
+    labels_dir.mkdir(parents=True)
+
+    rng = random.Random(seed)
+    split_map = source_split_map(records, val_ratio, seed)
+    train_images: list[str] = []
+    val_images: list[str] = []
+    manifest_rows: list[dict[str, Any]] = []
+    kind_counts: Counter[str] = Counter()
+    skipped = 0
+
+    def load_record(record: FinalManifestRecord) -> tuple[Any, list[PixelLabel]]:
+        image_path = repo_input_path(record.image)
+        image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
+        if image is None:
+            raise RuntimeError(f"failed to read image: {image_path}")
+        height, width = image.shape[:2]
+        return image, labels_for_record(record, width, height)
+
+    def add_sample(
+        *,
+        record: FinalManifestRecord,
+        kind: str,
+        index: int,
+        image: Any,
+        labels: list[PixelLabel],
+        extra: dict[str, Any],
+    ) -> None:
+        stem = f"{kind}_{index:06d}"
+        output_image, output_label = write_final_dataset_sample(
+            image=image,
+            labels=labels,
+            output_images_dir=images_dir,
+            output_labels_dir=labels_dir,
+            stem=stem,
+            jpeg_quality=jpeg_quality,
+        )
+        split = split_map.get(record.image, "train")
+        target_list = val_images if split == "val" else train_images
+        target_list.append(output_image.resolve().as_posix())
+        kind_counts[kind] += 1
+        manifest_rows.append(
+            {
+                "kind": kind,
+                "index": index,
+                "split": split,
+                "source_image": record.image,
+                "source_label": record.label,
+                "source_dataset": record.dataset,
+                "source_session": record.session,
+                "source_bucket": record.target_bucket,
+                "output_image": output_image.as_posix(),
+                "output_label": output_label.as_posix(),
+                "label_count": len(labels),
+                **extra,
+            }
+        )
+
+    if include_full_frame:
+        for index, record in enumerate(records):
+            image, labels = load_record(record)
+            image, labels = resize_image_and_labels(image, labels, full_width, full_height)
+            add_sample(
+                record=record,
+                kind="full1080",
+                index=index,
+                image=image,
+                labels=labels,
+                extra={"full_width": full_width, "full_height": full_height},
+            )
+
+    positive_records = [record for record in records if record.positive]
+    if roi_positive_count and not positive_records:
+        raise RuntimeError("roi_positive_count is set but train_pool has no positive records")
+    positive_weights = [final_positive_weight(record) for record in positive_records]
+    anchor_grid = (0.18, 0.32, 0.50, 0.68, 0.82)
+    for index in range(roi_positive_count):
+        record = rng.choices(positive_records, weights=positive_weights, k=1)[0]
+        image, labels = load_record(record)
+        if not labels:
+            skipped += 1
+            continue
+        anchor_label = max(labels, key=lambda label: label.box.width * label.box.height)
+        anchor_x = rng.choice(anchor_grid)
+        anchor_y = rng.choice(anchor_grid)
+        image_height, image_width = image.shape[:2]
+        crop_x, crop_y, crop_w, crop_h = roi_window_for_anchor(
+            anchor_label.box,
+            image_width,
+            image_height,
+            roi_width,
+            roi_height,
+            anchor_x,
+            anchor_y,
+        )
+        crop, crop_labels = crop_image_and_labels(image, labels, crop_x, crop_y, crop_w, crop_h)
+        if not crop_labels:
+            skipped += 1
+            continue
+        crop, crop_labels, aug_meta = apply_final_trainset_augmentation(crop, crop_labels, rng, enable_geometric=True)
+        add_sample(
+            record=record,
+            kind="roi_positive",
+            index=index,
+            image=crop,
+            labels=crop_labels,
+            extra={
+                "crop": {"x": crop_x, "y": crop_y, "width": crop_w, "height": crop_h},
+                "anchor": {"x": anchor_x, "y": anchor_y},
+                "augmentation": aug_meta,
+            },
+        )
+
+    negative_records = [record for record in records if not record.positive]
+    if negative_crop_count and not negative_records:
+        raise RuntimeError("negative_crop_count is set but train_pool has no negative records")
+    for index in range(negative_crop_count):
+        record = rng.choice(negative_records)
+        image, _ = load_record(record)
+        image_height, image_width = image.shape[:2]
+        crop_x, crop_y, crop_w, crop_h = random_negative_window(image_width, image_height, roi_width, roi_height, rng)
+        crop, crop_labels = crop_image_and_labels(image, [], crop_x, crop_y, crop_w, crop_h)
+        crop, crop_labels, aug_meta = apply_final_trainset_augmentation(crop, crop_labels, rng, enable_geometric=True)
+        add_sample(
+            record=record,
+            kind="roi_negative",
+            index=index,
+            image=crop,
+            labels=crop_labels,
+            extra={
+                "crop": {"x": crop_x, "y": crop_y, "width": crop_w, "height": crop_h},
+                "augmentation": aug_meta,
+            },
+        )
+
+    train_txt = output_root / "train.txt"
+    val_txt = output_root / "val.txt"
+    manifest_out = output_root / "manifest.jsonl"
+    report_path = output_root / "report.md"
+    train_txt.write_text("\n".join(train_images) + ("\n" if train_images else ""), encoding="utf-8")
+    val_txt.write_text("\n".join(val_images) + ("\n" if val_images else ""), encoding="utf-8")
+    manifest_out.write_text("".join(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n" for row in manifest_rows), encoding="utf-8")
+    write_data_yaml(output_root, train_txt, val_txt)
+    report_lines = [
+        "# YOLO Final Train-Pool Dataset Report",
+        "",
+        f"- Source manifest: `{manifest_path}`",
+        f"- Output root: `{output_root}`",
+        f"- Seed: `{seed}`",
+        f"- Train-pool source images: `{len(records)}`",
+        f"- Generated images: `{len(manifest_rows)}`",
+        f"- Train images: `{len(train_images)}`",
+        f"- Val images: `{len(val_images)}`",
+        f"- Skipped positive crops: `{skipped}`",
+        f"- Kind counts: `{json.dumps(dict(sorted(kind_counts.items())), sort_keys=True)}`",
+        f"- Source bucket counts: `{json.dumps(dict(sorted(Counter(record.target_bucket for record in records).items())), sort_keys=True)}`",
+        f"- Source dataset counts: `{json.dumps(dict(sorted(Counter(record.dataset for record in records).items())), sort_keys=True)}`",
+        "",
+        "## Policy",
+        "",
+        "- Only `train_pool` rows from the final raw benchmark manifest are used.",
+        "- The frozen `benchmark` split is not read for image generation.",
+        "- Train/val assignment is grouped by source image, so derived samples from one raw image cannot cross train/val.",
+        "- ROI crops are clamped inside the source image; no padding or synthetic border fill is used.",
+        "- Traditional augmentation uses brightness, contrast, saturation, value, optional horizontal flip, small rotation, blur, and Gaussian noise.",
+        "",
+    ]
+    report_path.write_text("\n".join(report_lines), encoding="utf-8")
+    return FinalTrainsetResult(
+        output_root=output_root,
+        images=len(manifest_rows),
+        train_images=len(train_images),
+        val_images=len(val_images),
+        manifest=manifest_out,
+        report=report_path,
+    )
+
+
 def collect_labeled_original_images(resolved: dict[str, Any]) -> list[str]:
     images_root = Path(resolved["inputs"]["images_root"]).resolve()
     labels_root = Path(resolved["inputs"]["labels_root"]).resolve()
@@ -754,6 +1245,39 @@ def cmd_copy_paste(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_build_final_trainset(args: argparse.Namespace) -> int:
+    try:
+        result = build_final_trainset(
+            manifest_path=args.manifest,
+            output_root=args.output_root,
+            seed=args.seed,
+            include_full_frame=not args.no_full_frame,
+            full_width=args.full_width,
+            full_height=args.full_height,
+            roi_width=args.roi_width,
+            roi_height=args.roi_height,
+            roi_positive_count=args.roi_positive_count,
+            negative_crop_count=args.negative_crop_count,
+            val_ratio=args.val_ratio,
+            jpeg_quality=args.jpeg_quality,
+            dry_run=args.dry_run,
+        )
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        print(f"error: {exc}")
+        return 2
+    if args.dry_run:
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0
+    assert isinstance(result, FinalTrainsetResult)
+    print(f"images={result.images}")
+    print(f"train_images={result.train_images}")
+    print(f"val_images={result.val_images}")
+    print(f"output_root={result.output_root}")
+    print(f"manifest={result.manifest}")
+    print(f"report={result.report}")
+    return 0
+
+
 def add_augment_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     parser_kwargs = {"formatter_class": argparse.ArgumentDefaultsHelpFormatter}
     augment = subparsers.add_parser("augment", help="生成 YOLO 训练数据增强数据集。", **parser_kwargs)
@@ -761,3 +1285,23 @@ def add_augment_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     copy_paste = augment_subparsers.add_parser("copy-paste", help="使用审核过的球 sprite 做 copy-paste 增强。", **parser_kwargs)
     copy_paste.add_argument("--config", type=Path, default=DEFAULT_AUGMENT_CONFIG, help="共享增强配置 TOML")
     copy_paste.set_defaults(func=cmd_copy_paste)
+
+    final_trainset = augment_subparsers.add_parser(
+        "build-final-trainset",
+        help="只从 final benchmark train_pool 生成 full-frame/ROI 训练集。",
+        **parser_kwargs,
+    )
+    final_trainset.add_argument("--manifest", type=Path, default=DEFAULT_FINAL_RAW_MANIFEST, help="final raw benchmark manifest")
+    final_trainset.add_argument("--output-root", type=Path, default=DEFAULT_FINAL_TRAINSET_OUTPUT, help="训练集输出目录")
+    final_trainset.add_argument("--seed", type=int, default=20260708, help="随机种子")
+    final_trainset.add_argument("--no-full-frame", action="store_true", help="不加入 1920x1080 full-frame 样本")
+    final_trainset.add_argument("--full-width", type=int, default=1920, help="full-frame 输出宽度")
+    final_trainset.add_argument("--full-height", type=int, default=1080, help="full-frame 输出高度")
+    final_trainset.add_argument("--roi-width", type=int, default=1024, help="ROI crop 宽度")
+    final_trainset.add_argument("--roi-height", type=int, default=576, help="ROI crop 高度")
+    final_trainset.add_argument("--roi-positive-count", type=int, default=5000, help="生成多少个正样本 ROI crop")
+    final_trainset.add_argument("--negative-crop-count", type=int, default=1500, help="生成多少个 empty hard-negative ROI crop")
+    final_trainset.add_argument("--val-ratio", type=float, default=0.10, help="按 source image 分组的 val 比例")
+    final_trainset.add_argument("--jpeg-quality", type=int, default=92, help="输出 JPEG 质量")
+    final_trainset.add_argument("--dry-run", action="store_true", help="只打印 train_pool 计数和计划，不读图片或写文件")
+    final_trainset.set_defaults(func=cmd_build_final_trainset)

@@ -42,6 +42,7 @@ def test_cli_help_exposes_package_create_and_verify() -> None:
     detect_help = run_cli("detect-gui", "--help")
     sprites_help = run_cli("sprites", "--help")
     augment_help = run_cli("augment", "--help")
+    augment_final_trainset_help = run_cli("augment", "build-final-trainset", "--help")
     benchmark_help = run_cli("benchmark", "--help")
     benchmark_final_raw_split_help = run_cli("benchmark", "build-final-raw-split", "--help")
     benchmark_final_raw_eval_help = run_cli("benchmark", "eval-final-raw", "--help")
@@ -64,6 +65,9 @@ def test_cli_help_exposes_package_create_and_verify() -> None:
     assert "review" in sprites_help.stdout
     assert augment_help.returncode == 0
     assert "copy-paste" in augment_help.stdout
+    assert "build-final-trainset" in augment_help.stdout
+    assert augment_final_trainset_help.returncode == 0
+    assert "--roi-positive-count" in augment_final_trainset_help.stdout
     assert benchmark_help.returncode == 0
     assert "tiles" in benchmark_help.stdout
     assert "build-final-raw-split" in benchmark_help.stdout
@@ -277,6 +281,75 @@ def test_benchmark_eval_final_raw_dry_run_does_not_require_model_or_detector_dep
     assert summary["records"] == 1
     assert summary["dataset_counts"] == {"auto_exposure": 1}
     assert summary["bucket_counts"] == {"large": 1}
+
+
+def test_augment_build_final_trainset_dry_run_does_not_require_images_or_detector_dependencies(tmp_path: Path) -> None:
+    manifest = tmp_path / "manifest.jsonl"
+    rows = [
+        {
+            "box_count": 1,
+            "dataset": "fixed_exposure",
+            "height": 100,
+            "image": "/tmp/train_small.jpg",
+            "label": "/tmp/train_small.txt",
+            "max_box_dim_px": 10.0,
+            "positive": True,
+            "reason": "default_train_pool",
+            "session": "fixed_small",
+            "split": "train_pool",
+            "target_bucket": "small",
+            "width": 100,
+        },
+        {
+            "box_count": 0,
+            "dataset": "fixed_exposure",
+            "height": 100,
+            "image": "/tmp/train_empty.jpg",
+            "label": "/tmp/train_empty.txt",
+            "max_box_dim_px": None,
+            "positive": False,
+            "reason": "default_train_pool",
+            "session": "fixed_empty",
+            "split": "train_pool",
+            "target_bucket": "empty",
+            "width": 100,
+        },
+        {
+            "box_count": 1,
+            "dataset": "auto_exposure",
+            "height": 100,
+            "image": "/tmp/bench_large.jpg",
+            "label": "/tmp/bench_large.txt",
+            "max_box_dim_px": 60.0,
+            "positive": True,
+            "reason": "session_holdout",
+            "session": "auto_bench",
+            "split": "benchmark",
+            "target_bucket": "large",
+            "width": 100,
+        },
+    ]
+    manifest.write_text("\n".join(json.dumps(row, sort_keys=True) for row in rows) + "\n", encoding="utf-8")
+
+    result = run_cli(
+        "augment",
+        "build-final-trainset",
+        "--dry-run",
+        "--manifest",
+        str(manifest),
+        "--roi-positive-count",
+        "5",
+        "--negative-crop-count",
+        "3",
+    )
+
+    assert result.returncode == 0
+    summary = json.loads(result.stdout)
+    assert summary["train_pool_records"] == 2
+    assert summary["planned_full_frame"] == 2
+    assert summary["planned_roi_positive"] == 5
+    assert summary["planned_negative_crops"] == 3
+    assert summary["bucket_counts"] == {"empty": 1, "small": 1}
 
 
 def test_detect_gui_dry_run_does_not_require_camera_or_detector_dependencies(tmp_path: Path) -> None:
