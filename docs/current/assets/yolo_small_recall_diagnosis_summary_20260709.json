@@ -1,0 +1,153 @@
+{
+  "dataset": {
+    "small_objects": 112,
+    "dim_min": 4.47744,
+    "dim_p25": 6.08202,
+    "dim_median": 6.6376800000000005,
+    "dim_p75": 6.92172,
+    "dim_max": 9.71568,
+    "count_le_5px": 8,
+    "count_le_7px": 88,
+    "count_le_8px": 108,
+    "datasets": {
+      "fixed_exposure": 112
+    },
+    "sessions": {
+      "20260707_141324_cam1": 112
+    }
+  },
+  "models": {
+    "non_p2": {
+      "objects": 112,
+      "iou50_conf05": {
+        "count": 9,
+        "total": 112,
+        "rate": 0.08035714285714286
+      },
+      "iou50_conf25": {
+        "count": 8,
+        "total": 112,
+        "rate": 0.07142857142857142
+      },
+      "center16_conf05": {
+        "count": 41,
+        "total": 112,
+        "rate": 0.36607142857142855
+      },
+      "center32_conf05": {
+        "count": 41,
+        "total": 112,
+        "rate": 0.36607142857142855
+      },
+      "lowconf_iou50": {
+        "count": 10,
+        "total": 112,
+        "rate": 0.08928571428571429
+      },
+      "lowconf_iou30": {
+        "count": 40,
+        "total": 112,
+        "rate": 0.35714285714285715
+      },
+      "lowconf_iou10": {
+        "count": 43,
+        "total": 112,
+        "rate": 0.38392857142857145
+      },
+      "lowconf_center16": {
+        "count": 43,
+        "total": 112,
+        "rate": 0.38392857142857145
+      },
+      "lowconf_center32": {
+        "count": 43,
+        "total": 112,
+        "rate": 0.38392857142857145
+      },
+      "max_iou_median": 0.0,
+      "max_iou_p75": 0.38346668306159265,
+      "near16_conf_median": 0.0,
+      "near32_conf_median": 0.0,
+      "iou50_conf_score_p75": 0.0,
+      "num_preds_low_conf_median": 1.0,
+      "one2one_finest_stride": 8,
+      "one2one_finest_score_median_all": 1.9560499708859425e-06,
+      "one2one_finest_score_median_tp05": 0.6287701725959778,
+      "one2one_finest_score_median_fn05": 1.599714096300886e-06,
+      "one2one_finest_percentile_median_tp05": 100.0,
+      "one2one_finest_percentile_median_fn05": 98.99209104938271,
+      "one2many_finest_stride": 8,
+      "one2many_finest_score_median_all": null,
+      "one2many_finest_score_median_tp05": null,
+      "one2many_finest_score_median_fn05": null,
+      "one2many_finest_percentile_median_tp05": null,
+      "one2many_finest_percentile_median_fn05": null
+    },
+    "p2_no_p5": {
+      "objects": 112,
+      "iou50_conf05": {
+        "count": 26,
+        "total": 112,
+        "rate": 0.23214285714285715
+      },
+      "iou50_conf25": {
+        "count": 16,
+        "total": 112,
+        "rate": 0.14285714285714285
+      },
+      "center16_conf05": {
+        "count": 43,
+        "total": 112,
+        "rate": 0.38392857142857145
+      },
+      "center32_conf05": {
+        "count": 43,
+        "total": 112,
+        "rate": 0.38392857142857145
+      },
+      "lowconf_iou50": {
+        "count": 32,
+        "total": 112,
+        "rate": 0.2857142857142857
+      },
+      "lowconf_iou30": {
+        "count": 48,
+        "total": 112,
+        "rate": 0.42857142857142855
+      },
+      "lowconf_iou10": {
+        "count": 49,
+        "total": 112,
+        "rate": 0.4375
+      },
+      "lowconf_center16": {
+        "count": 49,
+        "total": 112,
+        "rate": 0.4375
+      },
+      "lowconf_center32": {
+        "count": 49,
+        "total": 112,
+        "rate": 0.4375
+      },
+      "max_iou_median": 0.0,
+      "max_iou_p75": 0.522547919639818,
+      "near16_conf_median": 0.0,
+      "near32_conf_median": 0.0,
+      "iou50_conf_score_p75": 0.013148559257388115,
+      "num_preds_low_conf_median": 17.0,
+      "one2one_finest_stride": 4,
+      "one2one_finest_score_median_all": 5.3899711929261684e-05,
+      "one2one_finest_score_median_tp05": 0.3042037785053253,
+      "one2one_finest_score_median_fn05": 8.584810530010145e-06,
+      "one2one_finest_percentile_median_tp05": 100.0,
+      "one2one_finest_percentile_median_fn05": 98.67802372685185,
+      "one2many_finest_stride": 4,
+      "one2many_finest_score_median_all": null,
+      "one2many_finest_score_median_tp05": null,
+      "one2many_finest_score_median_fn05": null,
+      "one2many_finest_percentile_median_tp05": null,
+      "one2many_finest_percentile_median_fn05": null
+    }
+  }
+}
