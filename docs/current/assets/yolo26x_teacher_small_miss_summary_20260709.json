@@ -1,0 +1,19 @@
+{
+  "model": "runs/detect/tools/yolo/workspace/runs/training/yolo26x_teacher_final_trainpool_imgsz960_batch4_20260709/weights/best.pt",
+  "manifest": "tools/yolo/workspace/runs/final_raw_benchmark_v1_20260708/manifest_remote_eval.jsonl",
+  "records": 112,
+  "imgsz": 1536,
+  "main_conf": 0.05,
+  "low_conf": 0.001,
+  "iou50_hits_conf005": 29,
+  "iou50_fn_conf005": 83,
+  "center16_hits_conf0001": 55,
+  "no_center16_conf0001": 57,
+  "center16_but_iou50_fn_conf005": 26,
+  "median_gt_dim_px": 6.637680000000046,
+  "outputs": [
+    "yolo26x_teacher_small_center_hit_but_iou50_fn_conf005_20260709.jpg",
+    "yolo26x_teacher_small_iou50_fn_conf005_top40_20260709.jpg",
+    "yolo26x_teacher_small_no_center16_conf0001_20260709.jpg"
+  ]
+}
