@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, relative, resolve } from "node:path";
 
 type CameraId = "cam1" | "cam2";
@@ -9,6 +9,7 @@ type MonoOptions = {
   cameraId: CameraId;
   mode: Mode;
   dryRun: boolean;
+  runId: string;
   device: string;
   views: string;
   session?: string;
@@ -21,13 +22,14 @@ type MonoOptions = {
 type StereoOptions = {
   mode: Mode;
   dryRun: boolean;
+  runId: string;
   leftDevice: string;
   rightDevice: string;
   views: string;
   session?: string;
   output: string;
-  leftMono: string;
-  rightMono: string;
+  leftMono?: string;
+  rightMono?: string;
   config: string;
   minPairs: string;
   maxRmsPx: string;
@@ -81,7 +83,7 @@ try {
 
 async function runMono(args: string[]): Promise<number> {
   const options = parseMonoOptions(args);
-  const session = options.session ?? defaultSessionPath(options.mode, `${options.cameraId}_charuco`);
+  const session = options.session ?? defaultSessionPath(options.mode, `${options.cameraId}_charuco`, options.runId);
   const steps: CommandStep[] = [];
   if (options.mode !== "solve-only") {
     if (options.mode === "capture-solve" && existsSync(session)) {
@@ -131,7 +133,7 @@ async function runMono(args: string[]): Promise<number> {
 
 async function runStereo(args: string[]): Promise<number> {
   const options = parseStereoOptions(args);
-  const session = options.session ?? defaultSessionPath(options.mode, "stereo_charuco");
+  const session = options.session ?? defaultSessionPath(options.mode, "stereo_charuco", options.runId);
   const steps: CommandStep[] = [];
   if (options.mode !== "solve-only") {
     if (options.mode === "capture-solve" && existsSync(session)) {
@@ -156,6 +158,8 @@ async function runStereo(args: string[]): Promise<number> {
     });
   }
   if (options.mode !== "capture-only") {
+    const leftMono = options.leftMono ?? latestMonoArtifactPath("cam1");
+    const rightMono = options.rightMono ?? latestMonoArtifactPath("cam2");
     steps.push({
       label: "stereo solve",
       args: [
@@ -166,9 +170,9 @@ async function runStereo(args: string[]): Promise<number> {
         "--session",
         session,
         "--left-mono",
-        options.leftMono,
+        leftMono,
         "--right-mono",
-        options.rightMono,
+        rightMono,
         "--output",
         options.output,
         "--left-camera-id",
@@ -242,13 +246,15 @@ function parseMonoOptions(args: string[]): MonoOptions {
     process.exit(0);
   }
   const cameraId = parseCameraId(args[0]);
+  const runId = timestamp();
   const parsed: MonoOptions = {
     cameraId,
     mode: "capture-solve",
     dryRun: false,
+    runId,
     device: cameraId === "cam1" ? "/dev/video0" : "/dev/video2",
     views: "30",
-    output: artifactPath(cameraId),
+    output: defaultArtifactOutputPath(cameraId, runId),
     config: configPath(),
     minViews: "8",
     maxRmsPx: "1.0",
@@ -287,15 +293,15 @@ function parseStereoOptions(args: string[]): StereoOptions {
     printStereoUsage();
     process.exit(0);
   }
+  const runId = timestamp();
   const parsed: StereoOptions = {
     mode: "capture-solve",
     dryRun: false,
+    runId,
     leftDevice: "/dev/video0",
     rightDevice: "/dev/video2",
     views: "30",
-    output: artifactPath("stereo_cam1_cam2"),
-    leftMono: artifactPath("cam1"),
-    rightMono: artifactPath("cam2"),
+    output: defaultArtifactOutputPath("stereo_cam1_cam2", runId),
     config: configPath(),
     minPairs: "12",
     maxRmsPx: "2.0",
@@ -383,11 +389,11 @@ function hasAnyOption(args: string[], names: string[]): boolean {
   return args.some((arg) => names.some((name) => arg === name || arg.startsWith(`${name}=`)));
 }
 
-function defaultSessionPath(mode: Mode, prefix: string): string {
+function defaultSessionPath(mode: Mode, prefix: string, runId: string): string {
   if (mode === "solve-only") {
     return latestSessionPath(prefix);
   }
-  return resolve(calibrationCwd, "captures/local", `${prefix}_${timestamp()}`);
+  return uniquePath(resolve(calibrationCwd, "captures/local", `${prefix}_${runId}`));
 }
 
 function latestSessionPath(prefix: string): string {
@@ -448,6 +454,70 @@ function configPath(): string {
 
 function artifactPath(name: string): string {
   return resolve(repoRoot, "artifacts/calibration", name);
+}
+
+function defaultArtifactOutputPath(name: string, runId: string): string {
+  return uniquePath(artifactPath(`${name}_${runId}`));
+}
+
+function latestMonoArtifactPath(cameraId: CameraId): string {
+  const dir = resolve(repoRoot, "artifacts/calibration");
+  if (!existsSync(dir)) {
+    throw new Error(`No calibration artifact directory found at ${dir}; pass --left-mono/--right-mono explicitly.`);
+  }
+  const candidates = readdirSync(dir)
+    .map((name) => resolve(dir, name))
+    .filter((path) => isAcceptedMonoArtifact(path, cameraId))
+    .sort(
+      (left, right) =>
+        artifactCreatedAtMs(right) - artifactCreatedAtMs(left) ||
+        statSync(right).mtimeMs - statSync(left).mtimeMs,
+    );
+  if (candidates.length === 0) {
+    throw new Error(
+      `No accepted mono calibration package found for ${cameraId}; run mono ${cameraId} first or pass --left-mono/--right-mono.`,
+    );
+  }
+  return candidates[0];
+}
+
+function isAcceptedMonoArtifact(path: string, cameraId: CameraId): boolean {
+  if (!statSync(path).isDirectory()) return false;
+  const packageJson = readPackageJson(path);
+  return (
+    packageJson !== undefined &&
+    packageJson["schema_version"] === "calibration.mono.v1" &&
+    packageJson["package_type"] === "mono_camera_calibration" &&
+    packageJson["camera_id"] === cameraId &&
+    packageJson["accepted"] === true
+  );
+}
+
+function artifactCreatedAtMs(path: string): number {
+  const packageJson = readPackageJson(path);
+  const createdAt = packageJson?.created_at;
+  const parsed = typeof createdAt === "string" ? Date.parse(createdAt) : NaN;
+  return Number.isFinite(parsed) ? parsed : statSync(path).mtimeMs;
+}
+
+function readPackageJson(path: string): Record<string, unknown> | undefined {
+  try {
+    const payload: unknown = JSON.parse(readFileSync(resolve(path, "package.json"), "utf-8"));
+    if (payload !== null && typeof payload === "object" && !Array.isArray(payload)) {
+      return payload as Record<string, unknown>;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+function uniquePath(path: string): string {
+  if (!existsSync(path)) return path;
+  for (let suffix = 2; ; suffix += 1) {
+    const candidate = `${path}_${suffix}`;
+    if (!existsSync(candidate)) return candidate;
+  }
 }
 
 function pathFromRepo(value: string): string {
@@ -588,7 +658,7 @@ function printMonoUsage(): void {
   cam1 device: /dev/video0
   cam2 device: /dev/video2
   session: tools/calibration/captures/local/<cam>_charuco_<local_timestamp>
-  output: artifacts/calibration/<cam>
+  output: artifacts/calibration/<cam>_<local_timestamp>
 
 选项:
   --device <path>
@@ -610,9 +680,9 @@ function printStereoUsage(): void {
 默认:
   devices: /dev/video0,/dev/video2
   session: tools/calibration/captures/local/stereo_charuco_<local_timestamp>
-  left mono: artifacts/calibration/cam1
-  right mono: artifacts/calibration/cam2
-  output: artifacts/calibration/stereo_cam1_cam2
+  left mono: latest accepted artifacts/calibration/cam1*
+  right mono: latest accepted artifacts/calibration/cam2*
+  output: artifacts/calibration/stereo_cam1_cam2_<local_timestamp>
 
 选项:
   --devices <left,right>

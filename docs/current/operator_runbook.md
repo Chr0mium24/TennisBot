@@ -71,10 +71,14 @@ Use the mainline OpenCV GUI in order:
    the configured `15 mm` square / `11.25 mm` marker dimensions.
 2. Tune camera shutter/brightness in `bun scripts/calib.ts preview` if the
    view is too dark, saturated, or noisy.
-3. `bun scripts/calib.ts mono cam1` for the left mono capture and solve.
-4. `bun scripts/calib.ts mono cam2` for the right mono capture and solve.
+3. `bun scripts/calib.ts mono cam1` for the left mono capture and timestamped
+   solve package.
+4. `bun scripts/calib.ts mono cam2` for the right mono capture and timestamped
+   solve package.
 5. `bun scripts/calib.ts stereo` for stereo capture, solve, and runtime package
-   export under `artifacts/calibration/stereo_cam1_cam2`.
+   export under `artifacts/calibration/stereo_cam1_cam2_<local_timestamp>`.
+   When intentionally writing the fixed runtime package, rerun the solve step with
+   `bun scripts/calib.ts stereo --solve-only --output artifacts/calibration/stereo_cam1_cam2`.
 
 ## Vision Runtime Order
 

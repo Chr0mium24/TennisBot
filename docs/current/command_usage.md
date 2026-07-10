@@ -161,10 +161,11 @@ bun scripts/calib.ts stereo
 
 - 亮度检查设备：`/dev/video0,/dev/video2`
 - 预览调试设备：`/dev/video0,/dev/video2`
-- `cam1` 设备：`/dev/video0`，输出：`artifacts/calibration/cam1`
-- `cam2` 设备：`/dev/video2`，输出：`artifacts/calibration/cam2`
+- `cam1` 设备：`/dev/video0`，输出：`artifacts/calibration/cam1_<local_timestamp>`
+- `cam2` 设备：`/dev/video2`，输出：`artifacts/calibration/cam2_<local_timestamp>`
 - 双目标定设备：左 `/dev/video0`，右 `/dev/video2`
-- 双目输出：`artifacts/calibration/stereo_cam1_cam2`
+- 双目输入：默认使用最新 accepted 的 `cam1*` / `cam2*` 单目标定包
+- 双目输出：`artifacts/calibration/stereo_cam1_cam2_<local_timestamp>`
 - 配置：`tools/calibration/configs/dfoptix_charuco_15mm_capture.yaml`
 - 采集张数：`30`
 
@@ -177,12 +178,14 @@ bun scripts/calib.ts mono cam1 --capture-only
 bun scripts/calib.ts mono cam1 --solve-only --session tools/calibration/captures/local/<session>
 bun scripts/calib.ts stereo --dry-run
 bun scripts/calib.ts stereo --devices /dev/video0,/dev/video2
+bun scripts/calib.ts stereo --output artifacts/calibration/stereo_cam1_cam2
 ```
 
 正常标定顺序是先检查亮度和相机顺序，再分别完成 `cam1`、`cam2` 单目，
 最后完成双目。`mono` 和 `stereo` 默认都是“采集 GUI 结束后继续求解并导出
-运行时包”。`preview` 会打开 OpenCV 实时画面，窗口滑条可调
-`shutter/exposure_time_absolute` 和 `gain`，`q` 或 `esc` 退出。
+新的时间戳标定包”。如需让一次求解写入运行时默认读取的固定包，需显式指定
+`--output artifacts/calibration/stereo_cam1_cam2`。`preview` 会打开 OpenCV 实时画面，
+窗口滑条可调 `shutter/exposure_time_absolute` 和 `gain`，`q` 或 `esc` 退出。
 `mono/stereo --dry-run` 只打印底层命令；`brightness/preview --dry-run`
 不采集图像帧。
 

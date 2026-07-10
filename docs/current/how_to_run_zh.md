@@ -322,13 +322,16 @@ bun scripts/calib.ts mono cam2
 bun scripts/calib.ts stereo
 ```
 
-默认输出：
+默认输出会带本地时间戳，避免覆盖已有标定包：
 
 ```text
-artifacts/calibration/cam1
-artifacts/calibration/cam2
-artifacts/calibration/stereo_cam1_cam2
+artifacts/calibration/cam1_<local_timestamp>
+artifacts/calibration/cam2_<local_timestamp>
+artifacts/calibration/stereo_cam1_cam2_<local_timestamp>
 ```
+
+`stereo` 默认使用最新 accepted 的 `cam1*` / `cam2*` 单目标定包。如需让一次求解写入
+运行时默认包，需显式加 `--output artifacts/calibration/stereo_cam1_cam2`。
 
 如果只想看本机双目 YOLO 坐标 GUI，不接 ROS：
 

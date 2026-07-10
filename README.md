@@ -71,6 +71,10 @@ bun scripts/calib.ts mono cam2
 bun scripts/calib.ts stereo
 ```
 
+The calibration wrapper writes timestamped package directories by default so a
+new run does not overwrite the previous result. Use `--output` only when
+intentionally writing a fixed runtime path.
+
 Calibration and YOLO annotation/package commands do not require Torch, CUDA, or
 Ultralytics. Keep the default `uv sync` path for `tools/calibration` and
 `tools/yolo`; only pure YOLO camera detection uses `uv run --extra detect ...`.
