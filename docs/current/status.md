@@ -26,15 +26,15 @@ The runtime package path now includes:
   `/home/cr/tennis_robot_ws` control workspace;
 - external `target_manager` consuming `/target/raw` and publishing
   `/target/managed`;
-- `scripts/vision-runtime.ts` for logged runtime launches and single-task runs with
+- `scripts/vision-runtime.py` for logged runtime launches and single-task runs with
   caller-specified `task_id`.
 
 The current quick camera-device tool is:
 
 ```bash
-bun scripts/calib.ts brightness
-bun scripts/calib.ts brightness --devices /dev/video0,/dev/video2
-bun scripts/calib.ts preview
+uv run scripts/calib.py brightness
+uv run scripts/calib.py brightness --devices /dev/video0,/dev/video2
+uv run scripts/calib.py preview
 ```
 
 It prints average brightness for two USB cameras and can open a live preview
@@ -88,11 +88,11 @@ uv run --extra detect tennisbot-yolo detect-gui \
 Run local stereo coordinate display:
 
 ```bash
-bun scripts/stereo.ts record
-bun scripts/stereo.ts record --duration 60
-bun scripts/stereo.ts gui --tile
-bun scripts/stereo.ts gui --tile --record-run
-bun scripts/stereo.ts replay
+uv run scripts/stereo.py record
+uv run scripts/stereo.py record --duration 60
+uv run scripts/stereo.py gui --tile
+uv run scripts/stereo.py gui --tile --record-run
+uv run scripts/stereo.py replay
 ```
 
 `record` stores raw left/right videos and timestamp metadata under
@@ -102,17 +102,17 @@ pressed in the preview window.
 Dry-run the local stereo GUI defaults:
 
 ```bash
-bun scripts/stereo.ts record --dry-run
-bun scripts/stereo.ts gui --dry-run
+uv run scripts/stereo.py record --dry-run
+uv run scripts/stereo.py gui --dry-run
 ```
 
 Capture calibration frames:
 
 ```bash
-bun scripts/calib.ts preview
-bun scripts/calib.ts mono cam1
-bun scripts/calib.ts mono cam2
-bun scripts/calib.ts stereo
+uv run scripts/calib.py preview
+uv run scripts/calib.py mono cam1
+uv run scripts/calib.py mono cam2
+uv run scripts/calib.py stereo
 ```
 
 Build and run the vision runtime chain:
@@ -129,8 +129,8 @@ ros2 launch target_manager target_manager.launch.py
 Logged or single-task run:
 
 ```bash
-bun scripts/vision-runtime.ts run --record --session test01 --tile
-bun scripts/vision-runtime.ts task --task-id 42 --session catch42 --tile
+uv run scripts/vision-runtime.py run --record --session test01 --tile
+uv run scripts/vision-runtime.py task --task-id 42 --session catch42 --tile
 ```
 
 Inspect runtime topics:

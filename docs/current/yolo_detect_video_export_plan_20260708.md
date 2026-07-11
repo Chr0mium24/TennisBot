@@ -13,7 +13,7 @@ writes an annotated video with detection boxes.
 - Preserve the source video's frame size and FPS by default.
 - Draw bounding boxes, center points, confidence labels, and a compact status
   overlay.
-- Expose the command through `bun scripts/yolo.ts detect-video`.
+- Expose the command through `uv run scripts/yolo.py detect-video`.
 - Document usage and add CLI dry-run/help coverage.
 
 ## Non-Goals
@@ -28,4 +28,4 @@ writes an annotated video with detection boxes.
 - `uv run --project tools/yolo python -m tennisbot_yolo.cli detect-video --help`
 - `uv run --project tools/yolo python -m tennisbot_yolo.cli detect-video --dry-run ...`
 - `uv run --project tools/yolo pytest -q`
-- `bun scripts/yolo.ts detect-video --dry-run ...`
+- `uv run scripts/yolo.py detect-video --dry-run ...`

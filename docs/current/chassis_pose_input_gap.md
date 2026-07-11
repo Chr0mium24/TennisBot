@@ -119,7 +119,7 @@ This fallback is now implemented (2026-07-06). When `allow_missing_yaw=true`:
 
 CLI usage:
 ```bash
-bun scripts/vision-runtime.ts run --allow-missing-yaw --fallback-yaw 0.0
+uv run scripts/vision-runtime.py run --allow-missing-yaw --fallback-yaw 0.0
 ```
 
 ## Current Decision

@@ -168,7 +168,7 @@ about `1` per camera.
 Generated with:
 
 ```bash
-bun scripts/yolo.ts benchmark tiles --dry-run \
+uv run scripts/yolo.py benchmark tiles --dry-run \
   --imgsz-values 320,416,512,640,960,1280,1536 \
   --tile-profile full_4k:3840:2160:0 \
   --tile-profile tile_2048x1216:2048:1216:160 \

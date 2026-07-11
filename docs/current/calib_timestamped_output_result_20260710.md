@@ -4,7 +4,7 @@ Date: 2026-07-10
 
 ## Summary
 
-`scripts/calib.ts` no longer writes normal mono/stereo runs to fixed calibration
+`scripts/calib.py` no longer writes normal mono/stereo runs to fixed calibration
 package names by default. The default outputs are now timestamped:
 
 - `artifacts/calibration/cam1_<local_timestamp>`
@@ -21,13 +21,13 @@ writing a fixed runtime path.
 Commands run from the repository root:
 
 ```bash
-bun scripts/calib.ts --help
-bun scripts/calib.ts mono --help
-bun scripts/calib.ts stereo --help
-bun scripts/calib.ts mono cam1 --dry-run
-bun scripts/calib.ts mono cam2 --dry-run
-bun scripts/calib.ts stereo --dry-run
-bun scripts/calib.ts stereo --dry-run --output artifacts/calibration/stereo_cam1_cam2
+uv run scripts/calib.py --help
+uv run scripts/calib.py mono --help
+uv run scripts/calib.py stereo --help
+uv run scripts/calib.py mono cam1 --dry-run
+uv run scripts/calib.py mono cam2 --dry-run
+uv run scripts/calib.py stereo --dry-run
+uv run scripts/calib.py stereo --dry-run --output artifacts/calibration/stereo_cam1_cam2
 ```
 
 Observed results:

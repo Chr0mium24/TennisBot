@@ -36,7 +36,7 @@ Generation was configured with `require_label_file_backgrounds = true`, so only 
 Command:
 
 ```bash
-bun scripts/yolo.ts sprites extract \
+uv run scripts/yolo.py sprites extract \
   --images-root tools/yolo/workspace/runs/dataset_0260701_only_20260703/images \
   --labels-root tools/yolo/workspace/runs/dataset_0260701_only_20260703/labels \
   --excluded-file tools/yolo/workspace/runs/dataset_0260701_only_20260703/excluded_images.txt \
@@ -64,7 +64,7 @@ Output dataset:
 Command:
 
 ```bash
-bun scripts/yolo.ts augment copy-paste \
+uv run scripts/yolo.py augment copy-paste \
   --config tools/yolo/workspace/runs/augmentation_0260701_approx5000_20260703.toml
 ```
 

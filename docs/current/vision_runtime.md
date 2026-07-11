@@ -19,7 +19,7 @@ Already available:
 - `src/tennisbot_vision_runtime` owns the first stereo camera,
   field-frame transform, trajectory fit, and direct `/target/raw` publishing
   path.
-- `scripts/vision-runtime.ts` launches the main chain with optional timestamped
+- `scripts/vision-runtime.py` launches the main chain with optional timestamped
   runtime logging and single-task mode.
 
 Not yet available:
@@ -290,11 +290,11 @@ left/right camera frames
 
 ## Runtime Logging
 
-Enable logging from the Bun launcher:
+Enable logging from the uv/Python launcher:
 
 ```bash
-bun scripts/vision-runtime.ts run --record --session test01 --tile
-bun scripts/vision-runtime.ts task --task-id 42 --session catch42 --tile
+uv run scripts/vision-runtime.py run --record --session test01 --tile
+uv run scripts/vision-runtime.py task --task-id 42 --session catch42 --tile
 ```
 
 The session directory is `runs/vision-runtime/<session>/` and contains:

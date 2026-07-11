@@ -4,7 +4,7 @@
 
 ## 约定
 
-Python 工具使用 `uv`，前端和 TypeScript 脚本使用 `bun`。入口命令都提供默认
+Python 工具和根目录 launcher 使用 `uv`，前端和 TypeScript 包使用 `bun`。入口命令都提供默认
 路径、默认设备或默认端口；直接运行默认命令应该能进入最常用流程。
 
 `tools/calibration` 和 `tools/yolo` 的标注/模型包命令都可以在无
@@ -43,19 +43,19 @@ ros2 launch tennisbot_vision_runtime vision_runtime.launch.py
 ros2 launch target_manager target_manager.launch.py
 ```
 
-也可以用 Bun 主链路入口同时启动视觉运行时和外部 target manager。运行阶段
-Bun 默认会在子进程里自动 source ROS、控制工作区和本仓库
+也可以用 uv/Python 主链路入口同时启动视觉运行时和外部 target manager。运行阶段
+launcher 默认会在子进程里自动 source ROS、控制工作区和本仓库
 `install/setup.bash`，所以启动主链路时不需要在当前终端手动 source：
 
 ```bash
-bun scripts/vision-runtime.ts run
-bun scripts/vision-runtime.ts run --record --session test01 --tile
-bun scripts/vision-runtime.ts task --task-id 42 --session catch42 --tile
-bun scripts/vision-runtime.ts run --dry-run --record --devices /dev/video0,/dev/video2
+uv run scripts/vision-runtime.py run
+uv run scripts/vision-runtime.py run --record --session test01 --tile
+uv run scripts/vision-runtime.py task --task-id 42 --session catch42 --tile
+uv run scripts/vision-runtime.py run --dry-run --record --devices /dev/video0,/dev/video2
 ```
 
 如果要手动执行 `ros2 topic list`、`ros2 node list` 这类诊断命令，当前终端
-仍然需要按上面的顺序 source；Bun 的自动 source 只作用于它启动的子进程。
+仍然需要按上面的顺序 source；launcher 的自动 source 只作用于它启动的子进程。
 
 `run --record` 和 `task` 会默认写入 `runs/vision-runtime/<session>/`：
 
@@ -83,21 +83,21 @@ ros2 topic echo /target/managed
 启动本机 4K 双目 YOLO 坐标 GUI：
 
 ```bash
-bun scripts/stereo.ts record
-bun scripts/stereo.ts gui
+uv run scripts/stereo.py record
+uv run scripts/stereo.py gui
 ```
 
 常用选项：
 
 ```bash
-bun scripts/stereo.ts record --duration 60
-bun scripts/stereo.ts record --dry-run
-bun scripts/stereo.ts preview
-bun scripts/stereo.ts gui --tile
-bun scripts/stereo.ts gui --tile --record-run
-bun scripts/stereo.ts gui --dry-run
-bun scripts/stereo.ts gui --devices /dev/video0,/dev/video2
-bun scripts/stereo.ts replay
+uv run scripts/stereo.py record --duration 60
+uv run scripts/stereo.py record --dry-run
+uv run scripts/stereo.py preview
+uv run scripts/stereo.py gui --tile
+uv run scripts/stereo.py gui --tile --record-run
+uv run scripts/stereo.py gui --dry-run
+uv run scripts/stereo.py gui --devices /dev/video0,/dev/video2
+uv run scripts/stereo.py replay
 ```
 
 默认值：
@@ -126,16 +126,16 @@ bun scripts/stereo.ts replay
 常用入口：
 
 ```bash
-bun scripts/yolo.ts annotate
-bun scripts/yolo.ts sprites extract
-bun scripts/yolo.ts sprites review
-bun scripts/yolo.ts augment copy-paste
+uv run scripts/yolo.py annotate
+uv run scripts/yolo.py sprites extract
+uv run scripts/yolo.py sprites review
+uv run scripts/yolo.py augment copy-paste
 ```
 
 对当前 `tools/yolo/0260701` 数据目录进行局域网标注：
 
 ```bash
-bun scripts/yolo.ts annotate \
+uv run scripts/yolo.py annotate \
   --images-root tools/yolo/0260701/images \
   --labels-root tools/yolo/0260701/labels \
   --excluded-file tools/yolo/0260701/excluded_images.txt \
@@ -150,11 +150,11 @@ bun scripts/yolo.ts annotate \
 从仓库根目录运行：
 
 ```bash
-bun scripts/calib.ts brightness
-bun scripts/calib.ts preview
-bun scripts/calib.ts mono cam1
-bun scripts/calib.ts mono cam2
-bun scripts/calib.ts stereo
+uv run scripts/calib.py brightness
+uv run scripts/calib.py preview
+uv run scripts/calib.py mono cam1
+uv run scripts/calib.py mono cam2
+uv run scripts/calib.py stereo
 ```
 
 默认值：
@@ -172,13 +172,13 @@ bun scripts/calib.ts stereo
 常用选项：
 
 ```bash
-bun scripts/calib.ts preview cam1
-bun scripts/calib.ts preview cam2 --shutter 400 --gain 64
-bun scripts/calib.ts mono cam1 --capture-only
-bun scripts/calib.ts mono cam1 --solve-only --session tools/calibration/captures/local/<session>
-bun scripts/calib.ts stereo --dry-run
-bun scripts/calib.ts stereo --devices /dev/video0,/dev/video2
-bun scripts/calib.ts stereo --output artifacts/calibration/stereo_cam1_cam2
+uv run scripts/calib.py preview cam1
+uv run scripts/calib.py preview cam2 --shutter 400 --gain 64
+uv run scripts/calib.py mono cam1 --capture-only
+uv run scripts/calib.py mono cam1 --solve-only --session tools/calibration/captures/local/<session>
+uv run scripts/calib.py stereo --dry-run
+uv run scripts/calib.py stereo --devices /dev/video0,/dev/video2
+uv run scripts/calib.py stereo --output artifacts/calibration/stereo_cam1_cam2
 ```
 
 正常标定顺序是先检查亮度和相机顺序，再分别完成 `cam1`、`cam2` 单目，
@@ -192,7 +192,7 @@ bun scripts/calib.ts stereo --output artifacts/calibration/stereo_cam1_cam2
 ## 相机亮度检查
 
 ```bash
-bun scripts/calib.ts brightness
+uv run scripts/calib.py brightness
 ```
 
 默认值：
@@ -206,7 +206,7 @@ bun scripts/calib.ts brightness
 指定设备：
 
 ```bash
-bun scripts/calib.ts brightness --devices /dev/video0,/dev/video2
+uv run scripts/calib.py brightness --devices /dev/video0,/dev/video2
 ```
 
 ## 相机视频调试
@@ -214,20 +214,20 @@ bun scripts/calib.ts brightness --devices /dev/video0,/dev/video2
 双目预览并调快门/增益/亮度：
 
 ```bash
-bun scripts/calib.ts preview
+uv run scripts/calib.py preview
 ```
 
 单路预览：
 
 ```bash
-bun scripts/calib.ts preview cam1
-bun scripts/calib.ts preview cam2
+uv run scripts/calib.py preview cam1
+uv run scripts/calib.py preview cam2
 ```
 
 指定初始参数：
 
 ```bash
-bun scripts/calib.ts preview cam2 --shutter 400 --gain 64 --brightness 32
+uv run scripts/calib.py preview cam2 --shutter 400 --gain 64 --brightness 32
 ```
 
 默认值：
@@ -249,7 +249,7 @@ bun scripts/calib.ts preview cam2 --shutter 400 --gain 64 --brightness 32
 
 ## 底层标定工具
 
-通常直接使用上面的 `bun scripts/calib.ts ...` 快捷入口。需要排查底层 CLI
+通常直接使用上面的 `uv run scripts/calib.py ...` 快捷入口。需要排查底层 CLI
 时再进入目录：
 
 ```bash
@@ -320,7 +320,7 @@ uv run camera-calib-lab solve stereo \
 从仓库根目录启动标注前端：
 
 ```bash
-bun scripts/yolo.ts annotate
+uv run scripts/yolo.py annotate
 ```
 
 也可以直接进入工具目录运行：
@@ -343,7 +343,7 @@ uv run tennisbot-yolo annotate
 指定端口：
 
 ```bash
-bun scripts/yolo.ts annotate --port 8766
+uv run scripts/yolo.py annotate --port 8766
 ```
 
 验证默认模型包：
@@ -401,12 +401,12 @@ uv run --extra detect tennisbot-yolo detect-gui --tile
 ```
 
 注意：`tools/yolo detect-gui` 只显示检测框；需要显示球相对相机的
-x/y/z 坐标时使用根入口 `bun scripts/stereo.ts gui`。
+x/y/z 坐标时使用根入口 `uv run scripts/stereo.py gui`。
 
 离线导出已有视频的 YOLO 带框结果：
 
 ```bash
-bun scripts/yolo.ts detect-video input.mp4 \
+uv run scripts/yolo.py detect-video input.mp4 \
   --output runs/yolo-detect/input_boxes.mp4 \
   --tile \
   --overwrite

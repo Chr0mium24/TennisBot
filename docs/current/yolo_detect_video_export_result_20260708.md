@@ -5,7 +5,7 @@
 Implemented an offline YOLO video export command for existing video files:
 
 ```bash
-bun scripts/yolo.ts detect-video input.mp4 \
+uv run scripts/yolo.py detect-video input.mp4 \
   --output runs/yolo-detect/input_boxes.mp4 \
   --tile \
   --overwrite
@@ -19,7 +19,7 @@ and FPS by default.
 
 - Added `tools/yolo/src/tennisbot_yolo/detect_video.py`.
 - Registered `tennisbot-yolo detect-video` in the YOLO CLI.
-- Exposed `bun scripts/yolo.ts detect-video`.
+- Exposed `uv run scripts/yolo.py detect-video`.
 - Documented usage in `tools/yolo/README.md` and `docs/current/command_usage.md`.
 - Added CLI help and dry-run test coverage.
 
@@ -41,7 +41,7 @@ Passed:
 ```bash
 uv run --project tools/yolo python -m tennisbot_yolo.cli detect-video --help
 uv run --project tools/yolo python -m tennisbot_yolo.cli detect-video /tmp/input.mp4 --dry-run --output /tmp/input_boxes.mp4 --tile --imgsz 960 --stride 2
-bun scripts/yolo.ts detect-video /tmp/input.mp4 --dry-run --output /tmp/input_boxes.mp4 --tile --imgsz 960 --stride 2
+uv run scripts/yolo.py detect-video /tmp/input.mp4 --dry-run --output /tmp/input_boxes.mp4 --tile --imgsz 960 --stride 2
 cd tools/yolo && uv run python -m tennisbot_yolo.cli detect-video /tmp/input.mp4 --dry-run --output /tmp/input_boxes.mp4 --tile --imgsz 960 --stride 2
 cd tools/yolo && uv run python -m compileall src/tennisbot_yolo
 cd tools/yolo && uv run pytest -q

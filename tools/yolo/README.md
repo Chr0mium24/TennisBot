@@ -41,7 +41,7 @@ uv sync
 从仓库根目录启动：
 
 ```bash
-bun scripts/yolo.ts annotate
+uv run scripts/yolo.py annotate
 ```
 
 或从工具目录直接启动：
@@ -72,7 +72,7 @@ sprite 候选。审核页面里调整的是 ellipse/alpha mask，不会改原标
 从仓库根目录提取候选：
 
 ```bash
-bun scripts/yolo.ts sprites extract
+uv run scripts/yolo.py sprites extract
 ```
 
 或从工具目录直接运行：
@@ -91,7 +91,7 @@ uv run --extra augment tennisbot-yolo sprites extract
 打开审核页面：
 
 ```bash
-bun scripts/yolo.ts sprites review
+uv run scripts/yolo.py sprites review
 ```
 
 默认地址：
@@ -108,7 +108,7 @@ http://127.0.0.1:8766
 增强使用共享配置文件，不用单独按 copy-paste 命名：
 
 ```bash
-bun scripts/yolo.ts augment copy-paste --config tools/yolo/configs/augmentation.toml
+uv run scripts/yolo.py augment copy-paste --config tools/yolo/configs/augmentation.toml
 ```
 
 或从工具目录直接运行：
@@ -228,10 +228,10 @@ uv run --extra detect tennisbot-yolo detect-video input.mp4 \
   --overwrite
 ```
 
-从仓库根目录也可以用 Bun wrapper：
+从仓库根目录也可以用 uv launcher：
 
 ```bash
-bun scripts/yolo.ts detect-video input.mp4 \
+uv run scripts/yolo.py detect-video input.mp4 \
   --output runs/yolo-detect/input_boxes.mp4 \
   --tile \
   --overwrite

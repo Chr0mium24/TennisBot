@@ -54,11 +54,11 @@ Owns the mainline OpenCV calibration capture GUI for this project target:
 Current commands:
 
 ```bash
-bun scripts/calib.ts brightness
-bun scripts/calib.ts preview
-bun scripts/calib.ts mono cam1
-bun scripts/calib.ts mono cam2
-bun scripts/calib.ts stereo
+uv run scripts/calib.py brightness
+uv run scripts/calib.py preview
+uv run scripts/calib.py mono cam1
+uv run scripts/calib.py mono cam2
+uv run scripts/calib.py stereo
 ```
 
 ### `tools/yolo`
@@ -79,7 +79,7 @@ state, or trajectory prediction.
 Current commands:
 
 ```bash
-bun scripts/yolo.ts annotate
+uv run scripts/yolo.py annotate
 cd tools/yolo
 uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_yolo
 uv run --extra detect tennisbot-yolo detect-gui --devices /dev/video0,/dev/video2 --model ../../artifacts/models/tennis_ball_yolo/model.pt --tile
@@ -102,10 +102,10 @@ Owns the local OpenCV stereo-coordinate GUI:
 Current command:
 
 ```bash
-bun scripts/stereo.ts record
-bun scripts/stereo.ts gui --tile
-bun scripts/stereo.ts gui --tile --record-run
-bun scripts/stereo.ts replay
+uv run scripts/stereo.py record
+uv run scripts/stereo.py gui --tile
+uv run scripts/stereo.py gui --tile --record-run
+uv run scripts/stereo.py replay
 ```
 
 It displays camera-frame geometry only: x right, y down, z forward.
@@ -192,9 +192,9 @@ translation is only a placeholder until measured on the mounted rig.
 Camera brightness sanity check:
 
 ```bash
-bun scripts/calib.ts brightness
-bun scripts/calib.ts brightness --devices /dev/video0,/dev/video2
-bun scripts/calib.ts preview
+uv run scripts/calib.py brightness
+uv run scripts/calib.py brightness --devices /dev/video0,/dev/video2
+uv run scripts/calib.py preview
 ```
 
 Build and launch the ROS runtime:
@@ -211,15 +211,15 @@ ros2 launch target_manager target_manager.launch.py
 One-shot or logged runtime launcher:
 
 ```bash
-bun scripts/vision-runtime.ts run --record --session test01 --tile
-bun scripts/vision-runtime.ts task --task-id 42 --session catch42 --tile
+uv run scripts/vision-runtime.py run --record --session test01 --tile
+uv run scripts/vision-runtime.py task --task-id 42 --session catch42 --tile
 ```
 
 Start the local OpenCV stereo-coordinate GUI:
 
 ```bash
-bun scripts/stereo.ts record
-bun scripts/stereo.ts gui --tile
+uv run scripts/stereo.py record
+uv run scripts/stereo.py gui --tile
 ```
 
 Verify core packages:

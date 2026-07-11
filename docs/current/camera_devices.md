@@ -8,7 +8,7 @@ Use a quick brightness check to identify which USB camera is dark, for example
 when one lens cap is still on or one camera is blocked.
 
 ```bash
-bun scripts/calib.ts brightness
+uv run scripts/calib.py brightness
 ```
 
 The calibration wrapper captures one grayscale frame from `/dev/video0` and
@@ -20,7 +20,7 @@ darker device is printed as the likely covered camera.
 If auto order is wrong or you want to test specific devices:
 
 ```bash
-bun scripts/calib.ts brightness --devices /dev/video0,/dev/video2
+uv run scripts/calib.py brightness --devices /dev/video0,/dev/video2
 ```
 
 Requires `ffmpeg` and `v4l2-ctl` on the machine running the cameras.
@@ -30,14 +30,14 @@ Requires `ffmpeg` and `v4l2-ctl` on the machine running the cameras.
 Open a live stereo preview and tune UVC shutter/brightness before calibration:
 
 ```bash
-bun scripts/calib.ts preview
+uv run scripts/calib.py preview
 ```
 
 Open one camera:
 
 ```bash
-bun scripts/calib.ts preview cam1
-bun scripts/calib.ts preview cam2
+uv run scripts/calib.py preview cam1
+uv run scripts/calib.py preview cam2
 ```
 
 The preview window provides trackbars for `shutter`
@@ -52,9 +52,9 @@ black preview. It uses `v4l2-ctl` to write the controls and exits with `q` or
 Calibration:
 
 ```bash
-bun scripts/calib.ts mono cam1 --device <device>
-bun scripts/calib.ts mono cam2 --device <device>
-bun scripts/calib.ts stereo --left-device <left> --right-device <right>
+uv run scripts/calib.py mono cam1 --device <device>
+uv run scripts/calib.py mono cam2 --device <device>
+uv run scripts/calib.py stereo --left-device <left> --right-device <right>
 ```
 
 Before opening the browser runtime, use the calibration preview controls above

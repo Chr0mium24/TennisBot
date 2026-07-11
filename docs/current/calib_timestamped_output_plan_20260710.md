@@ -4,7 +4,7 @@ Date: 2026-07-10
 
 ## Goal
 
-Prevent the root `scripts/calib.ts` helper from overwriting existing calibration
+Prevent the root `scripts/calib.py` helper from overwriting existing calibration
 packages during the normal mono and stereo workflow.
 
 ## Plan
@@ -13,7 +13,7 @@ packages during the normal mono and stereo workflow.
   `artifacts/calibration/cam2` to timestamped package directories.
 - Change default stereo output from fixed `artifacts/calibration/stereo_cam1_cam2`
   to a timestamped package directory.
-- Keep `bun scripts/calib.ts mono cam1`, `mono cam2`, then `stereo` as the
+- Keep `uv run scripts/calib.py mono cam1`, `mono cam2`, then `stereo` as the
   normal workflow by having stereo select the latest accepted mono packages.
 - Leave explicit `--output` available for deliberately writing fixed runtime
   paths.

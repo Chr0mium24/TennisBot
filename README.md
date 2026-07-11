@@ -41,14 +41,14 @@ ros2 launch tennisbot_vision_runtime vision_runtime.launch.py
 ros2 launch target_manager target_manager.launch.py
 ```
 
-Or use the Bun runtime launcher. It auto-sources ROS, the control workspace,
+Or use the uv/Python runtime launcher. It auto-sources ROS, the control workspace,
 and this repository's `install/setup.bash` before starting ROS child
 processes:
 
 ```bash
-bun scripts/vision-runtime.ts run
-bun scripts/vision-runtime.ts run --record --session test01 --tile
-bun scripts/vision-runtime.ts task --task-id 42 --session catch42 --tile
+uv run scripts/vision-runtime.py run
+uv run scripts/vision-runtime.py run --record --session test01 --tile
+uv run scripts/vision-runtime.py task --task-id 42 --session catch42 --tile
 ```
 
 Inspect the runtime topics:
@@ -64,11 +64,11 @@ ros2 topic echo /target/managed
 Run camera checks and calibration:
 
 ```bash
-bun scripts/calib.ts brightness
-bun scripts/calib.ts preview
-bun scripts/calib.ts mono cam1
-bun scripts/calib.ts mono cam2
-bun scripts/calib.ts stereo
+uv run scripts/calib.py brightness
+uv run scripts/calib.py preview
+uv run scripts/calib.py mono cam1
+uv run scripts/calib.py mono cam2
+uv run scripts/calib.py stereo
 ```
 
 The calibration wrapper writes timestamped package directories by default so a
@@ -82,7 +82,7 @@ Ultralytics. Keep the default `uv sync` path for `tools/calibration` and
 Start the YOLO annotation frontend/backend:
 
 ```bash
-bun scripts/yolo.ts annotate
+uv run scripts/yolo.py annotate
 ```
 
 Create dry-run YOLO artifacts:

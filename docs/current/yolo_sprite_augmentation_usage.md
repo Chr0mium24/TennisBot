@@ -36,7 +36,7 @@ tools/yolo/0260701/labels
 局域网验证时监听 `0.0.0.0`：
 
 ```bash
-bun scripts/yolo.ts annotate \
+uv run scripts/yolo.py annotate \
   --images-root tools/yolo/0260701/images \
   --labels-root tools/yolo/0260701/labels \
   --excluded-file tools/yolo/0260701/excluded_images.txt \
@@ -67,7 +67,7 @@ tools/yolo/0260701/labels/<image-stem>.txt
 标完若干张后运行：
 
 ```bash
-bun scripts/yolo.ts sprites extract \
+uv run scripts/yolo.py sprites extract \
   --images-root tools/yolo/0260701/images \
   --labels-root tools/yolo/0260701/labels \
   --excluded-file tools/yolo/0260701/excluded_images.txt
@@ -84,13 +84,13 @@ tools/yolo/workspace/runs/sprites/manifest.jsonl
 只有确认要重新按 bbox 初始化 mask 时才使用：
 
 ```bash
-bun scripts/yolo.ts sprites extract ... --overwrite
+uv run scripts/yolo.py sprites extract ... --overwrite
 ```
 
 ### 3. 启动球 sprite 审核页面
 
 ```bash
-bun scripts/yolo.ts sprites review \
+uv run scripts/yolo.py sprites review \
   --host 0.0.0.0 \
   --port 8766
 ```
@@ -182,7 +182,7 @@ rotate_degrees = [-180, 180]
 确认 `approved/` 里已经有审核通过的 sprite 后运行：
 
 ```bash
-bun scripts/yolo.ts augment copy-paste \
+uv run scripts/yolo.py augment copy-paste \
   --config tools/yolo/workspace/runs/augmentation.0260701.toml
 ```
 

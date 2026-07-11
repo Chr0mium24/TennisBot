@@ -31,7 +31,7 @@ prediction correctness.
 For stereo x/y/z display, use the local stereo GUI instead:
 
 ```bash
-bun scripts/stereo.ts gui --tile
+uv run scripts/stereo.py gui --tile
 ```
 
 ## Verification

@@ -149,7 +149,7 @@ Use tiled YOLO recognition at runtime so the model sees image content at the sam
 Primary stereo GUI command:
 
 ```bash
-bun scripts/stereo.ts gui \
+uv run scripts/stereo.py gui \
   --tile \
   --tile-width 1536 \
   --tile-height 864 \
@@ -161,7 +161,7 @@ bun scripts/stereo.ts gui \
 Fast fallback recognition profile:
 
 ```bash
-bun scripts/stereo.ts gui \
+uv run scripts/stereo.py gui \
   --tile \
   --tile-width 2048 \
   --tile-height 1216 \
@@ -173,7 +173,7 @@ bun scripts/stereo.ts gui \
 Accuracy escalation recognition profile:
 
 ```bash
-bun scripts/stereo.ts gui \
+uv run scripts/stereo.py gui \
   --tile \
   --tile-width 1536 \
   --tile-height 864 \
@@ -207,7 +207,7 @@ Performance path:
 ## Implementation Plan
 
 1. Add a crop dataset generator under `tools/yolo`.
-   - Proposed CLI: `bun scripts/yolo.ts crops positive-jitter`
+   - Proposed CLI: `uv run scripts/yolo.py crops positive-jitter`
    - Python command: `tennisbot-yolo crops positive-jitter`
    - Use `uv` project execution and keep dependencies within existing `augment` extra if OpenCV is needed.
 2. Add a TOML config for crop generation.

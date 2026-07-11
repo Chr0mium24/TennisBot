@@ -14,7 +14,7 @@
 
 /home/cr/Codes/TennisBot
   src/tennisbot_vision_runtime
-  scripts/vision-runtime.ts
+  scripts/vision-runtime.py
   tools/calibration
   tools/stereo
   tools/yolo
@@ -50,7 +50,7 @@
 
 - ROS 2 Humble
 - `colcon`
-- `bun`
+- `bun`（前端、TypeScript 包和 stereo replay 前端仍使用）
 - `uv`
 - 摄像头和 YOLO 所需的系统图形/视频依赖
 
@@ -113,14 +113,14 @@ source install/setup.bash
 
 ## 每次开机后的最短运行命令
 
-### 1. 直接用 Bun 启动
+### 1. 直接用 uv launcher 启动
 
 ```bash
 cd /home/cr/Codes/TennisBot
-bun scripts/vision-runtime.ts run --record --session test01 --tile
+uv run scripts/vision-runtime.py run --record --session test01 --tile
 ```
 
-Bun 入口默认会在它启动的 ROS 子进程里自动执行：
+uv/Python 入口默认会在它启动的 ROS 子进程里自动执行：
 
 ```bash
 source /opt/ros/humble/setup.bash
@@ -128,7 +128,7 @@ source /home/cr/tennis_robot_ws/install/setup.bash
 source /home/cr/Codes/TennisBot/install/setup.bash
 ```
 
-所以运行主链路时，当前终端可以不手动 source。这个自动 source 只作用于 Bun
+所以运行主链路时，当前终端可以不手动 source。这个自动 source 只作用于 launcher
 启动的子进程，不会把你的当前终端变成 ROS 环境。
 
 默认 setup 路径可以用环境变量覆盖：
@@ -137,14 +137,14 @@ source /home/cr/Codes/TennisBot/install/setup.bash
 ROS_SETUP=/opt/ros/humble/setup.bash \
 TENNISBOT_CONTROL_SETUP=/home/cr/tennis_robot_ws/install/setup.bash \
 TENNISBOT_LOCAL_SETUP=/home/cr/Codes/TennisBot/install/setup.bash \
-bun scripts/vision-runtime.ts run --record --session test01 --tile
+uv run scripts/vision-runtime.py run --record --session test01 --tile
 ```
 
 也可以在命令行上控制：
 
 ```bash
-bun scripts/vision-runtime.ts run --no-auto-source
-bun scripts/vision-runtime.ts run --clear-setup-files \
+uv run scripts/vision-runtime.py run --no-auto-source
+uv run scripts/vision-runtime.py run --clear-setup-files \
   --setup-file /opt/ros/humble/setup.bash \
   --setup-file /home/cr/tennis_robot_ws/install/setup.bash \
   --setup-file /home/cr/Codes/TennisBot/install/setup.bash
@@ -199,10 +199,10 @@ ros2 topic echo /robot/chassis_position
 如果没有 `/robot/chassis_position`，视觉节点会等待，不应该把无底盘输入的
 本地替身逻辑当成真实接球闭环。
 
-### 4. dry-run 看 Bun 会启动什么
+### 4. dry-run 看 launcher 会启动什么
 
 ```bash
-bun scripts/vision-runtime.ts run --dry-run --record --devices /dev/video0,/dev/video2 --session dryrun
+uv run scripts/vision-runtime.py run --dry-run --record --devices /dev/video0,/dev/video2 --session dryrun
 ```
 
 正常会打印两条命令：
@@ -220,20 +220,20 @@ bash -lc 'source /opt/ros/humble/setup.bash && source /home/cr/tennis_robot_ws/i
 再手动 source：
 
 ```bash
-bun scripts/vision-runtime.ts run --record --session test01 --tile
+uv run scripts/vision-runtime.py run --record --session test01 --tile
 ```
 
 常用变体：
 
 ```bash
 # 不分块 YOLO，使用配置默认值
-bun scripts/vision-runtime.ts run --record --session test01
+uv run scripts/vision-runtime.py run --record --session test01
 
 # 指定双目设备
-bun scripts/vision-runtime.ts run --record --session test01 --devices /dev/video0,/dev/video2
+uv run scripts/vision-runtime.py run --record --session test01 --devices /dev/video0,/dev/video2
 
 # target_manager 已经在别的终端启动时，只启动视觉节点
-bun scripts/vision-runtime.ts run --record --session test01 --no-manager
+uv run scripts/vision-runtime.py run --record --session test01 --no-manager
 ```
 
 ## 单次 task 触发
@@ -242,13 +242,13 @@ bun scripts/vision-runtime.ts run --record --session test01 --no-manager
 并在任务完成后让视觉运行时节点退出：
 
 ```bash
-bun scripts/vision-runtime.ts task --task-id 42 --session catch42 --tile
+uv run scripts/vision-runtime.py task --task-id 42 --session catch42 --tile
 ```
 
 如果只想记录文本数据，不录双路视频：
 
 ```bash
-bun scripts/vision-runtime.ts task --task-id 42 --session catch42 --no-video
+uv run scripts/vision-runtime.py task --task-id 42 --session catch42 --no-video
 ```
 
 ## 日志和录像在哪里
@@ -278,7 +278,7 @@ events.ndjson      运行事件和错误
 
 ## 手动分开启动
 
-不用 Bun 也可以分两个终端手动跑。
+不用 launcher 也可以分两个终端手动跑。
 
 终端 A：
 
@@ -302,7 +302,7 @@ source install/setup.bash
 ros2 launch tennisbot_vision_runtime vision_runtime.launch.py
 ```
 
-Bun 入口只是把这两个进程按统一参数启动，并把日志参数、task 参数、设备参数
+uv/Python 入口只是把这两个进程按统一参数启动，并把日志参数、task 参数、设备参数
 转换成 ROS 参数传给视觉运行时节点。
 
 ## 相机和标定检查
@@ -310,16 +310,16 @@ Bun 入口只是把这两个进程按统一参数启动，并把日志参数、t
 先看设备亮度和画面：
 
 ```bash
-bun scripts/calib.ts brightness
-bun scripts/calib.ts preview
+uv run scripts/calib.py brightness
+uv run scripts/calib.py preview
 ```
 
 重新标定顺序：
 
 ```bash
-bun scripts/calib.ts mono cam1
-bun scripts/calib.ts mono cam2
-bun scripts/calib.ts stereo
+uv run scripts/calib.py mono cam1
+uv run scripts/calib.py mono cam2
+uv run scripts/calib.py stereo
 ```
 
 默认输出会带本地时间戳，避免覆盖已有标定包：
@@ -336,8 +336,8 @@ artifacts/calibration/stereo_cam1_cam2_<local_timestamp>
 如果只想看本机双目 YOLO 坐标 GUI，不接 ROS：
 
 ```bash
-bun scripts/stereo.ts record
-bun scripts/stereo.ts gui --tile
+uv run scripts/stereo.py record
+uv run scripts/stereo.py gui --tile
 ```
 
 这只是本机诊断工具，不能算真实接球闭环验证。
@@ -360,7 +360,7 @@ source /home/cr/tennis_robot_ws/install/setup.bash
 ros2 pkg list | grep -E 'target_msgs|target_manager'
 ```
 
-如果是通过 `bun scripts/vision-runtime.ts run` 启动时报错，先确认 Bun 自动 source
+如果是通过 `uv run scripts/vision-runtime.py run` 启动时报错，先确认 launcher 自动 source
 用到的 setup 文件存在：
 
 ```bash
@@ -385,7 +385,7 @@ test -f /home/cr/Codes/TennisBot/install/setup.bash
 ros2 topic hz /robot/chassis_position
 ls artifacts/calibration/stereo_cam1_cam2
 ls artifacts/models/tennis_ball_yolo/model.pt
-bun scripts/vision-runtime.ts run --dry-run --record --devices /dev/video0,/dev/video2
+uv run scripts/vision-runtime.py run --dry-run --record --devices /dev/video0,/dev/video2
 ```
 
 视觉节点只有在有近期底盘位置、双目相机帧、YOLO 检测和有效双目匹配时才发布
@@ -401,7 +401,7 @@ ros2 topic echo /target/raw
 ros2 topic echo /target/managed
 ```
 
-如果 Bun 是用 `--no-manager` 启动的，需要在别的终端手动启动
+如果 launcher 是用 `--no-manager` 启动的，需要在别的终端手动启动
 `target_manager`。
 
 ### Python 依赖缺失
@@ -416,8 +416,8 @@ ros2 topic echo /target/managed
 ```bash
 uv run -- python -m compileall -q src/tennisbot_vision_runtime
 PYTHONPATH=src/tennisbot_vision_runtime uv run python -m unittest discover -s src/tennisbot_vision_runtime/tests -v
-bun scripts/vision-runtime.ts --help
-bun scripts/vision-runtime.ts run --dry-run --record --devices /dev/video0,/dev/video2 --session dryrun
+uv run scripts/vision-runtime.py --help
+uv run scripts/vision-runtime.py run --dry-run --record --devices /dev/video0,/dev/video2 --session dryrun
 ```
 
 真实验收还需要真实底盘链路提供 `/robot/chassis_position`，并确认

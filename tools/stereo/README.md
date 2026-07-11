@@ -9,26 +9,26 @@ diagnostics.
 Run from the repository root through the launcher:
 
 ```bash
-bun scripts/stereo.ts record
-bun scripts/stereo.ts gui
+uv run scripts/stereo.py record
+uv run scripts/stereo.py gui
 ```
 
 Record a fixed-length raw stereo video:
 
 ```bash
-bun scripts/stereo.ts record --duration 60
+uv run scripts/stereo.py record --duration 60
 ```
 
 Record a long point/detection run from the coordinate GUI:
 
 ```bash
-bun scripts/stereo.ts gui --tile --record-run
+uv run scripts/stereo.py gui --tile --record-run
 ```
 
 Open the replay frontend:
 
 ```bash
-bun scripts/stereo.ts replay
+uv run scripts/stereo.py replay
 ```
 
 Direct tool command:
@@ -62,7 +62,7 @@ frames.ndjson
 pairs.ndjson
 ```
 
-`bun scripts/stereo.ts record` uses the default cameras and 4K MJPG capture
+`uv run scripts/stereo.py record` uses the default cameras and 4K MJPG capture
 settings. Without `--duration`, it records until `q` or `esc` is pressed in the
 preview window. The preview is only a downsampled raw stereo image; this path
 does not run YOLO, rectification, or overlay rendering.
