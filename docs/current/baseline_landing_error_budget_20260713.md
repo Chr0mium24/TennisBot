@@ -41,8 +41,9 @@
 YOLO 偏移报告：
 
 - `docs/current/yolo_center_offset_iou50_result_20260713.md`
-- `docs/current/assets/yolo_center_offset_iou50_montage_20260713.jpg`
-- `docs/current/assets/yolo_center_offset_iou50_overlay_distribution_20260713.jpg`
+- `docs/current/assets/baseline_yolo_overlay_clean_20260713.jpg`
+- `docs/current/assets/baseline_yolo_center_hist_clean_20260713.jpg`
+- `docs/current/assets/baseline_yolo_dxdy_hist_clean_20260713.jpg`
 
 评测口径：
 
@@ -62,11 +63,19 @@ YOLO 偏移报告：
 | abs_dx_px | 0.759 px | 3.606 px |
 | abs_dy_px | 0.889 px | 4.243 px |
 
-可视化：
+下面几张图只放图形本身，解释文字放在正文中。图内保留的 `GT`、`YOLO`、`dx`、`dy`、`p50`、`p95`、`px`、`m`、`cm`、`n` 均为缩写或单位。
 
-![YOLO center offset montage](assets/yolo_center_offset_iou50_montage_20260713.jpg)
+第一张图把所有 `IoU >= 0.5` 的准确匹配框重新对齐到人工 bbox 中心后叠在一起。绿色框表示人工 bbox，红色框表示 YOLO bbox，黄色点/线表示 YOLO 中心相对人工中心的偏移。
 
-![YOLO center offset overlay and distribution](assets/yolo_center_offset_iou50_overlay_distribution_20260713.jpg)
+![YOLO 框叠加图](assets/baseline_yolo_overlay_clean_20260713.jpg)
+
+第二张图是准确匹配框的中心偏移 `E = sqrt(dx^2 + dy^2)` 分布。它只描述“已经检测准确时”的中心偏移，不包含漏检或错检。
+
+![YOLO 中心偏移直方图](assets/baseline_yolo_center_hist_clean_20260713.jpg)
+
+第三张图把 `abs(dx)` 和 `abs(dy)` 的分布叠在一起，用于判断三角化更敏感的 x 方向误差量级。
+
+![YOLO 轴向偏移直方图](assets/baseline_yolo_dxdy_hist_clean_20260713.jpg)
 
 ## Error Model
 
@@ -160,6 +169,10 @@ height_to_landing_error ≈ 1.68 * height_error
 | 25cm | 0.10 | 0.39 | 0.89 | 1.58 | 2.23 |
 | 30cm | 0.08 | 0.33 | 0.74 | 1.31 | 1.85 |
 
+下图对应 p50 偏移场景。三条曲线分别是当前 `16.5cm`、`25cm` 和 `30cm` baseline 的落点误差下限随距离增长的趋势。
+
+![p50 落点误差曲线](assets/baseline_landing_error_p50_curve_clean_20260713.jpg)
+
 ### p95 YOLO Offset Case
 
 | baseline | 5m | 10m | 15m | 20m | 23.77m |
@@ -167,6 +180,10 @@ height_to_landing_error ≈ 1.68 * height_error
 | current 16.5cm | 0.62 | 2.46 | 5.53 | 9.84 | 13.89 |
 | 25cm | 0.41 | 1.62 | 3.65 | 6.49 | 9.17 |
 | 30cm | 0.34 | 1.35 | 3.04 | 5.41 | 7.64 |
+
+下图对应 p95 偏移场景。它展示的是成功检测样本中偏移较大的尾部情况，因此远场误差增长明显更快。
+
+![p95 落点误差曲线](assets/baseline_landing_error_p95_curve_clean_20260713.jpg)
 
 读数：
 
@@ -195,6 +212,10 @@ height_to_landing_error ≈ 1.68 * height_error
 | <= 0.30m | 3.5 | 4.3 | 4.7 |
 | <= 0.50m | 4.5 | 5.6 | 6.1 |
 | <= 1.00m | 6.4 | 7.9 | 8.6 |
+
+下图把不同误差目标下的最大可用距离画成曲线。实线表示 p50，虚线表示 p95；颜色表示 baseline。
+
+![误差目标可达距离曲线](assets/baseline_distance_limit_clean_20260713.jpg)
 
 ## Interpretation
 
