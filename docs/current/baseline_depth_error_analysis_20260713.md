@@ -21,15 +21,15 @@
 
 双目深度由视差决定：
 
-```text
-Z = f * B / d
-```
+$$
+Z = \frac{fB}{d}
+$$
 
 深度误差近似为：
 
-```text
-dZ = Z^2 / (f * B) * dd
-```
+$$
+dZ = \frac{Z^2}{fB} \cdot dd
+$$
 
 其中：
 
@@ -54,63 +54,81 @@ dZ = Z^2 / (f * B) * dd
 
 当前可用标定是 `1280x720`，YOLO 评测图像是 `3840x2160`。如果视场和裁切方式一致，像素焦距按分辨率比例放大 `3` 倍。
 
-```text
-f_720 = (fx_cam1 + fx_cam2) / 2
-      = (436.299 + 408.324) / 2
-      = 422.311 px
-```
+$$
+\begin{aligned}
+f_{720}
+&= \frac{fx_{cam1} + fx_{cam2}}{2} \\
+&= \frac{436.299 + 408.324}{2} \\
+&= 422.311 \text{ px}
+\end{aligned}
+$$
 
-```text
-f_4k = f_720 * 3
-     = 422.311 * 3
-     = 1266.934 px
-```
+$$
+\begin{aligned}
+f_{4k}
+&= f_{720} \cdot 3 \\
+&= 422.311 \cdot 3 \\
+&= 1266.934 \text{ px}
+\end{aligned}
+$$
 
 后续深度误差计算使用：
 
-```text
-f = 1266.934 px
-```
+$$
+f = 1266.934 \text{ px}
+$$
 
 焦距不确定性不能直接用标定 RMS 代替。这里使用 bootstrap 结果：
 
-```text
-σf_720 = sqrt(6.550^2 + 41.612^2) / 2
-       = 21.062 px
-```
+$$
+\begin{aligned}
+\sigma f_{720}
+&= \frac{\sqrt{6.550^2 + 41.612^2}}{2} \\
+&= 21.062 \text{ px}
+\end{aligned}
+$$
 
-```text
-σf_4k = 21.062 * 3
-      = 63.187 px
-```
+$$
+\begin{aligned}
+\sigma f_{4k}
+&= 21.062 \cdot 3 \\
+&= 63.187 \text{ px}
+\end{aligned}
+$$
 
-```text
-σf / f = 63.187 / 1266.934
-       = 0.0499
-       = 4.99%
-```
+$$
+\begin{aligned}
+\frac{\sigma f}{f}
+&= \frac{63.187}{1266.934} \\
+&= 0.0499 \\
+&= 4.99\%
+\end{aligned}
+$$
 
 ### 3.2 标定残差
 
 当前 stereo RMS 原始值是 `0.2121 px`，同样缩放到 4K 坐标：
 
-```text
-stereo_rms_4k = stereo_rms_720 * 3
-              = 0.2121 * 3
-              = 0.636 px
-```
+$$
+\begin{aligned}
+stereo\_rms_{4k}
+&= stereo\_rms_{720} \cdot 3 \\
+&= 0.2121 \cdot 3 \\
+&= 0.636 \text{ px}
+\end{aligned}
+$$
 
 当前 epipolar RMS 原始值是 `0.2568 px`，用于说明双目几何质量处于像素级范围。公式里实际使用的是 stereo RMS：
 
-```text
-stereo_rms = 0.636 px
-```
+$$
+stereo\_rms = 0.636 \text{ px}
+$$
 
 baseline 安装误差按 `1%` 计算：
 
-```text
-σB / B = 1% = 0.01
-```
+$$
+\frac{\sigma B}{B} = 1\% = 0.01
+$$
 
 ### 3.3 YOLO x 方向中心偏移
 
@@ -131,39 +149,51 @@ baseline 安装误差按 `1%` 计算：
 
 左右相机的 x 方向中心误差合成为视差误差：
 
-```text
-dd_yolo = sqrt(2) * abs_dx
-```
+$$
+dd_{yolo} = \sqrt{2} \cdot abs(dx)
+$$
 
 ### 4.1 p50 视差误差
 
-```text
-dd_yolo_p50 = sqrt(2) * 0.759
-             = 1.073 px
-```
+$$
+\begin{aligned}
+dd_{yolo,p50}
+&= \sqrt{2} \cdot 0.759 \\
+&= 1.073 \text{ px}
+\end{aligned}
+$$
 
 叠加标定残差：
 
-```text
-dd_p50 = sqrt(dd_yolo_p50^2 + stereo_rms^2)
-       = sqrt(1.073^2 + 0.636^2)
-       = 1.247 px
-```
+$$
+\begin{aligned}
+dd_{p50}
+&= \sqrt{dd_{yolo,p50}^2 + stereo\_rms^2} \\
+&= \sqrt{1.073^2 + 0.636^2} \\
+&= 1.247 \text{ px}
+\end{aligned}
+$$
 
 ### 4.2 p95 视差误差
 
-```text
-dd_yolo_p95 = sqrt(2) * 3.606
-             = 5.100 px
-```
+$$
+\begin{aligned}
+dd_{yolo,p95}
+&= \sqrt{2} \cdot 3.606 \\
+&= 5.100 \text{ px}
+\end{aligned}
+$$
 
 叠加标定残差：
 
-```text
-dd_p95 = sqrt(dd_yolo_p95^2 + stereo_rms^2)
-       = sqrt(5.100^2 + 0.636^2)
-       = 5.139 px
-```
+$$
+\begin{aligned}
+dd_{p95}
+&= \sqrt{dd_{yolo,p95}^2 + stereo\_rms^2} \\
+&= \sqrt{5.100^2 + 0.636^2} \\
+&= 5.139 \text{ px}
+\end{aligned}
+$$
 
 汇总如下：
 
@@ -178,55 +208,60 @@ dd_p95 = sqrt(dd_yolo_p95^2 + stereo_rms^2)
 
 只传播视差误差时：
 
-```text
-dZ = Z^2 / (f * B) * dd
-```
+$$
+dZ = \frac{Z^2}{fB} \cdot dd
+$$
 
 加入焦距不确定性和 baseline 1% 后，用平方和合成：
 
-```text
-σZ = sqrt(
-  (Z^2 / (f * B) * σd)^2
-  + (Z * σf / f)^2
-  + (Z * σB / B)^2
-)
-```
+$$
+\sigma Z =
+\sqrt{
+\left(\frac{Z^2}{fB} \cdot \sigma d\right)^2
++ \left(Z \cdot \frac{\sigma f}{f}\right)^2
++ \left(Z \cdot \frac{\sigma B}{B}\right)^2
+}
+$$
 
 ### 5.1 p50 深度误差公式
 
 代入 `f = 1266.934 px`、`σd_p50 = 1.247 px`、`σf/f = 0.0499`、`σB/B = 0.01`：
 
-```text
-σZ_p50 = sqrt(
-  (Z^2 / (1266.934 * B) * 1.247)^2
-  + (0.0499 * Z)^2
-  + (0.01 * Z)^2
-)
-```
+$$
+\sigma Z_{p50} =
+\sqrt{
+\left(\frac{Z^2}{1266.934B} \cdot 1.247\right)^2
++ (0.0499Z)^2
++ (0.01Z)^2
+}
+$$
 
 其中视差项可以整理为：
 
-```text
-Z^2 / (1266.934 * B) * 1.247 = 0.0009846 * Z^2 / B
-```
+$$
+\frac{Z^2}{1266.934B} \cdot 1.247
+= 0.0009846 \cdot \frac{Z^2}{B}
+$$
 
 ### 5.2 p95 深度误差公式
 
 代入 `f = 1266.934 px`、`σd_p95 = 5.139 px`、`σf/f = 0.0499`、`σB/B = 0.01`：
 
-```text
-σZ_p95 = sqrt(
-  (Z^2 / (1266.934 * B) * 5.139)^2
-  + (0.0499 * Z)^2
-  + (0.01 * Z)^2
-)
-```
+$$
+\sigma Z_{p95} =
+\sqrt{
+\left(\frac{Z^2}{1266.934B} \cdot 5.139\right)^2
++ (0.0499Z)^2
++ (0.01Z)^2
+}
+$$
 
 其中视差项可以整理为：
 
-```text
-Z^2 / (1266.934 * B) * 5.139 = 0.0040565 * Z^2 / B
-```
+$$
+\frac{Z^2}{1266.934B} \cdot 5.139
+= 0.0040565 \cdot \frac{Z^2}{B}
+$$
 
 单位：
 
