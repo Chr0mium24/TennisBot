@@ -50,14 +50,17 @@ Definitions:
 
 ## Visual Summary
 
-The montage below shows 12 representative accurate matches across the matched
-offset distribution. Each crop is centered around the ball region.
+The figure below overlays all `377` accurate matches in one centered coordinate
+frame and includes distribution histograms.
 
-- Green box: manual bbox.
-- Red box: YOLO bbox.
-- Yellow line: center offset from manual bbox center to YOLO bbox center.
+- Left: all boxes are re-centered on the manual bbox center.
+- Green: manual bbox.
+- Red: YOLO bbox.
+- Yellow: YOLO center offset cloud and offset rays.
+- Top-right: center offset histogram.
+- Bottom-right: semi-transparent overlaid `abs dx` / `abs dy` histograms.
 
-![YOLO center offset montage](assets/yolo_center_offset_iou50_montage_20260713.jpg)
+![YOLO center offset overlay and distribution](assets/yolo_center_offset_iou50_overlay_distribution_20260713.jpg)
 
 ## Matched Box Size Buckets
 
