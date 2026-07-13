@@ -28,7 +28,12 @@ from camera_calib_lab.solve import (
     undistorted_epipolar_rms_px,
     validate_stereo_source_devices,
 )
-from camera_calib_lab.v4l2_controls import V4L2Control, camera_controls_report, v4l2_controls_snapshot
+from camera_calib_lab.v4l2_controls import (
+    V4L2Control,
+    apply_calibration_capture_controls,
+    camera_controls_report,
+    v4l2_controls_snapshot,
+)
 
 
 class SolveCliTest(unittest.TestCase):
@@ -149,6 +154,47 @@ class SolveCliTest(unittest.TestCase):
         self.assertEqual(code, 0)
         report.assert_called_once_with(["/dev/video0", "/dev/video2"])
         self.assertEqual(output.getvalue(), "controls\n")
+
+    def test_calibration_capture_controls_are_applied_in_safe_order(self) -> None:
+        controls = {
+            name: V4L2Control(name, 0, 6500, 1, 0, 0)
+            for name in (
+                "auto_exposure",
+                "exposure_time_absolute",
+                "white_balance_automatic",
+                "white_balance_temperature",
+                "focus_automatic_continuous",
+                "focus_absolute",
+            )
+        }
+        with (
+            patch("camera_calib_lab.v4l2_controls.read_v4l2_controls", return_value=controls),
+            patch("camera_calib_lab.v4l2_controls.run_v4l2", return_value={"returncode": 0, "stdout": "", "stderr": ""}) as run,
+        ):
+            report = apply_calibration_capture_controls(["/dev/video0"])
+
+        self.assertEqual(
+            [call.args[0][-1] for call in run.call_args_list],
+            [
+                "--set-ctrl=auto_exposure=1",
+                "--set-ctrl=exposure_time_absolute=10",
+                "--set-ctrl=white_balance_automatic=0",
+                "--set-ctrl=white_balance_temperature=4600",
+                "--set-ctrl=focus_automatic_continuous=0",
+                "--set-ctrl=focus_absolute=600",
+            ],
+        )
+        self.assertIn("focus=600 manual", report)
+
+    def test_prepare_calibration_cli_reports_requested_devices(self) -> None:
+        output = StringIO()
+        with patch("camera_calib_lab.cli.apply_calibration_capture_controls", return_value="applied") as apply:
+            with redirect_stdout(output):
+                code = main(["camera", "prepare-calibration", "--devices", "/dev/video0,/dev/video2"])
+
+        self.assertEqual(code, 0)
+        apply.assert_called_once_with(["/dev/video0", "/dev/video2"])
+        self.assertEqual(output.getvalue(), "applied\n")
 
     def test_session_json_records_mono_v4l2_controls(self) -> None:
         controls = {"brightness": v4l2_payload(current=64)}

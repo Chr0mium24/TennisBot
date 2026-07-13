@@ -22,6 +22,14 @@ CALIBRATION_CONTROL_NAMES = (
     "focus_automatic_continuous",
     "focus_absolute",
 )
+CALIBRATION_CAPTURE_CONTROL_VALUES = (
+    (AUTO_EXPOSURE_CONTROL, MANUAL_AUTO_EXPOSURE_VALUE),
+    (EXPOSURE_CONTROL, 10),
+    ("white_balance_automatic", 0),
+    ("white_balance_temperature", 4600),
+    ("focus_automatic_continuous", 0),
+    ("focus_absolute", 600),
+)
 
 
 @dataclass(frozen=True)
@@ -60,6 +68,22 @@ def camera_controls_report(devices: Iterable[str]) -> str:
                 lines.append(f"  {name}: unsupported")
                 continue
             lines.append(f"  {name}: {control.value}{control_mode_label(name, control.value)}")
+    return "\n".join(lines)
+
+
+def apply_calibration_capture_controls(devices: Iterable[str]) -> str:
+    lines = ["Applied calibration camera controls:"]
+    for device in devices:
+        controls = read_v4l2_controls(str(device))
+        missing = [name for name, _ in CALIBRATION_CAPTURE_CONTROL_VALUES if name not in controls]
+        if missing:
+            raise RuntimeError(f"{device} does not provide required controls: {', '.join(missing)}")
+        for name, value in CALIBRATION_CAPTURE_CONTROL_VALUES:
+            result = run_v4l2(["-d", str(device), f"--set-ctrl={name}={value}"])
+            if result["returncode"] != 0:
+                detail = result["stderr"] or result["stdout"] or "unknown v4l2-ctl error"
+                raise RuntimeError(f"failed to set {device} {name}={value}: {detail}")
+        lines.append(f"- {device}: exposure=10 manual, focus=600 manual, white_balance=4600 manual")
     return "\n".join(lines)
 
 

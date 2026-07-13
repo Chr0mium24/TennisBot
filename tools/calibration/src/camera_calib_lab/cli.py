@@ -10,7 +10,7 @@ from camera_calib_lab.camera_preview import PreviewOptions, run_camera_preview
 from camera_calib_lab.cli_summary import capture_summary, mono_solve_summary, stereo_solve_summary
 from camera_calib_lab.capture_gui import run_mono_charuco_gui, run_stereo_charuco_gui
 from camera_calib_lab.solve import solve_mono_package, solve_stereo_package
-from camera_calib_lab.v4l2_controls import camera_controls_report
+from camera_calib_lab.v4l2_controls import apply_calibration_capture_controls, camera_controls_report
 
 
 def capture_charuco_auto_gui(args: argparse.Namespace) -> int:
@@ -102,6 +102,14 @@ def camera_controls(args: argparse.Namespace) -> int:
     if not devices:
         raise ValueError("camera controls requires at least one --devices entry")
     print(camera_controls_report(devices))
+    return 0
+
+
+def camera_prepare_calibration(args: argparse.Namespace) -> int:
+    devices = [device.strip() for device in str(args.devices).split(",") if device.strip()]
+    if not devices:
+        raise ValueError("camera prepare-calibration requires at least one --devices entry")
+    print(apply_calibration_capture_controls(devices))
     return 0
 
 
@@ -221,6 +229,10 @@ def build_parser() -> argparse.ArgumentParser:
     controls = camera_subparsers.add_parser("controls", help="显示当前 V4L2 标定相关控制参数。", **parser_kwargs)
     controls.add_argument("--devices", required=True, help="逗号分隔的一到两个相机设备")
     controls.set_defaults(handler=camera_controls)
+
+    prepare = camera_subparsers.add_parser("prepare-calibration", help="设定标定采集固定相机参数。", **parser_kwargs)
+    prepare.add_argument("--devices", required=True, help="逗号分隔的一到两个相机设备")
+    prepare.set_defaults(handler=camera_prepare_calibration)
 
     preview = camera_subparsers.add_parser("preview", help="打开相机实时画面并调节快门/亮度。", **parser_kwargs)
     preview.add_argument("--device", default="", help="单相机设备；与 --devices 二选一")

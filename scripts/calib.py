@@ -111,6 +111,12 @@ def run_mono(args: list[str]) -> int:
             )
         steps.append(
             CommandStep(
+                f"{options.camera_id} prepare controls",
+                ["camera", "prepare-calibration", "--devices", options.device],
+            )
+        )
+        steps.append(
+            CommandStep(
                 f"{options.camera_id} current controls",
                 ["camera", "controls", "--devices", options.device],
             )
@@ -176,6 +182,12 @@ def run_stereo(args: list[str]) -> int:
             raise ValueError(
                 f"Session path already exists: {session}. Pass --session to a new path or use --solve-only."
             )
+        steps.append(
+            CommandStep(
+                "stereo prepare controls",
+                ["camera", "prepare-calibration", "--devices", f"{options.left_device},{options.right_device}"],
+            )
+        )
         steps.append(
             CommandStep(
                 "stereo current controls",
