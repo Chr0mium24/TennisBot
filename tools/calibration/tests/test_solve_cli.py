@@ -131,6 +131,15 @@ class SolveCliTest(unittest.TestCase):
         self.assertIn("focus_absolute: 55", report)
         self.assertIn("white_balance_automatic: unsupported", report)
 
+    def test_v4l2_bool_control_line_is_parsed_without_min_max(self) -> None:
+        from camera_calib_lab.v4l2_controls import parse_control_line
+
+        control = parse_control_line("white_balance_automatic 0x0098090c (bool) : default=1 value=1")
+
+        self.assertIsNotNone(control)
+        assert control is not None
+        self.assertEqual((control.minimum, control.maximum, control.value), (0, 1, 1))
+
     def test_camera_controls_cli_reports_requested_devices(self) -> None:
         output = StringIO()
         with patch("camera_calib_lab.cli.camera_controls_report", return_value="controls") as report:

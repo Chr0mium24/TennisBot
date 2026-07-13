@@ -95,6 +95,10 @@ def parse_control_line(line: str) -> V4L2Control | None:
         key: int(value)
         for key, value in re.findall(r"(min|max|step|default|value)=(-?\d+)", body)
     }
+    if "(bool)" in line:
+        values.setdefault("min", 0)
+        values.setdefault("max", 1)
+        values.setdefault("step", 1)
     if not {"min", "max", "default", "value"}.issubset(values):
         return None
     step = max(1, values.get("step", 1))

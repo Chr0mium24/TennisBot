@@ -9,3 +9,4 @@ Before opening a mono or stereo calibration capture GUI, print the current V4L2 
 1. Add a calibration CLI command that reports a deterministic set of current V4L2 controls, including exposure, brightness, gain, white balance, and focus controls when supported.
 2. Run that command as a pre-capture step in the wrapper for mono and stereo calibration; resolve and print stereo mono inputs before capture.
 3. Add unit coverage for the report and wrapper command ordering, run the calibration test suite, and record the result.
+4. Validate against the connected cameras and handle V4L2 boolean controls, whose output omits min/max fields.
