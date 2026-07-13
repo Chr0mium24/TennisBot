@@ -48,6 +48,17 @@ Definitions:
 | signed_dx_px | 377 | -0.383 | 2.007 | -0.241 | 0.506 | 1.282 | 1.854 | 13.724 |
 | signed_dy_px | 377 | -0.114 | 1.971 | -0.275 | 0.773 | 1.693 | 2.924 | 10.994 |
 
+## Visual Summary
+
+The montage below shows 12 representative accurate matches across the matched
+offset distribution. Each crop is centered around the ball region.
+
+- Green box: manual bbox.
+- Red box: YOLO bbox.
+- Yellow line: center offset from manual bbox center to YOLO bbox center.
+
+![YOLO center offset montage](assets/yolo_center_offset_iou50_montage_20260713.jpg)
+
 ## Matched Box Size Buckets
 
 | GT max bbox dimension | matches | center p50 | center p90 | center p95 | abs dx p50 | abs dy p50 |
