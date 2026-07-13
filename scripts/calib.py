@@ -111,6 +111,12 @@ def run_mono(args: list[str]) -> int:
             )
         steps.append(
             CommandStep(
+                f"{options.camera_id} current controls",
+                ["camera", "controls", "--devices", options.device],
+            )
+        )
+        steps.append(
+            CommandStep(
                 f"{options.camera_id} capture",
                 [
                     "capture",
@@ -157,11 +163,25 @@ def run_stereo(args: list[str]) -> int:
     options = parse_stereo_options(args)
     session = options.session or default_session_path(options.mode, "stereo_charuco", options.run_id)
     steps: list[CommandStep] = []
+    left_mono: Path | None = None
+    right_mono: Path | None = None
+    if options.mode != "capture-only":
+        left_mono = options.left_mono or latest_mono_artifact_path("cam1")
+        right_mono = options.right_mono or latest_mono_artifact_path("cam2")
+        print("Stereo mono calibration inputs:")
+        print(f"  cam1: {display_path(left_mono)}")
+        print(f"  cam2: {display_path(right_mono)}")
     if options.mode != "solve-only":
         if options.mode == "capture-solve" and session.exists():
             raise ValueError(
                 f"Session path already exists: {session}. Pass --session to a new path or use --solve-only."
             )
+        steps.append(
+            CommandStep(
+                "stereo current controls",
+                ["camera", "controls", "--devices", f"{options.left_device},{options.right_device}"],
+            )
+        )
         steps.append(
             CommandStep(
                 "stereo capture",
@@ -182,8 +202,8 @@ def run_stereo(args: list[str]) -> int:
             )
         )
     if options.mode != "capture-only":
-        left_mono = options.left_mono or latest_mono_artifact_path("cam1")
-        right_mono = options.right_mono or latest_mono_artifact_path("cam2")
+        assert left_mono is not None
+        assert right_mono is not None
         steps.append(
             CommandStep(
                 "stereo solve",

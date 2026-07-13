@@ -17,6 +17,10 @@ CALIBRATION_CONTROL_NAMES = (
     EXPOSURE_CONTROL,
     BRIGHTNESS_CONTROL,
     GAIN_CONTROL,
+    "white_balance_automatic",
+    "white_balance_temperature",
+    "focus_automatic_continuous",
+    "focus_absolute",
 )
 
 
@@ -43,6 +47,31 @@ def v4l2_controls_snapshot(
 ) -> dict[str, Any]:
     controls = read_v4l2_controls(str(device))
     return {name: control_readback_payload(controls[name]) for name in control_names if name in controls}
+
+
+def camera_controls_report(devices: Iterable[str]) -> str:
+    lines = ["Current V4L2 camera controls:"]
+    for device in devices:
+        controls = read_v4l2_controls(str(device))
+        lines.append(f"- {device}:")
+        for name in CALIBRATION_CONTROL_NAMES:
+            control = controls.get(name)
+            if control is None:
+                lines.append(f"  {name}: unsupported")
+                continue
+            lines.append(f"  {name}: {control.value}{control_mode_label(name, control.value)}")
+    return "\n".join(lines)
+
+
+def control_mode_label(name: str, value: int) -> str:
+    if name == AUTO_EXPOSURE_CONTROL:
+        if value == MANUAL_AUTO_EXPOSURE_VALUE:
+            return " (manual)"
+        if value == AUTO_EXPOSURE_VALUE:
+            return " (auto)"
+    if name in {"focus_automatic_continuous", "white_balance_automatic"}:
+        return " (auto)" if value else " (manual)"
+    return ""
 
 
 def read_v4l2_controls(device: str) -> dict[str, V4L2Control]:

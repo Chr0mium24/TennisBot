@@ -28,7 +28,7 @@ from camera_calib_lab.solve import (
     undistorted_epipolar_rms_px,
     validate_stereo_source_devices,
 )
-from camera_calib_lab.v4l2_controls import V4L2Control, v4l2_controls_snapshot
+from camera_calib_lab.v4l2_controls import V4L2Control, camera_controls_report, v4l2_controls_snapshot
 
 
 class SolveCliTest(unittest.TestCase):
@@ -111,7 +111,35 @@ class SolveCliTest(unittest.TestCase):
         self.assertEqual(snapshot["exposure_time_absolute"]["current"], 200)
         self.assertEqual(snapshot["brightness"]["current"], 64)
         self.assertEqual(snapshot["gain"]["current"], 255)
-        self.assertNotIn("focus_absolute", snapshot)
+        self.assertEqual(snapshot["focus_absolute"]["current"], 8)
+
+    def test_camera_controls_report_includes_focus_and_auto_modes(self) -> None:
+        controls = {
+            "auto_exposure": V4L2Control("auto_exposure", 0, 3, 1, 3, 1),
+            "exposure_time_absolute": V4L2Control("exposure_time_absolute", 3, 2047, 1, 166, 200),
+            "brightness": V4L2Control("brightness", -64, 64, 1, 0, 12),
+            "gain": V4L2Control("gain", 0, 255, 1, 0, 16),
+            "focus_automatic_continuous": V4L2Control("focus_automatic_continuous", 0, 1, 1, 1, 0),
+            "focus_absolute": V4L2Control("focus_absolute", 0, 255, 1, 0, 55),
+        }
+
+        with patch("camera_calib_lab.v4l2_controls.read_v4l2_controls", return_value=controls):
+            report = camera_controls_report(["/dev/video0"])
+
+        self.assertIn("auto_exposure: 1 (manual)", report)
+        self.assertIn("focus_automatic_continuous: 0 (manual)", report)
+        self.assertIn("focus_absolute: 55", report)
+        self.assertIn("white_balance_automatic: unsupported", report)
+
+    def test_camera_controls_cli_reports_requested_devices(self) -> None:
+        output = StringIO()
+        with patch("camera_calib_lab.cli.camera_controls_report", return_value="controls") as report:
+            with redirect_stdout(output):
+                code = main(["camera", "controls", "--devices", "/dev/video0,/dev/video2"])
+
+        self.assertEqual(code, 0)
+        report.assert_called_once_with(["/dev/video0", "/dev/video2"])
+        self.assertEqual(output.getvalue(), "controls\n")
 
     def test_session_json_records_mono_v4l2_controls(self) -> None:
         controls = {"brightness": v4l2_payload(current=64)}
