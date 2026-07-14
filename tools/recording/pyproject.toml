@@ -1,0 +1,32 @@
+[project]
+name = "tennisbot-recording"
+version = "0.1.0"
+description = "TennisBot V4L2/ffmpeg camera recording CLI."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pyyaml>=6.0.0",
+]
+
+[project.scripts]
+tennisbot-recording = "tennisbot_recording.cli:main"
+pytest = "tennisbot_recording.pytest_main:main"
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

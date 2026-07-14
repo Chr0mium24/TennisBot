@@ -16,6 +16,7 @@ workflow.
 | `packages/core` | Artifact validation, stereo pairing, triangulation helpers |
 | `src` | Vision runtime package; target interfaces are provided by the external control workspace |
 | `tools/calibration` | Fixed DFOptix ChArUco OpenCV mono/stereo capture GUI |
+| `tools/recording` | V4L2/ffmpeg camera recording CLI migrated from local lab scripts |
 | `tools/yolo` | Standalone YOLO runtime model package tooling |
 | `tools/stereo` | Local OpenCV stereo recorder, coordinate GUI, and replay tooling |
 | `artifacts/` | Ignored local runtime outputs for calibration and model packages |
@@ -70,6 +71,20 @@ uv run scripts/calib.py mono cam1
 uv run scripts/calib.py mono cam2
 uv run scripts/calib.py stereo
 ```
+
+Record raw camera video through the config-driven ffmpeg recorder:
+
+```bash
+uv run scripts/recording.py single --dry-run
+uv run scripts/recording.py single --duration 60
+uv run scripts/recording.py dual --dry-run
+uv run scripts/recording.py dual --duration 60
+uv run scripts/recording.py gui
+```
+
+Recording defaults live in `tools/recording/configs/tennis_camera_recording.yaml`.
+The recorder loads exposure, white balance, brightness, gain, and related V4L2
+controls from that config before opening the camera.
 
 The calibration wrapper writes timestamped package directories by default so a
 new run does not overwrite the previous result. Use `--output` only when

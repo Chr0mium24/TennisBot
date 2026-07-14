@@ -1,0 +1,2 @@
+"""TennisBot camera recording CLI."""
+

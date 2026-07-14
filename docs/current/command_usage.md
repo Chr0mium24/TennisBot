@@ -119,6 +119,43 @@ uv run scripts/stereo.py replay
 页面里用两个进度条选择轨迹时间段，并基于选中点系生成 3D 显示和相机坐标
 预测曲线。时间段不通过命令行参数传入。
 
+## 原始相机录像入口
+
+从仓库根目录运行：
+
+```bash
+uv run scripts/recording.py single --dry-run
+uv run scripts/recording.py single --duration 60
+uv run scripts/recording.py single --duration 60 --sample-fps 3
+uv run scripts/recording.py dual --dry-run
+uv run scripts/recording.py dual --duration 60
+uv run scripts/recording.py dual --preview
+uv run scripts/recording.py gui
+```
+
+默认配置：
+
+- 配置文件：`tools/recording/configs/tennis_camera_recording.yaml`
+- 单路设备：`/dev/video0`
+- 双路设备：`/dev/video2,/dev/video0`
+- 分辨率：`3840x2160`
+- 帧率：`30`
+- 输入格式：`mjpeg`
+- 输出目录：`runs/recording`
+- 控制项：从 YAML 加载 `exposure_time_absolute`、白平衡、亮度、增益、锐度等 V4L2 参数
+
+常用覆盖：
+
+```bash
+uv run scripts/recording.py single --exposure 100 --wb 4600 --duration 30
+uv run scripts/recording.py dual --control exposure_time_absolute=166
+uv run scripts/recording.py extract --dry-run 20260701_205507
+uv run scripts/recording.py normalize --dry-run --base-epoch 1782893181 runs/recording/<session>
+```
+
+`dual` 的软同步沿用 V4L2 absolute timestamps 加 `output_ts_offset` 的软件归一化；
+这不是硬件同步。
+
 ## YOLO 标注、抠球审核和增强
 
 详细流程见 [YOLO 标注、抠球审核和数据增强使用说明](yolo_sprite_augmentation_usage.md)。
