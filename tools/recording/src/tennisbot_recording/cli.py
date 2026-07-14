@@ -10,7 +10,7 @@ from typing import Any
 import yaml
 
 from .config import ControlValue, REPO_ROOT, load_config
-from .gui import run_gui
+from .gui import run_dual_gui, run_gui
 from .postprocess import ExtractOptions, NormalizeOptions, extract_yolo_frames, normalize_timestamps
 from .recording import build_dual_plan, build_single_plan, record_dual, record_single
 
@@ -83,6 +83,18 @@ def build_parser() -> argparse.ArgumentParser:
     gui_single.add_argument("--sample-fps", type=positive_float, default=None, help="Keep this many frames per second while recording")
     gui_single.add_argument("--dry-run", action="store_true", help="Print resolved GUI config without opening the camera")
     gui_single.set_defaults(func=cmd_gui_single)
+
+    gui_dual = gui_subparsers.add_parser("dual", help="Open two-camera side-by-side preview/record GUI.", **parser_kwargs)
+    add_config_arg(gui_dual)
+    add_control_override_args(gui_dual)
+    gui_dual.add_argument("--devices", default="", help="Comma-separated camera devices")
+    gui_dual.add_argument("--out-root", type=Path, default=None, help="Output root")
+    gui_dual.add_argument("--preview-width", type=positive_int, default=None, help="Per-camera preview width")
+    gui_dual.add_argument("--preview-fps", type=positive_float, default=None, help="Preview frames per second")
+    gui_dual.add_argument("--soft-sync", action="store_true", default=None, help="Use V4L2 absolute timestamps and output offset metadata")
+    gui_dual.add_argument("--no-soft-sync", action="store_false", dest="soft_sync", help="Disable soft timestamp normalization")
+    gui_dual.add_argument("--dry-run", action="store_true", help="Print resolved GUI config without opening cameras")
+    gui_dual.set_defaults(func=cmd_gui_dual)
 
     extract = subparsers.add_parser("extract-yolo-frames", help="Extract recordings into the YOLO annotation image layout.", **parser_kwargs)
     extract.add_argument("inputs", nargs="+", help="Session names, session directories, or video files")
@@ -214,6 +226,33 @@ def cmd_gui_single(args: argparse.Namespace) -> int:
         preview_width=preview_width,
         preview_fps=preview_fps,
         sample_fps=sample_fps,
+    )
+    return 0
+
+
+def cmd_gui_dual(args: argparse.Namespace) -> int:
+    config = config_with_overrides(args)
+    devices = parse_devices(args.devices) if args.devices else (config.dual.devices[0], config.dual.devices[1])
+    out_root = resolve_out_root(args.out_root, config.recording.output_root)
+    preview_width = args.preview_width if args.preview_width is not None else config.preview.width
+    preview_fps = args.preview_fps if args.preview_fps is not None else config.preview.fps
+    soft_sync = config.dual.soft_sync if args.soft_sync is None else bool(args.soft_sync)
+    if args.dry_run:
+        print("recording_dual_gui=dry-run")
+        print(f"devices={devices[0]},{devices[1]}")
+        print(f"out_root={out_root}")
+        print(f"capture={config.capture.video_size}@{config.capture.fps:g} input_format={config.capture.input_format}")
+        print(f"preview={preview_width}px@{preview_fps:g}fps per_camera")
+        print(f"soft_sync={soft_sync}")
+        print(f"controls={config.v4l2_controls_string()}")
+        return 0
+    run_dual_gui(
+        config=config,
+        devices=devices,
+        out_root=out_root,
+        preview_width=preview_width,
+        preview_fps=preview_fps,
+        soft_sync=soft_sync,
     )
     return 0
 

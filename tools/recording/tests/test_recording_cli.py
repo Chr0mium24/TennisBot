@@ -83,6 +83,18 @@ def test_gui_single_dry_run_uses_config(capsys) -> None:
     assert "sample_fps=3" in output
 
 
+def test_gui_dual_dry_run_uses_config_and_overrides(capsys) -> None:
+    code = main(["gui", "dual", "--dry-run", "--devices", "/dev/video4,/dev/video6", "--no-soft-sync"])
+
+    output = capsys.readouterr().out
+    assert code == 0
+    assert "recording_dual_gui=dry-run" in output
+    assert "devices=/dev/video4,/dev/video6" in output
+    assert "preview=960px@10fps per_camera" in output
+    assert "soft_sync=False" in output
+    assert "exposure_time_absolute=200" in output
+
+
 def test_extract_yolo_frames_dry_run_maps_video_labels(tmp_path: Path, capsys) -> None:
     session = tmp_path / "20260701_205507"
     session.mkdir()

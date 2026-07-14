@@ -80,6 +80,7 @@ uv run scripts/recording.py single --duration 60
 uv run scripts/recording.py dual --dry-run
 uv run scripts/recording.py dual --duration 60
 uv run scripts/recording.py gui
+uv run scripts/recording.py gui dual
 ```
 
 Recording defaults live in `tools/recording/configs/tennis_camera_recording.yaml`.

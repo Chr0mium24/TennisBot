@@ -33,6 +33,7 @@ uv run tennisbot-recording record dual --dry-run
 uv run tennisbot-recording record dual --duration 60
 uv run tennisbot-recording record dual --preview
 uv run tennisbot-recording gui single
+uv run tennisbot-recording gui dual
 ```
 
 From the repository root, prefer the wrapper:
@@ -41,6 +42,7 @@ From the repository root, prefer the wrapper:
 uv run scripts/recording.py single --dry-run
 uv run scripts/recording.py dual --duration 60
 uv run scripts/recording.py gui
+uv run scripts/recording.py gui dual
 ```
 
 Both `single` and `dual` configure the selected cameras before recording. CLI
@@ -50,6 +52,9 @@ control flags override the YAML for one run:
 uv run scripts/recording.py single --exposure 100 --wb 4600 --duration 30
 uv run scripts/recording.py dual --control exposure_time_absolute=166
 ```
+
+`gui dual` shows both cameras side by side in one window and records through
+the same dual ffmpeg path as `record dual`.
 
 Default outputs are written under ignored `runs/recording`.
 

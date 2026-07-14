@@ -26,7 +26,7 @@ def normalize_args(argv: list[str]) -> list[str]:
     if command in {"dual", "stereo"}:
         return ["record", "dual", *rest]
     if command == "gui":
-        if rest and rest[0] == "single":
+        if rest and rest[0] in {"single", "dual"}:
             return ["gui", *rest]
         return ["gui", "single", *rest]
     if command == "extract":
@@ -42,6 +42,7 @@ def print_usage() -> None:
   uv run scripts/recording.py single [options]
   uv run scripts/recording.py dual [options]
   uv run scripts/recording.py gui [options]
+  uv run scripts/recording.py gui dual [options]
   uv run scripts/recording.py extract [options] <session|dir|video...>
   uv run scripts/recording.py normalize [options] <dir|video...>
   uv run scripts/recording.py config show
@@ -57,6 +58,7 @@ def print_usage() -> None:
   uv run scripts/recording.py dual --duration 60
   uv run scripts/recording.py dual --preview
   uv run scripts/recording.py gui
+  uv run scripts/recording.py gui dual
   uv run scripts/recording.py extract --dry-run 20260701_205507
   uv run scripts/recording.py normalize --dry-run --base-epoch 1782893181 runs/recording/<session>
 

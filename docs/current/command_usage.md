@@ -131,6 +131,7 @@ uv run scripts/recording.py dual --dry-run
 uv run scripts/recording.py dual --duration 60
 uv run scripts/recording.py dual --preview
 uv run scripts/recording.py gui
+uv run scripts/recording.py gui dual
 ```
 
 默认配置：
@@ -155,6 +156,9 @@ uv run scripts/recording.py normalize --dry-run --base-epoch 1782893181 runs/rec
 
 `dual` 的软同步沿用 V4L2 absolute timestamps 加 `output_ts_offset` 的软件归一化；
 这不是硬件同步。
+
+`gui dual` 在一个窗口中左右并排显示两路相机画面，开始录像时仍走同一套
+双路 ffmpeg 录像命令和 YAML 相机控制。
 
 ## YOLO 标注、抠球审核和增强
 
