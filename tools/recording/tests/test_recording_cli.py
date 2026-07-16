@@ -1,12 +1,19 @@
 from __future__ import annotations
 
-from pathlib import Path
+import signal
 import subprocess
+from pathlib import Path
 
 from tennisbot_recording.cli import main
 from tennisbot_recording.config import DEFAULT_CONFIG_PATH, load_config
 from tennisbot_recording.gui import start_noninteractive_process
-from tennisbot_recording.recording import build_dual_plan, build_single_plan, display_command, print_saved_videos
+from tennisbot_recording.recording import (
+    build_dual_plan,
+    build_single_plan,
+    display_command,
+    print_saved_videos,
+    terminate_processes,
+)
 
 
 def test_default_config_loads_record_script_camera_controls() -> None:
@@ -74,6 +81,31 @@ def test_print_saved_videos_reports_only_existing_outputs(tmp_path: Path, capsys
     output = capsys.readouterr().out
     assert f"Saved video: {saved}" in output
     assert str(missing) not in output
+
+
+def test_terminate_processes_signals_all_captures_before_waiting() -> None:
+    events: list[str] = []
+
+    class FakeProcess:
+        def __init__(self, name: str) -> None:
+            self.name = name
+            self.done = False
+
+        def poll(self):
+            return 0 if self.done else None
+
+        def send_signal(self, sent_signal):
+            events.append(f"signal:{self.name}:{sent_signal}")
+
+        def wait(self, timeout=None):
+            events.append(f"wait:{self.name}")
+            self.done = True
+            return 0
+
+    terminate_processes([FakeProcess("left"), FakeProcess("right")])
+
+    assert events[:2] == [f"signal:left:{signal.SIGINT}", f"signal:right:{signal.SIGINT}"]
+    assert events[2:] == ["wait:left", "wait:right"]
 
 
 def test_record_single_dry_run_accepts_negative_brightness_override(capsys) -> None:

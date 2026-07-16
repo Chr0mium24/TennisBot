@@ -669,8 +669,35 @@ def run_foreground(command: Sequence[str]) -> int:
 
 
 def terminate_processes(processes: Sequence[subprocess.Popen[bytes]]) -> None:
+    active = [process for process in processes if process.poll() is None]
+    if not active:
+        return
+    for process in active:
+        process.send_signal(signal.SIGINT)
+    remaining = wait_for_processes(active, timeout=5)
+    for process in remaining:
+        process.terminate()
+    remaining = wait_for_processes(remaining, timeout=2)
+    for process in remaining:
+        process.kill()
+    wait_for_processes(remaining, timeout=2)
+
+
+def wait_for_processes(
+    processes: Sequence[subprocess.Popen[bytes]],
+    *,
+    timeout: float,
+) -> list[subprocess.Popen[bytes]]:
+    deadline = time.monotonic() + timeout
     for process in processes:
-        terminate_process(process)
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        try:
+            process.wait(timeout=remaining)
+        except subprocess.TimeoutExpired:
+            pass
+    return [process for process in processes if process.poll() is None]
 
 
 def terminate_process(process: subprocess.Popen[bytes]) -> None:
