@@ -16,6 +16,7 @@ from .recording import (
     build_single_ffmpeg_command,
     DualRecordingPlan,
     format_number,
+    print_saved_videos,
     run_checked,
     terminate_processes,
     write_dual_session,
@@ -158,9 +159,9 @@ class TennisRecorderGui:
         self.current_output = output
         self.stop_button.configure(state=NORMAL)
         if self.sample_fps is None:
-            self.status.set(f"Recording: {output}")
+            self.status.set("Recording")
         else:
-            self.status.set(f"Recording {format_number(self.sample_fps)} fps: {output}")
+            self.status.set(f"Recording at {format_number(self.sample_fps)} fps")
 
     def stop_recording(self) -> None:
         process = self.record_process
@@ -171,7 +172,7 @@ class TennisRecorderGui:
         self.stop_button.configure(state=DISABLED)
         self.record_button.configure(state=NORMAL)
         if self.current_output is not None:
-            self.status.set(f"Saved: {self.current_output}")
+            print_saved_videos((self.current_output,))
         self.current_output = None
         self.configure_camera()
         self.start_preview()
@@ -180,9 +181,9 @@ class TennisRecorderGui:
         if self.record_process is not None and self.recording_started_at is not None and self.current_output is not None:
             elapsed = int(time.monotonic() - self.recording_started_at)
             if self.sample_fps is None:
-                self.status.set(f"Recording {elapsed}s: {self.current_output}")
+                self.status.set(f"Recording {elapsed}s")
             else:
-                self.status.set(f"Recording {elapsed}s at {format_number(self.sample_fps)} fps: {self.current_output}")
+                self.status.set(f"Recording {elapsed}s at {format_number(self.sample_fps)} fps")
             if self.record_process.poll() is not None:
                 self.stop_recording()
         self.root.after(1000, self.tick)
@@ -327,7 +328,7 @@ class TennisDualRecorderGui:
         self.current_plan = plan
         self.recording_started_at = time.monotonic()
         self.stop_button.configure(state=NORMAL)
-        self.status.set(f"Recording stereo: {plan.out_dir}")
+        self.status.set("Recording stereo")
 
     def stop_recording(self) -> None:
         if self.record_processes:
@@ -338,7 +339,7 @@ class TennisDualRecorderGui:
         self.stop_button.configure(state=DISABLED)
         self.record_button.configure(state=NORMAL)
         if self.current_plan is not None:
-            self.status.set(f"Saved stereo recording: {self.current_plan.out_dir}")
+            print_saved_videos(self.current_plan.outputs)
         self.current_plan = None
         self.configure_cameras()
         self.start_preview()
@@ -346,7 +347,7 @@ class TennisDualRecorderGui:
     def tick(self) -> None:
         if self.record_processes and self.recording_started_at is not None and self.current_plan is not None:
             elapsed = int(time.monotonic() - self.recording_started_at)
-            self.status.set(f"Recording stereo {elapsed}s: {self.current_plan.out_dir}")
+            self.status.set(f"Recording stereo {elapsed}s")
             if any(process.poll() is not None for process in self.record_processes):
                 self.stop_recording()
         self.root.after(1000, self.tick)
