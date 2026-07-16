@@ -6,7 +6,7 @@ import threading
 import time
 from pathlib import Path
 from tkinter import BOTH, BOTTOM, DISABLED, LEFT, NORMAL, X, Button, Frame, Label, PhotoImage, StringVar, Tk
-from typing import BinaryIO, TextIO
+from typing import Any, BinaryIO, TextIO
 
 from .config import RecordingConfig
 from .recording import (
@@ -81,7 +81,11 @@ class TennisRecorderGui:
         if self.preview_process is not None:
             return
         command = build_preview_command(self.config, self.device, self.preview_width, self.preview_fps)
-        self.preview_process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        self.preview_process = start_noninteractive_process(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
         self.preview_thread = threading.Thread(target=self.read_preview_frames, daemon=True)
         self.preview_thread.start()
         self.status.set("Previewing")
@@ -149,7 +153,7 @@ class TennisRecorderGui:
             sample_fps=self.sample_fps,
         )
         write_single_metadata(plan, self.config)
-        self.record_process = subprocess.Popen(command)
+        self.record_process = start_noninteractive_process(command)
         self.recording_started_at = time.monotonic()
         self.current_output = output
         self.stop_button.configure(state=NORMAL)
@@ -254,7 +258,11 @@ class TennisDualRecorderGui:
             return
         for index, device in enumerate(self.devices):
             command = build_preview_command(self.config, device, self.preview_width, self.preview_fps)
-            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            process = start_noninteractive_process(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
             self.preview_processes[index] = process
             thread = threading.Thread(target=self.read_preview_frames, args=(index, process), daemon=True)
             self.preview_threads[index] = thread
@@ -314,7 +322,7 @@ class TennisDualRecorderGui:
             log = log_file.open("w", encoding="utf-8")
             self.record_logs.append(log)
             self.record_processes.append(
-                subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT)
+                start_noninteractive_process(command, stdout=log, stderr=subprocess.STDOUT)
             )
         self.current_plan = plan
         self.recording_started_at = time.monotonic()
@@ -419,6 +427,10 @@ def build_preview_command(config: RecordingConfig, device: str, preview_width: i
         "ppm",
         "-",
     ]
+
+
+def start_noninteractive_process(command: list[str], **kwargs: Any) -> subprocess.Popen[bytes]:
+    return subprocess.Popen(command, stdin=subprocess.DEVNULL, **kwargs)
 
 
 def terminate_process(process: subprocess.Popen[bytes]) -> None:

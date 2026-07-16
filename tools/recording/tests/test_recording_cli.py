@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+import subprocess
 
 from tennisbot_recording.cli import main
 from tennisbot_recording.config import DEFAULT_CONFIG_PATH, load_config
+from tennisbot_recording.gui import start_noninteractive_process
 from tennisbot_recording.recording import build_dual_plan, build_single_plan, display_command, print_saved_videos
 
 
@@ -105,6 +107,25 @@ def test_gui_dual_dry_run_uses_config_and_overrides(capsys) -> None:
     assert "preview=960px@10fps per_camera" in output
     assert "soft_sync=False" in output
     assert "exposure_time_absolute=10" in output
+
+
+def test_gui_process_does_not_inherit_terminal_stdin(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+    sentinel = object()
+
+    def fake_popen(command, **kwargs):
+        captured["command"] = command
+        captured.update(kwargs)
+        return sentinel
+
+    monkeypatch.setattr("tennisbot_recording.gui.subprocess.Popen", fake_popen)
+
+    process = start_noninteractive_process(["ffmpeg", "-version"], stdout=-1)
+
+    assert process is sentinel
+    assert captured["command"] == ["ffmpeg", "-version"]
+    assert captured["stdin"] == subprocess.DEVNULL
+    assert captured["stdout"] == -1
 
 
 def test_extract_yolo_frames_dry_run_maps_video_labels(tmp_path: Path, capsys) -> None:
