@@ -33,7 +33,7 @@ preview:
 
 controls:
   auto_exposure: 1
-  exposure_time_absolute: 200
+  exposure_time_absolute: 10
   white_balance_automatic: 0
   white_balance_temperature: 4600
   brightness: -5

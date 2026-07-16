@@ -14,7 +14,7 @@ def test_default_config_loads_record_script_camera_controls() -> None:
     assert config.capture.fps == 30
     assert config.single.device == "/dev/video0"
     assert config.dual.devices == ("/dev/video2", "/dev/video0")
-    assert "exposure_time_absolute=200" in config.v4l2_controls_string()
+    assert "exposure_time_absolute=10" in config.v4l2_controls_string()
     assert "white_balance_temperature=4600" in config.v4l2_controls_string()
     assert "brightness=-5" in config.v4l2_controls_string()
 
@@ -33,7 +33,7 @@ def test_single_plan_uses_config_controls_and_sample_fps(tmp_path: Path) -> None
 
     command = display_command(plan.record_command)
     assert plan.output == tmp_path / "20260714_120000" / "20260714_120000_video0.mkv"
-    assert "--set-ctrl=auto_exposure=1,exposure_time_absolute=200" in display_command(plan.set_controls_command)
+    assert "--set-ctrl=auto_exposure=1,exposure_time_absolute=10" in display_command(plan.set_controls_command)
     assert "-vf fps=3" in command
     assert "-t 60" in command
     assert "/dev/video8" in command
@@ -104,7 +104,7 @@ def test_gui_dual_dry_run_uses_config_and_overrides(capsys) -> None:
     assert "devices=/dev/video4,/dev/video6" in output
     assert "preview=960px@10fps per_camera" in output
     assert "soft_sync=False" in output
-    assert "exposure_time_absolute=200" in output
+    assert "exposure_time_absolute=10" in output
 
 
 def test_extract_yolo_frames_dry_run_maps_video_labels(tmp_path: Path, capsys) -> None:
