@@ -4,7 +4,7 @@ from pathlib import Path
 
 from tennisbot_recording.cli import main
 from tennisbot_recording.config import DEFAULT_CONFIG_PATH, load_config
-from tennisbot_recording.recording import build_dual_plan, build_single_plan, display_command
+from tennisbot_recording.recording import build_dual_plan, build_single_plan, display_command, print_saved_videos
 
 
 def test_default_config_loads_record_script_camera_controls() -> None:
@@ -60,6 +60,18 @@ def test_dual_plan_builds_soft_sync_parallel_commands(tmp_path: Path) -> None:
     assert "soft_sync_base_epoch=" in first
     assert "/dev/video2" in first
     assert "/dev/video0" in second
+
+
+def test_print_saved_videos_reports_only_existing_outputs(tmp_path: Path, capsys) -> None:
+    saved = tmp_path / "camera-a.mkv"
+    missing = tmp_path / "camera-b.mkv"
+    saved.write_bytes(b"video")
+
+    print_saved_videos((saved, missing))
+
+    output = capsys.readouterr().out
+    assert f"Saved video: {saved}" in output
+    assert str(missing) not in output
 
 
 def test_record_single_dry_run_accepts_negative_brightness_override(capsys) -> None:

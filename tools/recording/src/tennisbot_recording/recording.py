@@ -436,7 +436,9 @@ def record_single(plan: SingleRecordingPlan, config: RecordingConfig, *, dry_run
     if config.capture.settle_seconds > 0:
         time.sleep(config.capture.settle_seconds)
     write_single_metadata(plan, config)
-    return run_foreground(plan.record_command)
+    status = run_foreground(plan.record_command)
+    print_saved_videos((plan.output,))
+    return status
 
 
 def record_dual(
@@ -464,10 +466,19 @@ def record_dual(
         time.sleep(config.capture.settle_seconds)
     write_dual_session(plan, config, devices=devices, preview=preview, parallel_capture=parallel_capture)
     if preview:
-        return run_preview_dual(plan)
-    if parallel_capture:
-        return run_parallel_dual(plan)
-    return run_foreground(plan.single_process_command)
+        status = run_preview_dual(plan)
+    elif parallel_capture:
+        status = run_parallel_dual(plan)
+    else:
+        status = run_foreground(plan.single_process_command)
+    print_saved_videos(plan.outputs)
+    return status
+
+
+def print_saved_videos(paths: Sequence[Path]) -> None:
+    for path in paths:
+        if path.is_file():
+            print(f"Saved video: {path}")
 
 
 def print_single_plan(plan: SingleRecordingPlan) -> None:
