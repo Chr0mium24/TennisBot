@@ -1,0 +1,47 @@
+schema_version: 1
+capture:
+  width: 3840
+  height: 2160
+  fps: 30
+  pixel_format: MJPG
+cameras:
+  cam1:
+    role: left
+    device: /dev/video0
+  cam2:
+    role: right
+    device: /dev/video2
+profiles:
+  runtime: &runtime
+    brightness: -5
+    contrast: 1
+    saturation: 64
+    white_balance_automatic: 0
+    white_balance_temperature: 4600
+    gamma: 100
+    gain: 32
+    power_line_frequency: 1
+    sharpness: 1
+    backlight_compensation: 0
+    auto_exposure: 1
+    exposure_time_absolute: 10
+    focus_automatic_continuous: 0
+    focus_absolute: 0
+  recording: *runtime
+  test: *runtime
+  calibration:
+    brightness: -5
+    contrast: 1
+    saturation: 64
+    white_balance_automatic: 0
+    white_balance_temperature: 4600
+    gamma: 100
+    gain: 32
+    power_line_frequency: 1
+    sharpness: 1
+    backlight_compensation: 0
+    auto_exposure: 1
+    exposure_time_absolute: 100
+    focus_automatic_continuous: 0
+    focus_absolute: 0
+
