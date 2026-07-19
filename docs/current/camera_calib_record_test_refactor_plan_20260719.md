@@ -271,6 +271,60 @@ The refactor must eliminate the current conflicts between calibration control
 constants, `scripts/camera_controls.py`, and the recording YAML. In particular,
 device order and focus settings must not vary by entry point.
 
+## Current Stereo Recording Overlap
+
+The repository currently has two different dual-camera recording paths. They
+must not be treated as identical during migration.
+
+| Concern | `scripts/stereo.py record` | `scripts/recording.py dual` |
+| --- | --- | --- |
+| Capture backend | OpenCV `VideoCapture` | ffmpeg with V4L2 inputs |
+| Video output | `left.mp4` and `right.mp4` | two timestamped MKV files |
+| Encoding | decode camera MJPEG and re-encode with `mp4v` | normally stream-copy camera MJPEG into MKV |
+| Operator UI | always opens an OpenCV side-by-side preview | headless by default; optional ffplay preview; separate dual recording GUI also exists |
+| Stop behavior | `q`, Escape, or configured duration | Ctrl+C, configured duration, or GUI stop handling |
+| Camera controls | fixed values from the root camera-control script | YAML configuration with command-line overrides |
+| Per-frame log | `frames.ndjson` with monotonic and Unix timestamps | no equivalent external per-frame NDJSON log |
+| Pair log | `pairs.ndjson` with pair ID, read delta, and threshold result | no equivalent pair-by-pair NDJSON log |
+| Soft-sync model | sequential left read followed by right read, then measure the read-time delta | V4L2 absolute packet timestamps with a common output timestamp offset and session-level base time |
+| Default output root | `runs/raw-stereo` | `runs/recording` |
+| Current default device order | `/dev/video0`, then `/dev/video2` | `/dev/video2`, then `/dev/video0` in the recording YAML |
+
+The `stereo record` path is useful for short algorithm diagnostics because its
+session contains:
+
+```text
+session.json
+left.mp4
+right.mp4
+frames.ndjson
+pairs.ndjson
+```
+
+Its pair record describes the delay between sequential software reads. It is
+not hardware synchronization. Its main drawbacks are mandatory GUI operation,
+MJPEG decode plus `mp4v` re-encoding, duplicated camera controls, and a separate
+session schema.
+
+The `recording dual` path is the preferred base for formal and long-running raw
+capture because ffmpeg provides headless operation, lower-overhead MJPEG
+preservation, configurable camera controls, coordinated process shutdown, and
+GUI or preview variants. Its current gap is the lack of exported per-frame and
+pair-by-pair timing logs equivalent to `frames.ndjson` and `pairs.ndjson`.
+
+The consolidated recorder must therefore use the recording/ffmpeg path as its
+base while preserving or replacing these `stereo record` capabilities:
+
+1. per-frame capture or packet timestamps for both cameras;
+2. stable frame identity and pair identity;
+3. pair timing delta and threshold diagnostics;
+4. a machine-readable session schema that online tests can also consume;
+5. GUI and headless modes over the same encoder and metadata implementation.
+
+The current default device-order conflict must be resolved through stable
+`cam1`/`cam2` identities before comparing or merging recordings. A path must not
+be considered migrated merely because it produces two video files.
+
 ## Migration Mapping
 
 | Current surface | Target surface |
