@@ -23,6 +23,7 @@ profiles:
     power_line_frequency: 1
     sharpness: 1
     backlight_compensation: 0
+    # UVC exposure_auto enum: 1=manual, 3=aperture-priority auto.
     auto_exposure: 1
     exposure_time_absolute: 10
     focus_automatic_continuous: 0
@@ -40,6 +41,7 @@ profiles:
     power_line_frequency: 1
     sharpness: 1
     backlight_compensation: 0
+    # Keep calibration exposure manual at the same absolute value.
     auto_exposure: 1
     exposure_time_absolute: 10
     focus_automatic_continuous: 0

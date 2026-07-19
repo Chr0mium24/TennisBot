@@ -32,6 +32,7 @@ preview:
   port: 23456
 
 controls:
+  # Compatibility mirror only; canonical profile uses 1=manual.
   auto_exposure: 1
   exposure_time_absolute: 10
   white_balance_automatic: 0
