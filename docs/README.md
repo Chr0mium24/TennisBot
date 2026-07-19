@@ -28,7 +28,7 @@
 
 - [标定工具](../tools/calibration/README.md)
 - [YOLO 工具](../tools/yolo/README.md)
-- [本机双目工具](../tools/stereo/README.md)
+- [录制工具](../tools/recording/README.md)
 
 ## 报告
 

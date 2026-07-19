@@ -41,13 +41,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    config_parser = subparsers.add_parser("config", help="Inspect recording config.", **parser_kwargs)
-    config_subparsers = config_parser.add_subparsers(dest="config_command", required=True)
-    show = config_subparsers.add_parser("show", help="Print parsed recording config.", **parser_kwargs)
-    add_config_arg(show)
-    show.add_argument("--json", action="store_true", help="Print JSON instead of YAML")
-    show.set_defaults(func=cmd_config_show)
-
     record = subparsers.add_parser("record", help="Record camera video.", **parser_kwargs)
     record_subparsers = record.add_subparsers(dest="record_command", required=True)
 
@@ -99,31 +92,6 @@ def build_parser() -> argparse.ArgumentParser:
     gui_dual.add_argument("--no-soft-sync", action="store_false", dest="soft_sync", help="Disable soft timestamp normalization")
     gui_dual.add_argument("--dry-run", action="store_true", help="Print resolved GUI config without opening cameras")
     gui_dual.set_defaults(func=cmd_gui_dual)
-
-    extract = subparsers.add_parser("extract-yolo-frames", help="Extract recordings into the YOLO annotation image layout.", **parser_kwargs)
-    extract.add_argument("inputs", nargs="+", help="Session names, session directories, or video files")
-    extract.add_argument("--fps", type=positive_float, default=2.0, help="Frames per second to extract")
-    extract.add_argument("--dataset-root", type=Path, default=Path("tools/yolo/workspace/dataset"), help="Dataset root containing images/ and labels/")
-    extract.add_argument("--images-dir", type=Path, default=None, help="Output image directory")
-    extract.add_argument("--labels-dir", type=Path, default=None, help="Label directory to create")
-    extract.add_argument("--recordings-root", type=Path, default=Path("runs/recording"), help="Root used when an input is a session name")
-    extract.add_argument("--session", default="", help="Output session prefix; valid only with one input group")
-    extract.add_argument("--format", "--image-format", dest="image_format", default="jpg", help="Output image format: jpg or png")
-    extract.add_argument("--jpeg-quality", type=positive_int, default=2, help="JPEG quality for ffmpeg -q:v")
-    extract.add_argument("--png-compression", type=non_negative_int, default=3, help="PNG compression level")
-    extract.add_argument("--cam-map", default="video0:cam1,video2:cam2", help="Comma-separated source:target camera map")
-    extract.add_argument("--overwrite", action="store_true", help="Remove existing matching output frames before extracting")
-    extract.add_argument("--dry-run", action="store_true", help="Print ffmpeg commands without writing files")
-    extract.set_defaults(func=cmd_extract_yolo_frames)
-
-    normalize = subparsers.add_parser("normalize-timestamps", help="Remux videos with absolute packet timestamps to relative MKV timestamps.", **parser_kwargs)
-    normalize.add_argument("inputs", nargs="+", help="Session directories or video files")
-    normalize.add_argument("--output-dir", type=Path, default=None, help="Write normalized files into this directory")
-    normalize.add_argument("--suffix", default="_normalized", help="Output suffix before .mkv")
-    normalize.add_argument("--base-epoch", default="", help="Timestamp offset to subtract; default is earliest first video packet PTS")
-    normalize.add_argument("--overwrite", action="store_true", help="Allow replacing existing output files")
-    normalize.add_argument("--dry-run", action="store_true", help="Print ffmpeg commands without writing files")
-    normalize.set_defaults(func=cmd_normalize_timestamps)
 
     return parser
 

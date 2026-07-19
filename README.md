@@ -14,11 +14,11 @@ workflow.
 | --- | --- |
 | `packages/contracts` | Shared TypeScript data contracts |
 | `packages/core` | Artifact validation, stereo pairing, triangulation helpers |
+| `packages/vision-python` | Shared camera identities, controls, YOLO and stereo runtime algorithms |
 | `src` | Vision runtime package; target interfaces are provided by the external control workspace |
 | `tools/calibration` | Fixed DFOptix ChArUco OpenCV mono/stereo capture GUI |
 | `tools/recording` | V4L2/ffmpeg camera recording CLI migrated from local lab scripts |
 | `tools/yolo` | Standalone YOLO runtime model package tooling |
-| `tools/stereo` | Local OpenCV stereo recorder, coordinate GUI, and replay tooling |
 | `artifacts/` | Ignored local runtime outputs for calibration and model packages |
 | `desperate/` | Ignored local-only archive for legacy lab code, not part of the parent Git repository |
 
@@ -65,27 +65,30 @@ ros2 topic echo /target/managed
 Run camera checks and calibration:
 
 ```bash
-uv run scripts/calib.py brightness
-uv run scripts/calib.py preview
-uv run scripts/calib.py mono cam1
-uv run scripts/calib.py mono cam2
-uv run scripts/calib.py stereo
+uv run scripts/camera.py list
+uv run scripts/camera.py check
+uv run scripts/camera.py preview stereo
+uv run scripts/calib.py online mono cam1
+uv run scripts/calib.py online mono cam2
+uv run scripts/calib.py online stereo
 ```
 
 Record raw camera video through the config-driven ffmpeg recorder:
 
 ```bash
-uv run scripts/recording.py single --dry-run
-uv run scripts/recording.py single --duration 60
-uv run scripts/recording.py dual --dry-run
-uv run scripts/recording.py dual --duration 60
-uv run scripts/recording.py gui
-uv run scripts/recording.py gui dual
+uv run scripts/record.py mono cam1 --dry-run
+uv run scripts/record.py stereo --duration 60
+uv run scripts/record.py stereo --gui
 ```
 
-Recording defaults live in `tools/recording/configs/tennis_camera_recording.yaml`.
-The recorder loads exposure, white balance, brightness, gain, and related V4L2
-controls from that config before opening the camera.
+Run online vision diagnostics, optionally recording the already-open streams:
+
+```bash
+uv run scripts/test.py yolo mono cam1
+uv run scripts/test.py yolo stereo --gui --record
+uv run scripts/test.py triangulation stereo --json
+uv run scripts/test.py communication chassis-position
+```
 
 The calibration wrapper writes timestamped package directories by default so a
 new run does not overwrite the previous result. Use `--output` only when

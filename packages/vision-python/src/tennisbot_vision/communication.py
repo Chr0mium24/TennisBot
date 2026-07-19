@@ -11,7 +11,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from process_utils import REPO_ROOT, process_env, require_value, shell_quote
+from .command_utils import REPO_ROOT, process_env, require_value, shell_quote
 
 
 @dataclass
@@ -346,16 +346,16 @@ def is_finite(value: float | None) -> bool:
 def print_usage() -> None:
     print(
         """用法:
-  uv run scripts/check-chassis-position.py [options]
+  uv run scripts/test.py communication chassis-position [options]
 
 说明:
   检查 /robot/chassis_position 是否存在、类型是否正确、是否能收到一条消息，并输出关键字段。
   输出是普通文本，不生成 Markdown 文件。
 
 常用:
-  uv run scripts/check-chassis-position.py
-  uv run scripts/check-chassis-position.py --timeout 8 --hz-seconds 5
-  uv run scripts/check-chassis-position.py --no-hz
+  uv run scripts/test.py communication chassis-position
+  uv run scripts/test.py communication chassis-position --timeout 8 --hz-seconds 5
+  uv run scripts/test.py communication chassis-position --no-hz
 
 选项:
   --topic <name>             默认 /robot/chassis_position

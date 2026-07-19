@@ -250,8 +250,8 @@ class YoloBallDetector:
                 from ultralytics import YOLO
             except ImportError as exc:
                 raise RuntimeError(
-                    "ultralytics is required for YOLO stereo GUI detection. Run with "
-                    "`uv run --extra detect tennisbot-stereo gui ...`."
+                    "ultralytics is required for online YOLO diagnostics. Run through "
+                    "`uv run scripts/test.py ...`."
                 ) from exc
             model = YOLO(str(model_path))
 
@@ -299,6 +299,13 @@ class YoloBallDetector:
             detections_from_result(results[0], 0, 0, self.class_id),
             detections_from_result(results[1], 0, 0, self.class_id),
         )
+
+    def detect(self, frame: np.ndarray) -> list[BallDetection]:
+        """Run one-camera inference without creating a second camera source."""
+        if self.tile:
+            return self._detect_tiled(frame)
+        result = self._predict([frame], imgsz=self.imgsz)[0]
+        return detections_from_result(result, 0, 0, self.class_id)
 
     def _detect_pair_with_roi_tracking(
         self,

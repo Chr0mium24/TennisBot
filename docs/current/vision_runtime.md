@@ -12,8 +12,8 @@ Already available:
 
 - `packages/core` has tested TypeScript stereo geometry helpers.
 - `src/tennisbot_vision_runtime` has the active Python trajectory predictor.
-- `tools/stereo` has tested OpenCV stereo detection, matching, triangulation,
-  and local recording paths.
+- `packages/vision-python` has tested OpenCV stereo detection, matching,
+  triangulation, and attachable diagnostic recording paths.
 - external `target_msgs` and `target_manager` are provided by the sourced
   control workspace.
 - `src/tennisbot_vision_runtime` owns the first stereo camera,
@@ -324,7 +324,7 @@ Module-level checks:
 
 ```bash
 cd packages/core && bun test
-cd tools/stereo && uv run pytest
+uv run --project packages/vision-python --extra test pytest packages/vision-python/tests
 ```
 
 ROS package checks:

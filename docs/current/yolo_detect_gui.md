@@ -28,10 +28,10 @@ uv run --extra detect tennisbot-yolo detect-gui \
 The GUI is detection-only. It intentionally does not prove stereo geometry or
 prediction correctness.
 
-For stereo x/y/z display, use the local stereo GUI instead:
+For stereo x/y/z display, use the shared triangulation test instead:
 
 ```bash
-uv run scripts/stereo.py gui --tile
+uv run scripts/test.py triangulation stereo --gui
 ```
 
 ## Verification

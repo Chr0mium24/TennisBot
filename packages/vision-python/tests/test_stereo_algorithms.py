@@ -5,9 +5,9 @@ from pathlib import Path
 
 import numpy as np
 
-from tennisbot_stereo.calibration import RuntimeStereoCalibration, project_point
-from tennisbot_stereo.matching import StereoBallMatcher
-from tennisbot_stereo.types import BallDetection
+from tennisbot_vision.calibration import RuntimeStereoCalibration, project_point
+from tennisbot_vision.matching import StereoBallMatcher
+from tennisbot_vision.types import BallDetection
 
 
 def test_loads_and_scales_runtime_calibration_package(tmp_path: Path) -> None:

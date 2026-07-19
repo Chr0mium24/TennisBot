@@ -5,6 +5,8 @@ import subprocess
 from dataclasses import dataclass
 from typing import Any, Iterable
 
+from tennisbot_camera.config import load_camera_config
+
 
 EXPOSURE_CONTROL = "exposure_time_absolute"
 BRIGHTNESS_CONTROL = "brightness"
@@ -22,13 +24,17 @@ CALIBRATION_CONTROL_NAMES = (
     "focus_automatic_continuous",
     "focus_absolute",
 )
-CALIBRATION_CAPTURE_CONTROL_VALUES = (
-    (AUTO_EXPOSURE_CONTROL, MANUAL_AUTO_EXPOSURE_VALUE),
-    (EXPOSURE_CONTROL, 10),
-    ("white_balance_automatic", 0),
-    ("white_balance_temperature", 4600),
-    ("focus_automatic_continuous", 0),
-    ("focus_absolute", 600),
+_CAPTURE_PROFILE = load_camera_config().profile("calibration")
+CALIBRATION_CAPTURE_CONTROL_VALUES = tuple(
+    (name, _CAPTURE_PROFILE[name])
+    for name in (
+        AUTO_EXPOSURE_CONTROL,
+        EXPOSURE_CONTROL,
+        "white_balance_automatic",
+        "white_balance_temperature",
+        "focus_automatic_continuous",
+        "focus_absolute",
+    )
 )
 
 

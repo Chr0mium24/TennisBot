@@ -1,129 +1,23 @@
-# Local Runtime Operator Runbook
+# Camera / Vision Operator Runbook
 
-Date: 2026-07-03
+Date: 2026-07-19
 
-## Scope
+1. Run `uv run scripts/camera.py list` and confirm cam1 is left and cam2 is
+   right.
+2. Apply/check the intended profile with `camera.py controls`, then run
+   `camera.py check` and raw `preview` as needed.
+3. Calibrate cam1 and cam2 with `calib.py online mono`, then stereo with
+   `calib.py online stereo`. Use `offline` only for an existing session.
+4. Capture formal raw data with `record.py`; headless is the normal SSH path
+   and `--gui` is the local operator path.
+5. Validate YOLO independently with `test.py yolo mono/stereo` before testing
+   `test.py triangulation stereo`.
+6. Add `--record` only when the diagnostic frames/results must be retained.
+   Use `--record-overlay` only when rendered review video is also required.
+7. Source ROS and the control workspace, then use
+   `test.py communication chassis-position` before starting vision runtime.
+8. Start the ROS runtime only after camera, calibration, model, and pose input
+   checks pass.
 
-This runbook is the local-machine sequence for the current local reference
-tools. The target real runtime is the vision runtime path documented in
-[Vision Runtime](vision_runtime.md).
-
-1. `tools/calibration` OpenCV GUI for fixed DFOptix ChArUco mono/stereo capture.
-2. `tools/yolo` for pure YOLO detection and runtime model packages.
-3. `tools/stereo` for local OpenCV 4K stereo YOLO coordinate display.
-4. `src/tennisbot_vision_runtime` for the vision runtime camera-to-target
-   runtime path.
-
-The real catch loop still requires real chassis pose and control links. Local
-camera tools are diagnostics only.
-
-## Start Surfaces
-
-From the repository root:
-
-```bash
-source /opt/ros/humble/setup.bash
-source /home/cr/tennis_robot_ws/install/setup.bash
-colcon build --base-paths src --packages-select tennisbot_vision_runtime --symlink-install
-source install/setup.bash
-```
-
-Start the vision runtime node and external target manager in separate
-terminals:
-
-```bash
-ros2 launch tennisbot_vision_runtime vision_runtime.launch.py
-ros2 launch target_manager target_manager.launch.py
-```
-
-Or start the same chain through the uv/Python runtime launcher:
-
-```bash
-uv run scripts/vision-runtime.py run
-uv run scripts/vision-runtime.py run --record --session test01 --tile
-uv run scripts/vision-runtime.py task --task-id 42 --session catch42 --tile
-```
-
-Start the local stereo coordinate GUI:
-
-```bash
-uv run scripts/stereo.py record
-uv run scripts/stereo.py gui --tile
-```
-
-## Calibration Order
-
-Before taking calibration frames, check camera brightness/order:
-
-```bash
-uv run scripts/calib.py brightness
-```
-
-Open the live camera preview if exposure or UVC brightness needs tuning:
-
-```bash
-uv run scripts/calib.py preview
-```
-
-Use the mainline OpenCV GUI in order:
-
-1. Confirm the fixed physical DFOptix ChArUco board is clean, flat, and matches
-   the configured `15 mm` square / `11.25 mm` marker dimensions.
-2. Tune camera shutter/brightness in `uv run scripts/calib.py preview` if the
-   view is too dark, saturated, or noisy.
-3. `uv run scripts/calib.py mono cam1` for the left mono capture and timestamped
-   solve package.
-4. `uv run scripts/calib.py mono cam2` for the right mono capture and timestamped
-   solve package.
-5. `uv run scripts/calib.py stereo` for stereo capture, solve, and runtime package
-   export under `artifacts/calibration/stereo_cam1_cam2_<local_timestamp>`.
-   When intentionally writing the fixed runtime package, rerun the solve step with
-   `uv run scripts/calib.py stereo --solve-only --output artifacts/calibration/stereo_cam1_cam2`.
-
-## Vision Runtime Order
-
-After the stereo package verifies and the camera rig is mounted:
-
-1. Measure and set `camera_translation_m` and `camera_rotation_rpy_rad` in
-   `src/tennisbot_vision_runtime/config/vision_runtime.yaml`.
-2. Confirm the interface bridge is publishing `/robot/chassis_position`
-   as `target_msgs/ChassisPosition` in the field/interface frame.
-3. Launch `tennisbot_vision_runtime` and confirm it publishes `/target/raw`
-   only when a real ball is detected in both cameras and recent chassis
-   position is available.
-4. Launch external `target_manager` from the sourced control workspace and
-   confirm `/target/managed` before enabling chassis planner behavior.
-5. For evidence capture, prefer `uv run scripts/vision-runtime.py run --record` or
-   `uv run scripts/vision-runtime.py task --task-id <id> --session <name>` so the video,
-   chassis position, YOLO detections, selected observations, and raw targets
-   share one timestamped session directory.
-
-## Local Stereo GUI Order
-
-After the stereo package verifies:
-
-1. Run `uv run scripts/stereo.py gui --dry-run` to confirm default devices,
-   artifact paths, and 4K capture settings.
-2. Run `uv run scripts/stereo.py record` when raw left/right stereo video is
-   needed. It writes under `runs/raw-stereo` and stops on `q` or `esc`; use
-   `--duration <seconds>` only for an automatic stop.
-3. Run `uv run scripts/stereo.py gui --tile` for YOLO detection on small 4K balls.
-4. Add `--record-run` for long trajectory point/detection recording under
-   `runs/stereo`.
-5. Read the right panel as left-camera-frame coordinates: x right, y down,
-   z forward.
-
-Open the replay frontend:
-
-```bash
-uv run scripts/stereo.py replay
-```
-
-The replay page lists recorded sessions and uses two UI range sliders for the
-selected trajectory window. Do not pass replay time windows through CLI flags.
-
-## Current Runtime Evidence
-
-Historical browser/runtime reports remain under `docs/archive/`. Current
-runtime evidence should come from runtime topics and logs from the vision
-runtime chain.
+The test commands are diagnostics. They do not replace the ROS/Gazebo chassis
+pose/control chain and cannot validate a real catch loop without that backend.

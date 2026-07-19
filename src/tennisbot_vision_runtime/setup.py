@@ -14,7 +14,7 @@ setup(
         ("share/" + package_name + "/config", ["config/vision_runtime.yaml"]),
         ("share/" + package_name + "/launch", ["launch/vision_runtime.launch.py"]),
     ],
-    install_requires=["setuptools"],
+    install_requires=["setuptools", "tennisbot-vision"],
     zip_safe=True,
     maintainer="syh",
     maintainer_email="syh@example.com",

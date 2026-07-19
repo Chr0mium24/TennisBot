@@ -1,249 +1,73 @@
-# TennisBot Current Architecture
+# TennisBot 当前架构
 
-Date: 2026-07-03
+日期：2026-07-19
 
-## Current Shape
+## 操作入口
 
-TennisBot is a local-machine-first workspace. The active tracked code lives in
-top-level `packages/`, `scripts/`, `src/`, and `tools/`.
-
-```text
-TennisBot/
-  packages/
-    contracts/       shared TypeScript data contracts
-    core/            artifact loaders, stereo pairing, triangulation helpers
-  src/
-    interface/       imported ROS2 target interface packages
-    tennisbot_*      repository-owned ROS2 vision messages, adapter, runtime
-  tools/
-    calibration/     fixed DFOptix ChArUco OpenCV capture GUI
-    yolo/            annotation, YOLO package, pure detection GUI
-    stereo/          raw stereo recorder and local stereo coordinate GUI
-  scripts/
-    yolo.ts          root launcher for the YOLO annotation frontend/backend
-    stereo.ts        root launcher for stereo record/preview/replay
-  artifacts/         ignored local runtime artifacts
-  docs/
-    current/         current operational truth
-    reports/         business/report artifacts
-    archive/         dated plans, probes, reviews, and historical results
-```
-
-Ignored legacy lab code can still exist under local `desperate/` directories,
-but it is no longer the main tracked architecture.
-
-## Tool Boundaries
-
-### `tools/calibration`
-
-Owns the mainline OpenCV calibration capture GUI for this project target:
-
-- fixed DFOptix ChArUco target profile
-  `dfoptix_charuco_14x9_square15mm_marker11_25mm`;
-- `DICT_5X5_100`, 14 x 9 squares, 15 mm squares, 11.25 mm markers;
-- mono capture GUI command;
-- stereo capture GUI command;
-- mono ChArUco solve and runtime package export;
-- stereo ChArUco solve and runtime package export;
-- USB camera brightness checks;
-- capture quality checks for full-corner coverage, brightness, sharpness,
-  stability, position buckets, and dwell capture;
-- `session.json` capture sessions with saved frame paths plus per-frame
-  metadata and summary artifacts.
-
-Current commands:
-
-```bash
-uv run scripts/calib.py brightness
-uv run scripts/calib.py preview
-uv run scripts/calib.py mono cam1
-uv run scripts/calib.py mono cam2
-uv run scripts/calib.py stereo
-```
-
-### `tools/yolo`
-
-Owns tennis-ball detector tooling:
-
-- local annotation frontend/backend via `tennisbot-yolo annotate`;
-- runtime model package create/verify;
-- pure OpenCV YOLO detection GUI via `tennisbot-yolo detect-gui`.
-
-The annotation and model-package paths use the default `uv sync` environment and
-do not require Torch, CUDA, or Ultralytics. `detect-gui` is isolated behind the
-optional `detect` extra.
-
-It does not own stereo geometry, calibration, camera/world transforms, runtime
-state, or trajectory prediction.
-
-Current commands:
-
-```bash
-uv run scripts/yolo.py annotate
-cd tools/yolo
-uv run tennisbot-yolo package verify --path ../../artifacts/models/tennis_ball_yolo
-uv run --extra detect tennisbot-yolo detect-gui --devices /dev/video0,/dev/video2 --model ../../artifacts/models/tennis_ball_yolo/model.pt --tile
-```
-
-### `tools/stereo`
-
-Owns the local OpenCV stereo-coordinate GUI:
-
-- opens two USB cameras at 4K MJPG by default;
-- runs YOLO tennis-ball detection;
-- reads the current runtime stereo calibration package;
-- rectifies detected centers, pairs candidates, triangulates a camera-frame
-  3D point, and displays x/y/z/range plus stereo diagnostics.
-- records raw left/right stereo video under `runs/raw-stereo`;
-- records long local sessions under `runs/stereo`;
-- serves a local replay frontend that lists records, selects time windows with
-  UI sliders, and renders camera-frame 3D points plus prediction curves.
-
-Current command:
-
-```bash
-uv run scripts/stereo.py record
-uv run scripts/stereo.py gui --tile
-uv run scripts/stereo.py gui --tile --record-run
-uv run scripts/stereo.py replay
-```
-
-It displays camera-frame geometry only: x right, y down, z forward.
-
-### `packages/core`
-
-Owns TypeScript artifact validation and stereo geometry helpers:
-
-- YOLO and stereo calibration artifact metadata loaders;
-- stereo detection pairing with rectification, disparity/depth filtering, and
-  reprojection diagnostics;
-- rectified stereo triangulation helpers.
-
-It has no browser UI, OpenCV GUI, camera device access, dataset management, or
-training code. The active ROS trajectory predictor lives in
-`src/tennisbot_vision_runtime`.
-
-### `src`
-
-Owns tracked vision runtime integration:
-
-- external `target_msgs` and `target_manager` come from the sourced control
-  workspace (`/home/cr/tennis_robot_ws/install`);
-- `src/tennisbot_vision_runtime`: stereo vision runtime that
-  consumes camera frames plus `/robot/chassis_position` and publishes
-  `/target/raw`, with optional timestamped runtime logging.
-
-The nominal raw target path is 30 Hz. The managed target output remains at most
-10 Hz by design.
-
-### Target Vision Runtime
-
-The real runtime is a vision runtime, not a frontend. The runtime
-design is documented in
-[Vision Runtime](vision_runtime.md).
-
-The node consumes stereo camera frames and timestamped chassis pose, transforms
-triangulated ball points into the field/interface frame, fits the trajectory,
-and publishes `/target/raw`. It publishes nothing without real camera
-observations and recent `/robot/chassis_position` samples.
-
-## Runtime Flow
+相机相关业务统一为四个根入口：
 
 ```text
-1. tools/calibration captures mono/stereo ChArUco sessions
-2. tools/calibration solves mono/stereo calibration packages under artifacts/calibration/...
-3. tools/yolo creates or verifies artifacts/models/tennis_ball_yolo
-4. tools/stereo can run the local OpenCV 4K stereo coordinate GUI
-5. tennisbot_vision_runtime consumes `/robot/chassis_position`
-6. tennisbot_vision_runtime reads two camera streams
-7. the node runs YOLO, stereo pairing, triangulation, field-frame transforms,
-   and trajectory prediction
-8. the node publishes `/target/raw`
-9. external `target_manager` publishes `/target/managed` for the planner/state
-   machine
+scripts/camera.py  -> list / check / preview / controls
+scripts/calib.py   -> online|offline × mono|stereo
+scripts/record.py  -> mono|stereo × headless|GUI
+scripts/test.py    -> YOLO / triangulation / communication diagnostics
 ```
 
-When runtime logging is enabled, vision runtime sessions are written under
-`runs/vision-runtime/<session>/` with left/right video, frame timestamps, chassis
-position, YOLO detections, selected observations, raw targets, and runtime
-events.
+`scripts/vision-runtime.py` 仍负责真实 ROS 视觉运行时。YOLO 数据、标注和模型包
+由 `scripts/yolo.py` 负责，不属于在线相机诊断入口。
 
-## Current Validation State
+## Python 能力边界
 
-The current local stereo package under `artifacts/calibration/stereo_cam1_cam2`
-is accepted with no runtime quality warning:
+`packages/vision-python` 是共享的 `tennisbot-vision` uv 包：
+
+- `tennisbot_camera`：稳定 `cam1`/`cam2` 身份、左右顺序、采集配置、控制
+  profile、mono/stereo frame source、时间戳和 raw preview；
+- `tennisbot_vision`：运行时标定包加载、YOLO、ROI、双目匹配、矫正、三角化、
+  GUI/终端诊断和可附着的测试录制 sink。
+
+`tools/calibration` 保留 ChArUco GUI 采集、质量门槛和 mono/stereo 求解器。
+`tools/recording` 保留 ffmpeg/V4L2 编码、会话、时间戳导出和 GUI。二者是独立
+uv 项目，但都消费共享相机配置。
+
+`src/tennisbot_vision_runtime` 直接依赖安装后的 `tennisbot-vision`，不再把
+工具源目录插入 `sys.path`。运行时使用相同的标定加载、检测与匹配算法。
+
+## 数据流
 
 ```text
-stereo_rms_reprojection_px=0.212138
-epipolar_rms_px=0.256774
-rectification_y_p95_px=0.429620
-baseline_m=0.164989
+canonical camera config
+  -> mono/stereo frame source
+  -> YOLO
+  -> optional stereo matching + triangulation
+  -> GUI or structured terminal output
+  -> optional test recording sink (same already-open frames)
 ```
 
-The epipolar metric is computed after undistorting points and evaluating the
-essential-matrix constraint in normalized coordinates, converted back to pixels
-by average focal length. The remaining physical gap is the measured
-chassis-to-camera extrinsic and full real chassis validation. The
-vision runtime node includes a configurable `T_chassis_camera`, but the default
-translation is only a placeholder until measured on the mounted rig.
+独立 `record` 使用 ffmpeg 直接保存相机 MJPEG。`test --record` 不能启动第二个
+录制进程重新打开 V4L2，而是把测试循环已经取得的 frame 交给 in-process sink。
 
-## Main Commands
+ROS 真实闭环仍为：
 
-Camera brightness sanity check:
-
-```bash
-uv run scripts/calib.py brightness
-uv run scripts/calib.py brightness --devices /dev/video0,/dev/video2
-uv run scripts/calib.py preview
+```text
+stereo cameras + /robot/chassis_position
+  -> tennisbot_vision_runtime
+  -> /target/raw
+  -> external target_manager
+  -> /target/managed
 ```
 
-Build and launch the ROS runtime:
+没有 ROS/Gazebo 后端时只能验证纯视觉和前端能力，不能声称完成真实接球闭环。
+视觉数据必须尽早转换到球场/接口坐标系，再做轨迹拟合和目标发布。
 
-```bash
-source /opt/ros/humble/setup.bash
-source /home/cr/tennis_robot_ws/install/setup.bash
-colcon build --base-paths src --packages-select tennisbot_vision_runtime --symlink-install
-source install/setup.bash
-ros2 launch tennisbot_vision_runtime vision_runtime.launch.py
-ros2 launch target_manager target_manager.launch.py
-```
+## 配置与产物
 
-One-shot or logged runtime launcher:
+- 相机身份和 profile：`packages/vision-python/src/tennisbot_camera/camera_config.yaml`
+- 标定采集配置：`tools/calibration/configs/dfoptix_charuco_15mm_capture.yaml`
+- 录制编码配置：`tools/recording/configs/tennis_camera_recording.yaml`
+- 标定包：`artifacts/calibration/`
+- 模型包：`artifacts/models/`
+- 录制：`runs/recording/`
+- 在线测试录制：`runs/test/`
+- ROS runtime 日志：`runs/vision-runtime/`
 
-```bash
-uv run scripts/vision-runtime.py run --record --session test01 --tile
-uv run scripts/vision-runtime.py task --task-id 42 --session catch42 --tile
-```
-
-Start the local OpenCV stereo-coordinate GUI:
-
-```bash
-uv run scripts/stereo.py record
-uv run scripts/stereo.py gui --tile
-```
-
-Verify core packages:
-
-```bash
-cd packages/contracts && bun test && bun run typecheck
-cd packages/core && bun test && bun run typecheck
-```
-
-Inspect ROS interfaces and topics:
-
-```bash
-ros2 interface show target_msgs/msg/ChassisPosition
-ros2 interface show target_msgs/msg/RawTarget
-ros2 interface show target_msgs/msg/ManagedTarget
-ros2 topic list -t
-ros2 topic echo /robot/chassis_position
-ros2 topic echo /target/raw
-ros2 topic echo /target/managed
-```
-
-## Remaining Engineering Work
-
-- Recalibrate after the cameras are mounted in their real physical positions.
-- Measure and configure the real `T_chassis_camera` extrinsics.
-- Verify `/target/raw` -> `/target/managed` with real chassis pose and control
-  links.
+旧 `scripts/stereo.py`、`scripts/recording.py`、`tools/stereo` 和 replay 已移除。

@@ -172,30 +172,3 @@ def test_gui_process_does_not_inherit_terminal_stdin(monkeypatch) -> None:
     assert captured["command"] == ["ffmpeg", "-version"]
     assert captured["stdin"] == subprocess.DEVNULL
     assert captured["stdout"] == -1
-
-
-def test_extract_yolo_frames_dry_run_maps_video_labels(tmp_path: Path, capsys) -> None:
-    session = tmp_path / "20260701_205507"
-    session.mkdir()
-    (session / "20260701_205507_video0.mkv").write_bytes(b"")
-    (session / "20260701_205507_video2.mkv").write_bytes(b"")
-
-    code = main(["extract-yolo-frames", "--dry-run", "--dataset-root", str(tmp_path / "dataset"), str(session)])
-
-    output = capsys.readouterr().out
-    assert code == 0
-    assert "20260701_205507_cam1_frame_%06d.jpg" in output
-    assert "20260701_205507_cam2_frame_%06d.jpg" in output
-    assert "-vf fps=2" in output
-
-
-def test_normalize_timestamps_dry_run_uses_base_epoch(tmp_path: Path, capsys) -> None:
-    video = tmp_path / "input.mkv"
-    video.write_bytes(b"")
-
-    code = main(["normalize-timestamps", "--dry-run", "--base-epoch", "1782893181.5", str(video)])
-
-    output = capsys.readouterr().out
-    assert code == 0
-    assert "-output_ts_offset -1782893181.5" in output
-    assert "input_normalized.mkv" in output

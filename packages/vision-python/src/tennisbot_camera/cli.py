@@ -125,7 +125,7 @@ def command_preview(config, target: str, duration: float | None) -> int:
         with StereoFrameSource(*config.devices(target), config) as source:
             while duration is None or time.monotonic() - started < duration:
                 _, left, right, delta = source.read()
-                canvas = cv2.hconcat([left.image, right.image])
+                canvas = cv2.hconcat([preview_frame(left.image), preview_frame(right.image)])
                 cv2.putText(canvas, f"pair delta {delta / 1e6:.2f} ms", (30, 60), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 3)
                 cv2.imshow("TennisBot raw stereo", canvas)
                 if cv2.waitKey(1) & 0xFF in (27, ord("q")):
@@ -133,13 +133,20 @@ def command_preview(config, target: str, duration: float | None) -> int:
     else:
         with FrameSource(config.camera(target), config) as source:
             while duration is None or time.monotonic() - started < duration:
-                cv2.imshow(f"TennisBot raw {target}", source.read().image)
+                cv2.imshow(f"TennisBot raw {target}", preview_frame(source.read().image))
                 if cv2.waitKey(1) & 0xFF in (27, ord("q")):
                     break
     cv2.destroyAllWindows()
     return 0
 
 
+def preview_frame(frame, width: int = 960):
+    import cv2
+    if frame.shape[1] <= width:
+        return frame
+    height = max(1, round(frame.shape[0] * width / frame.shape[1]))
+    return cv2.resize(frame, (width, height), interpolation=cv2.INTER_AREA)
+
+
 if __name__ == "__main__":
     raise SystemExit(main())
-

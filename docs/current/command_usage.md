@@ -1,468 +1,93 @@
 # 命令入口使用说明
 
-日期：2026-07-03
+日期：2026-07-19
 
-## 约定
+所有 Python 入口从仓库根目录用 `uv run` 执行。
 
-Python 工具和根目录 launcher 使用 `uv`，前端和 TypeScript 包使用 `bun`。入口命令都提供默认
-路径、默认设备或默认端口；直接运行默认命令应该能进入最常用流程。
+## Camera
 
-`tools/calibration` 和 `tools/yolo` 的标注/模型包命令都可以在无
-`torch`、无 CUDA/NVIDIA Python 包的环境里运行。不要使用
-`uv sync --all-extras` 或 `uv run --extra detect ...`，除非要跑纯 YOLO
-相机检测 GUI。
+```bash
+uv run scripts/camera.py list
+uv run scripts/camera.py check
+uv run scripts/camera.py preview cam1
+uv run scripts/camera.py preview cam2
+uv run scripts/camera.py preview stereo
+uv run scripts/camera.py controls show stereo
+uv run scripts/camera.py controls apply stereo --profile runtime
+uv run scripts/camera.py controls apply stereo --profile calibration
+```
 
-## 本机运行入口
+`cam1` 是 left `/dev/video0`，`cam2` 是 right `/dev/video2`。`preview` 只显示
+原始画面，不运行 YOLO、不标定、不录制。
 
-本仓库只构建视觉运行时包。`target_msgs` 和 `target_manager` 来自
-`/home/cr/tennis_robot_ws/install/setup.bash` 对应的控制工作区：
+## Calibration
+
+```bash
+uv run scripts/calib.py online mono cam1
+uv run scripts/calib.py online mono cam2
+uv run scripts/calib.py online stereo
+
+uv run scripts/calib.py offline mono cam1 --session <path>
+uv run scripts/calib.py offline mono cam2 --session <path>
+uv run scripts/calib.py offline stereo --session <path>
+```
+
+online 一定打开 ChArUco GUI，完成采集后继续求解；offline 一定不打开相机或
+GUI，只求解明确指定的 session。可用 `--output` 指定标定包位置，用
+`--dry-run` 检查底层步骤。
+
+## Recording
+
+```bash
+uv run scripts/record.py mono cam1
+uv run scripts/record.py mono cam2 --duration 60
+uv run scripts/record.py stereo
+uv run scripts/record.py mono cam1 --gui
+uv run scripts/record.py stereo --gui
+```
+
+默认 headless，适合 SSH。mono/stereo 和 GUI/headless 使用相同 ffmpeg 录制、
+控制 profile 和 session schema。输出位于 `runs/recording`，包含
+`session.json`、视频、`frames.ndjson`，双目另含 `pairs.ndjson`。
+
+## Test
+
+```bash
+uv run scripts/test.py yolo mono cam1
+uv run scripts/test.py yolo mono cam2 --gui
+uv run scripts/test.py yolo stereo
+uv run scripts/test.py yolo stereo --gui
+uv run scripts/test.py triangulation stereo
+uv run scripts/test.py triangulation stereo --gui
+uv run scripts/test.py communication chassis-position
+```
+
+headless 持续输出检测数、置信度、FPS、推理延迟和 pair delta；三角化另输出
+相机坐标 `x/y/z`、disparity、epipolar 和 reprojection error。加 `--json`
+输出 NDJSON 风格的一行一帧诊断。
+
+只有在线 test 支持录制：
+
+```bash
+uv run scripts/test.py yolo mono cam1 --record
+uv run scripts/test.py yolo stereo --gui --record
+uv run scripts/test.py triangulation stereo --record
+uv run scripts/test.py triangulation stereo --gui --record-overlay
+```
+
+`--record-overlay` 自动启用 `--record`。可用 `--record-root` 和
+`--record-session` 指定会话。录制 sink 使用测试进程已经打开的 frame，不会
+二次打开相机。
+
+## ROS runtime
 
 ```bash
 source /opt/ros/humble/setup.bash
 source /home/cr/tennis_robot_ws/install/setup.bash
+uv pip install -e packages/vision-python
 colcon build --base-paths src --packages-select tennisbot_vision_runtime --symlink-install
 source install/setup.bash
-```
-
-默认值：
-
-- `tennisbot_vision_runtime` 订阅 `/robot/chassis_position`
-- `tennisbot_vision_runtime` 直接发布 `/target/raw`
-- 外部 `target_manager` 订阅 `/target/raw` 并发布 `/target/managed`
-- 名义频率：vision raw target 最高 30 Hz，managed target 最高 10 Hz
-
-启动视觉运行时主链路：
-
-```bash
-ros2 launch tennisbot_vision_runtime vision_runtime.launch.py
-```
-
-启动外部 target manager：
-
-```bash
-ros2 launch target_manager target_manager.launch.py
-```
-
-也可以用 uv/Python 主链路入口同时启动视觉运行时和外部 target manager。运行阶段
-launcher 默认会在子进程里自动 source ROS、控制工作区和本仓库
-`install/setup.bash`，所以启动主链路时不需要在当前终端手动 source：
-
-```bash
 uv run scripts/vision-runtime.py run
-uv run scripts/vision-runtime.py run --record --session test01 --tile
-uv run scripts/vision-runtime.py task --task-id 42 --session catch42 --tile
-uv run scripts/vision-runtime.py run --dry-run --record --devices /dev/video0,/dev/video2
 ```
 
-如果要手动执行 `ros2 topic list`、`ros2 node list` 这类诊断命令，当前终端
-仍然需要按上面的顺序 source；launcher 的自动 source 只作用于它启动的子进程。
-
-`run --record` 和 `task` 会默认写入 `runs/vision-runtime/<session>/`：
-
-- `session.json`
-- `left.mp4`、`right.mp4`
-- `frames.ndjson`
-- `chassis.ndjson`
-- `detections.ndjson`
-- `observations.ndjson`
-- `targets.ndjson`
-- `events.ndjson`
-
-查看接口和话题：
-
-```bash
-ros2 interface show target_msgs/msg/ChassisPosition
-ros2 interface show target_msgs/msg/RawTarget
-ros2 interface show target_msgs/msg/ManagedTarget
-ros2 topic list -t
-ros2 topic hz /robot/chassis_position
-ros2 topic echo /target/raw
-ros2 topic echo /target/managed
-```
-
-启动本机 4K 双目 YOLO 坐标 GUI：
-
-```bash
-uv run scripts/stereo.py record
-uv run scripts/stereo.py gui
-```
-
-常用选项：
-
-```bash
-uv run scripts/stereo.py record --duration 60
-uv run scripts/stereo.py record --dry-run
-uv run scripts/stereo.py preview
-uv run scripts/stereo.py gui --tile
-uv run scripts/stereo.py gui --tile --record-run
-uv run scripts/stereo.py gui --dry-run
-uv run scripts/stereo.py gui --devices /dev/video0,/dev/video2
-uv run scripts/stereo.py replay
-```
-
-默认值：
-
-- 相机：`/dev/video0,/dev/video2`
-- 分辨率：`3840x2160`
-- 帧率：`30`
-- 格式：`MJPG`
-- 标定包：`artifacts/calibration/stereo_cam1_cam2`
-- 模型：`artifacts/models/tennis_ball_yolo/model.pt`
-- 原始双目视频目录：`runs/raw-stereo`
-- GUI 点流记录目录：`runs/stereo`
-
-`record` 写入 `left.mp4`、`right.mp4`、`session.json`、`frames.ndjson` 和
-`pairs.ndjson`。不传 `--duration` 时会一直录制，预览窗口按 `q` 或 `esc`
-停止；预览只做原始双目画面降采样，不运行 YOLO、矫正或 overlay。
-
-`replay` 会打开本地前端，列出 `runs/stereo` 下面的记录；选中记录后在
-页面里用两个进度条选择轨迹时间段，并基于选中点系生成 3D 显示和相机坐标
-预测曲线。时间段不通过命令行参数传入。
-
-## 原始相机录像入口
-
-从仓库根目录运行：
-
-```bash
-uv run scripts/recording.py single --dry-run
-uv run scripts/recording.py single --duration 60
-uv run scripts/recording.py single --duration 60 --sample-fps 3
-uv run scripts/recording.py dual --dry-run
-uv run scripts/recording.py dual --duration 60
-uv run scripts/recording.py dual --preview
-uv run scripts/recording.py gui
-uv run scripts/recording.py gui dual
-```
-
-默认配置：
-
-- 配置文件：`tools/recording/configs/tennis_camera_recording.yaml`
-- 单路设备：`/dev/video0`
-- 双路设备：`/dev/video2,/dev/video0`
-- 分辨率：`3840x2160`
-- 帧率：`30`
-- 输入格式：`mjpeg`
-- 输出目录：`runs/recording`
-- 控制项：从 YAML 加载 `exposure_time_absolute`、白平衡、亮度、增益、锐度等 V4L2 参数
-
-常用覆盖：
-
-```bash
-uv run scripts/recording.py single --exposure 100 --wb 4600 --duration 30
-uv run scripts/recording.py dual --control exposure_time_absolute=166
-uv run scripts/recording.py extract --dry-run 20260701_205507
-uv run scripts/recording.py normalize --dry-run --base-epoch 1782893181 runs/recording/<session>
-```
-
-`dual` 的软同步沿用 V4L2 absolute timestamps 加 `output_ts_offset` 的软件归一化；
-这不是硬件同步。
-
-`gui dual` 在一个窗口中左右并排显示两路相机画面，开始录像时仍走同一套
-双路 ffmpeg 录像命令和 YAML 相机控制。
-
-## YOLO 标注、抠球审核和增强
-
-详细流程见 [YOLO 标注、抠球审核和数据增强使用说明](yolo_sprite_augmentation_usage.md)。
-
-常用入口：
-
-```bash
-uv run scripts/yolo.py annotate
-uv run scripts/yolo.py sprites extract
-uv run scripts/yolo.py sprites review
-uv run scripts/yolo.py augment copy-paste
-```
-
-对当前 `tools/yolo/0260701` 数据目录进行局域网标注：
-
-```bash
-uv run scripts/yolo.py annotate \
-  --images-root tools/yolo/0260701/images \
-  --labels-root tools/yolo/0260701/labels \
-  --excluded-file tools/yolo/0260701/excluded_images.txt \
-  --host 0.0.0.0 \
-  --port 8765
-```
-
-生成 sprite 候选时默认不覆盖已有候选；只有显式加 `--overwrite` 才会重写。
-
-## 标定快捷入口
-
-从仓库根目录运行：
-
-```bash
-uv run scripts/calib.py brightness
-uv run scripts/calib.py preview
-uv run scripts/calib.py mono cam1
-uv run scripts/calib.py mono cam2
-uv run scripts/calib.py stereo
-```
-
-默认值：
-
-- 亮度检查设备：`/dev/video0,/dev/video2`
-- 预览调试设备：`/dev/video0,/dev/video2`
-- `cam1` 设备：`/dev/video0`，输出：`artifacts/calibration/cam1_<local_timestamp>`
-- `cam2` 设备：`/dev/video2`，输出：`artifacts/calibration/cam2_<local_timestamp>`
-- 双目标定设备：左 `/dev/video0`，右 `/dev/video2`
-- 双目输入：默认使用最新 accepted 的 `cam1*` / `cam2*` 单目标定包
-- 双目输出：`artifacts/calibration/stereo_cam1_cam2_<local_timestamp>`
-- 配置：`tools/calibration/configs/dfoptix_charuco_15mm_capture.yaml`
-- 采集张数：`30`
-
-常用选项：
-
-```bash
-uv run scripts/calib.py preview cam1
-uv run scripts/calib.py preview cam2 --shutter 400 --gain 64
-uv run scripts/calib.py mono cam1 --capture-only
-uv run scripts/calib.py mono cam1 --solve-only --session tools/calibration/captures/local/<session>
-uv run scripts/calib.py stereo --dry-run
-uv run scripts/calib.py stereo --devices /dev/video0,/dev/video2
-uv run scripts/calib.py stereo --output artifacts/calibration/stereo_cam1_cam2
-```
-
-正常标定顺序是先检查亮度和相机顺序，再分别完成 `cam1`、`cam2` 单目，
-最后完成双目。`mono` 和 `stereo` 默认都是“采集 GUI 结束后继续求解并导出
-新的时间戳标定包”。如需让一次求解写入运行时默认读取的固定包，需显式指定
-`--output artifacts/calibration/stereo_cam1_cam2`。`preview` 会打开 OpenCV 实时画面，
-窗口滑条可调 `shutter/exposure_time_absolute` 和 `gain`，`q` 或 `esc` 退出。
-`mono/stereo --dry-run` 只打印底层命令；`brightness/preview --dry-run`
-不采集图像帧。
-
-## 相机亮度检查
-
-```bash
-uv run scripts/calib.py brightness
-```
-
-默认值：
-
-- 设备：`/dev/video0,/dev/video2`
-- 分辨率：`1280x720`
-- 帧率：`30`
-- 输入格式：`mjpeg`
-- 超时：`5000 ms`
-
-指定设备：
-
-```bash
-uv run scripts/calib.py brightness --devices /dev/video0,/dev/video2
-```
-
-## 相机视频调试
-
-双目预览并调快门/增益/亮度：
-
-```bash
-uv run scripts/calib.py preview
-```
-
-单路预览：
-
-```bash
-uv run scripts/calib.py preview cam1
-uv run scripts/calib.py preview cam2
-```
-
-指定初始参数：
-
-```bash
-uv run scripts/calib.py preview cam2 --shutter 400 --gain 64 --brightness 32
-```
-
-默认值：
-
-- 双目设备：`/dev/video0,/dev/video2`
-- `cam1` 设备：`/dev/video0`
-- `cam2` 设备：`/dev/video2`
-- 分辨率：`3840x2160`
-- 帧率：`30`
-- 输入格式：`MJPG`
-- 默认切到手动曝光，并将 `shutter`、`gain`、`brightness` 初始化到高可见值，方便先看到画面再下调
-
-窗口操作：
-
-- 滑条：`shutter` 调 `exposure_time_absolute`
-- 滑条：`gain` 调 UVC `gain`
-- 滑条：`brightness` 调 UVC `brightness`
-- 退出：`q` 或 `esc`
-
-## 底层标定工具
-
-通常直接使用上面的 `uv run scripts/calib.py ...` 快捷入口。需要排查底层 CLI
-时再进入目录：
-
-```bash
-cd tools/calibration
-```
-
-单目采集 GUI：
-
-```bash
-uv run camera-calib-lab capture charuco-auto-gui
-```
-
-默认值：
-
-- 配置：`configs/dfoptix_charuco_15mm_capture.yaml`
-- 输出：`captures/local/dfoptix_charuco_auto_session`
-- 采集张数：`30`
-- 相机：`/dev/video0`
-
-双目采集 GUI：
-
-```bash
-uv run camera-calib-lab capture stereo-charuco-auto-gui
-```
-
-默认值：
-
-- 配置：`configs/dfoptix_charuco_15mm_capture.yaml`
-- 输出：`captures/local/dfoptix_stereo_charuco_auto_session`
-- 采集组数：`30`
-- 左相机：`/dev/video0`
-- 右相机：`/dev/video2`
-
-相机 USB 端口变化时：
-
-```bash
-uv run camera-calib-lab capture stereo-charuco-auto-gui --left-device /dev/video0 --right-device /dev/video2
-```
-
-单目求解并导出运行时包：
-
-```bash
-uv run camera-calib-lab solve mono \
-  --session captures/local/20260630_cam1_charuco \
-  --output ../../artifacts/calibration/cam1 \
-  --camera-id cam1
-
-uv run camera-calib-lab solve mono \
-  --session captures/local/20260630_cam2_charuco \
-  --output ../../artifacts/calibration/cam2 \
-  --camera-id cam2
-```
-
-双目求解并导出运行时包：
-
-```bash
-uv run camera-calib-lab solve stereo \
-  --session captures/local/20260630_stereo_charuco \
-  --left-mono ../../artifacts/calibration/cam1 \
-  --right-mono ../../artifacts/calibration/cam2 \
-  --output ../../artifacts/calibration/stereo_cam1_cam2 \
-  --left-camera-id cam1 \
-  --right-camera-id cam2
-```
-
-## YOLO 工具
-
-从仓库根目录启动标注前端：
-
-```bash
-uv run scripts/yolo.py annotate
-```
-
-也可以直接进入工具目录运行：
-
-```bash
-cd tools/yolo
-uv run tennisbot-yolo annotate
-```
-
-默认 `uv sync` 不安装 `torch`、`ultralytics` 或 CUDA/NVIDIA Python 包。
-`detect-gui` 是 `tools/yolo` 中唯一需要 `--extra detect` 的命令。
-
-默认值：
-
-- 图片目录：`tools/yolo/workspace/dataset/images`
-- 标签目录：`tools/yolo/workspace/dataset/labels`
-- 排除列表：`tools/yolo/workspace/dataset/excluded_images.txt`
-- 地址：`127.0.0.1:8765`
-
-指定端口：
-
-```bash
-uv run scripts/yolo.py annotate --port 8766
-```
-
-验证默认模型包：
-
-```bash
-uv run tennisbot-yolo package verify
-```
-
-默认值：
-
-- 模型包：`artifacts/models/tennis_ball_yolo`
-
-这个默认模型包已纳入 Git 跟踪，拉取仓库后应直接存在。
-
-创建 dry-run 模型包：
-
-```bash
-uv run tennisbot-yolo package create --dry-run
-```
-
-默认值：
-
-- 输出：`artifacts/models/tennis_ball_yolo`
-- 默认模型类型：`onnx`
-
-创建真实模型包时必须显式传入至少一个模型文件，避免误把空包当成真实模型：
-
-```bash
-uv run tennisbot-yolo package create \
-  --model-pt ../../artifacts/model_candidates/tennis_ball_yolo/best.pt \
-  --default-model pt
-```
-
-纯 YOLO 检测 GUI：
-
-```bash
-uv run --extra detect tennisbot-yolo detect-gui
-```
-
-默认值：
-
-- 相机：`/dev/video0,/dev/video2`
-- 分辨率：`3840x2160`
-- 帧率：`30`
-- 格式：`MJPG`
-- 模型：`artifacts/models/tennis_ball_yolo/model.pt`
-- 置信度：`0.05`
-- 输入尺寸：`1280`
-- 预览宽度：`720`
-
-小球太小时建议加 tiled 推理：
-
-```bash
-uv run --extra detect tennisbot-yolo detect-gui --tile
-```
-
-注意：`tools/yolo detect-gui` 只显示检测框；需要显示球相对相机的
-x/y/z 坐标时使用根入口 `uv run scripts/stereo.py gui`。
-
-离线导出已有视频的 YOLO 带框结果：
-
-```bash
-uv run scripts/yolo.py detect-video input.mp4 \
-  --output runs/yolo-detect/input_boxes.mp4 \
-  --tile \
-  --overwrite
-```
-
-等价的工具目录命令：
-
-```bash
-cd tools/yolo
-uv run --extra detect tennisbot-yolo detect-video ../../input.mp4 \
-  --output ../../runs/yolo-detect/input_boxes.mp4 \
-  --tile \
-  --overwrite
-```
-
-默认会保留原视频分辨率和 FPS，输出 mp4v 编码的视频，只包含检测框、中心点、
-置信度和状态 overlay，不保留音频。这个命令只验证 2D YOLO 检测效果，不验证
-双目几何、轨迹预测、ROS 发布或真实接球闭环。
+通信测试只读真实 ROS topic，不生成球、目标或本地底盘替身。

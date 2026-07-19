@@ -6,7 +6,7 @@ from typing import Any
 
 import numpy as np
 
-from tennisbot_stereo.detection import YoloBallDetector
+from tennisbot_vision.detection import YoloBallDetector
 
 
 class FakeTensor:

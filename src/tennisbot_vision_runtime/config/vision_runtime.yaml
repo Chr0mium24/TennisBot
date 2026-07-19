@@ -12,7 +12,6 @@ vision_runtime:
     # Runtime stereo tool import path. In the repo workspace this points to the
     # existing OpenCV stereo code; deployments can override it or install the
     # package into the ROS environment.
-    stereo_tool_python_path: tools/stereo/src
 
     left_device: /dev/video0
     right_device: /dev/video2

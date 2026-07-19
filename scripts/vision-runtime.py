@@ -11,7 +11,6 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from camera_controls import apply_default_camera_controls, build_camera_control_commands
 from process_utils import REPO_ROOT, display_command, parse_devices, process_env, require_value, shell_quote
 
 
@@ -69,14 +68,17 @@ def run(options: Options) -> int:
     devices = camera_devices(options)
 
     if options.dry_run:
-        for command in build_camera_control_commands(devices):
-            print(display_command(command))
+        print(display_command(["uv", "run", "scripts/camera.py", "controls", "apply", "stereo", "--profile", "runtime", "--dry-run"]))
         if manager is not None:
             print(display_command(manager))
         print(display_command(vision_runtime))
         return 0
 
-    apply_default_camera_controls(devices, REPO_ROOT)
+    if options.devices or options.left_device or options.right_device:
+        print("warning: runtime device overrides do not change canonical camera control targets", file=sys.stderr)
+    controls_code = run_camera_controls()
+    if controls_code != 0:
+        return controls_code
 
     procs: list[subprocess.Popen[bytes]] = []
     if manager is not None:
@@ -151,6 +153,15 @@ def build_vision_runtime_command(options: Options) -> list[str]:
         "--ros-args",
         *params,
     ]
+
+
+def run_camera_controls() -> int:
+    return subprocess.run(
+        ["uv", "run", "scripts/camera.py", "controls", "apply", "stereo", "--profile", "runtime"],
+        cwd=REPO_ROOT,
+        env=process_env(),
+        check=False,
+    ).returncode
 
 
 def build_manager_command(options: Options) -> list[str] | None:

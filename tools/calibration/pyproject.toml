@@ -7,7 +7,11 @@ dependencies = [
     "numpy>=2.0.0",
     "opencv-python>=4.13.0.92",
     "pyyaml>=6.0.0",
+    "tennisbot-vision",
 ]
+
+[tool.uv.sources]
+tennisbot-vision = { path = "../../packages/vision-python", editable = true }
 
 [project.scripts]
 camera-calib-lab = "camera_calib_lab.cli:main"

@@ -1,77 +1,25 @@
-# TennisBot Recording Tool
+# TennisBot Recording Capability
 
-`tools/recording` migrates the local V4L2/ffmpeg scripts from `~/Codes/record`
-into a uv-managed CLI.
-
-## Config
-
-Default config:
+`tools/recording` owns the ffmpeg/V4L2 encoder, GUI, session schema, clean
+shutdown, and packet timestamp export. Operators should use the focused root
+entry:
 
 ```bash
-tools/recording/configs/tennis_camera_recording.yaml
+uv run scripts/record.py mono cam1
+uv run scripts/record.py mono cam2 --gui
+uv run scripts/record.py stereo
+uv run scripts/record.py stereo --gui
 ```
 
-The config stores 4K MJPEG capture defaults and V4L2 controls such as
-`exposure_time_absolute`, fixed white balance, brightness, gain, sharpness, and
-focus mode. Relative output paths are resolved from the repository root.
+Camera identities, capture defaults, and controls come from the shared
+`tennisbot_camera` configuration. Encoding-specific defaults remain in
+`configs/tennis_camera_recording.yaml`.
 
-Inspect the parsed config:
+Outputs default to `runs/recording`. Every session has `session.json` and
+`frames.ndjson`; stereo also has `pairs.ndjson`. GUI and headless modes use the
+same recording builders and metadata writers. Soft synchronization is a
+software timestamp relationship, not hardware synchronization.
 
-```bash
-uv run tennisbot-recording config show
-```
-
-## Recording
-
-From this directory:
-
-```bash
-uv run tennisbot-recording record single --dry-run
-uv run tennisbot-recording record single --duration 60
-uv run tennisbot-recording record single --duration 60 --sample-fps 3
-uv run tennisbot-recording record dual --dry-run
-uv run tennisbot-recording record dual --duration 60
-uv run tennisbot-recording record dual --preview
-uv run tennisbot-recording gui single
-uv run tennisbot-recording gui dual
-```
-
-From the repository root, prefer the wrapper:
-
-```bash
-uv run scripts/recording.py single --dry-run
-uv run scripts/recording.py dual --duration 60
-uv run scripts/recording.py gui
-uv run scripts/recording.py gui dual
-```
-
-Both `single` and `dual` configure the selected cameras before recording. CLI
-control flags override the YAML for one run:
-
-```bash
-uv run scripts/recording.py single --exposure 100 --wb 4600 --duration 30
-uv run scripts/recording.py dual --control exposure_time_absolute=166
-```
-
-`gui dual` shows both cameras side by side in one window and records through
-the same dual ffmpeg path as `record dual`.
-
-Default outputs are written under ignored `runs/recording`.
-
-## Postprocessing
-
-Extract videos into the YOLO annotation image layout:
-
-```bash
-uv run scripts/recording.py extract --dry-run 20260701_205507
-uv run scripts/recording.py extract --fps 2 runs/recording/20260701_205507
-```
-
-Normalize videos whose packet timestamps are absolute Unix times:
-
-```bash
-uv run scripts/recording.py normalize --dry-run --base-epoch 1782893181 runs/recording/20260701_205507
-uv run scripts/recording.py normalize --output-dir fixed runs/recording/20260701_205507
-```
-
-Soft sync is still software timestamp normalization. It is not hardware sync.
+Dataset frame extraction and timestamp normalization remain internal legacy
+modules pending a separate data/media tool decision and are not exposed by
+`scripts/record.py`.

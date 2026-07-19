@@ -186,6 +186,7 @@ dependencies = [
     { name = "numpy" },
     { name = "opencv-python" },
     { name = "pyyaml" },
+    { name = "tennisbot-vision" },
 ]
 
 [package.dev-dependencies]
@@ -198,7 +199,28 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.0.0" },
     { name = "opencv-python", specifier = ">=4.13.0.92" },
     { name = "pyyaml", specifier = ">=6.0.0" },
+    { name = "tennisbot-vision", editable = "../../packages/vision-python" },
 ]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=9.0.3" }]
+
+[[package]]
+name = "tennisbot-vision"
+version = "0.1.0"
+source = { editable = "../../packages/vision-python" }
+dependencies = [
+    { name = "numpy" },
+    { name = "opencv-python" },
+    { name = "pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "numpy", specifier = ">=1.24,<3" },
+    { name = "opencv-python", specifier = ">=4.8" },
+    { name = "pytest", marker = "extra == 'test'", specifier = ">=8.0" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "ultralytics", marker = "extra == 'detect'", specifier = ">=8.3" },
+]
+provides-extras = ["detect", "test"]

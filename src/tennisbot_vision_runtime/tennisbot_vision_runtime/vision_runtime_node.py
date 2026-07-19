@@ -11,7 +11,6 @@ from datetime import datetime
 import json
 import math
 from pathlib import Path
-import sys
 from typing import Any, Callable, Optional, TextIO
 
 import rclpy
@@ -45,7 +44,6 @@ class VisionRuntimeNode(Node):
         self.declare_parameter("runtime_rate_hz", 30.0)
         self.declare_parameter("enable_camera", True)
         self.declare_parameter("dry_run", False)
-        self.declare_parameter("stereo_tool_python_path", "tools/stereo/src")
         self.declare_parameter("left_device", "/dev/video0")
         self.declare_parameter("right_device", "/dev/video2")
         self.declare_parameter("width", 3840)
@@ -857,16 +855,10 @@ class CameraRuntime:
 
     @classmethod
     def from_node(cls, node: VisionRuntimeNode) -> CameraRuntime:
-        stereo_tool_path = Path(str(node.get_parameter("stereo_tool_python_path").value)).expanduser()
-        if stereo_tool_path and stereo_tool_path.is_dir():
-            resolved = str(stereo_tool_path.resolve())
-            if resolved not in sys.path:
-                sys.path.insert(0, resolved)
-
         import cv2  # noqa: PLC0415
-        from tennisbot_stereo.calibration import RuntimeStereoCalibration  # noqa: PLC0415
-        from tennisbot_stereo.detection import YoloBallDetector  # noqa: PLC0415
-        from tennisbot_stereo.matching import StereoBallMatcher  # noqa: PLC0415
+        from tennisbot_vision.calibration import RuntimeStereoCalibration  # noqa: PLC0415
+        from tennisbot_vision.detection import YoloBallDetector  # noqa: PLC0415
+        from tennisbot_vision.matching import StereoBallMatcher  # noqa: PLC0415
 
         width = int(node.get_parameter("width").value)
         height = int(node.get_parameter("height").value)
@@ -1003,7 +995,7 @@ class CameraRuntime:
         )
         actual_size = (int(left_frame.shape[1]), int(left_frame.shape[0]))
         if actual_size != self.calibration.image_size:
-            from tennisbot_stereo.calibration import RuntimeStereoCalibration  # noqa: PLC0415
+            from tennisbot_vision.calibration import RuntimeStereoCalibration  # noqa: PLC0415
 
             self.calibration = RuntimeStereoCalibration.from_package(
                 self.calibration_package,
