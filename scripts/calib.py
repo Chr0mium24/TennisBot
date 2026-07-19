@@ -69,26 +69,25 @@ def main(argv: list[str]) -> int:
         return 0
 
     try:
-        command = argv[0]
-        rest = argv[1:]
-        if command == "brightness":
-            return run_step(
-                CommandStep("camera brightness", ["camera", "brightness", *brightness_args(rest)]),
-                False,
-            )
-        if command == "preview":
-            if rest and rest[0] in {"--help", "-h"}:
-                print_preview_usage()
-                return 0
-            return run_step(
-                CommandStep("camera preview", ["camera", "preview", *preview_args(rest)]),
-                False,
-            )
-        if command == "mono":
+        workflow = argv[0]
+        if workflow not in {"online", "offline"}:
+            raise ValueError(f"Unknown calibration workflow: {workflow}")
+        if len(argv) < 2 or argv[1] in {"--help", "-h"}:
+            print_usage()
+            return 0
+        kind = argv[1]
+        rest = argv[2:]
+        if kind not in {"mono", "stereo"}:
+            raise ValueError("calibration kind must be mono or stereo")
+        if has_any_option(rest, ["--capture-only", "--solve-only"]):
+            raise ValueError("capture-only/solve-only are internal; use online or offline")
+        if workflow == "offline":
+            if not has_any_option(rest, ["--session"]):
+                raise ValueError("offline calibration requires --session <path>")
+            rest = [*rest, "--solve-only"]
+        if kind == "mono":
             return run_mono(rest)
-        if command == "stereo":
-            return run_stereo(rest)
-        raise ValueError(f"Unknown command: {command}")
+        return run_stereo(rest)
     except ValueError as error:
         print(error, file=sys.stderr)
         print("", file=sys.stderr)
@@ -112,13 +111,13 @@ def run_mono(args: list[str]) -> int:
         steps.append(
             CommandStep(
                 f"{options.camera_id} prepare controls",
-                ["camera", "prepare-calibration", "--devices", options.device],
+                ["@camera", "controls", "apply", options.camera_id, "--profile", "calibration"],
             )
         )
         steps.append(
             CommandStep(
                 f"{options.camera_id} current controls",
-                ["camera", "controls", "--devices", options.device],
+                ["@camera", "controls", "show", options.camera_id],
             )
         )
         steps.append(
@@ -185,13 +184,13 @@ def run_stereo(args: list[str]) -> int:
         steps.append(
             CommandStep(
                 "stereo prepare controls",
-                ["camera", "prepare-calibration", "--devices", f"{options.left_device},{options.right_device}"],
+                ["@camera", "controls", "apply", "stereo", "--profile", "calibration"],
             )
         )
         steps.append(
             CommandStep(
                 "stereo current controls",
-                ["camera", "controls", "--devices", f"{options.left_device},{options.right_device}"],
+                ["@camera", "controls", "show", "stereo"],
             )
         )
         steps.append(
@@ -255,13 +254,19 @@ def run_steps(steps: list[CommandStep], dry_run: bool) -> int:
 
 
 def run_step(step: CommandStep, dry_run: bool) -> int:
-    command = [*CALIBRATION_COMMAND, *step.args]
+    is_camera = bool(step.args and step.args[0] == "@camera")
+    command = (
+        ["uv", "run", str(REPO_ROOT / "scripts/camera.py"), *step.args[1:]]
+        if is_camera
+        else [*CALIBRATION_COMMAND, *step.args]
+    )
+    cwd = REPO_ROOT if is_camera else CALIBRATION_CWD
     if dry_run:
         print(f"{step.label}:")
-        print(f"  cd {display_path(CALIBRATION_CWD)}")
-        print(f"  {display_calibration_command(command)}")
+        print(f"  cd {display_path(cwd)}")
+        print(f"  {display_calibration_command(command) if not is_camera else ' '.join(shell_quote(value) for value in command)}")
         return 0
-    return run_streaming(command, cwd=CALIBRATION_CWD)
+    return run_streaming(command, cwd=cwd)
 
 
 def parse_mono_options(args: list[str]) -> MonoOptions:
@@ -606,32 +611,21 @@ def display_command_arg(value: str) -> str:
 def print_usage() -> None:
     print(
         """用法:
-  uv run scripts/calib.py brightness [camera brightness options]
-  uv run scripts/calib.py preview [cam1|cam2|stereo] [camera preview options]
-  uv run scripts/calib.py mono cam1 [options]
-  uv run scripts/calib.py mono cam2 [options]
-  uv run scripts/calib.py stereo [options]
+  uv run scripts/calib.py online mono cam1 [options]
+  uv run scripts/calib.py online mono cam2 [options]
+  uv run scripts/calib.py online stereo [options]
+  uv run scripts/calib.py offline mono cam1 --session <path> [options]
+  uv run scripts/calib.py offline mono cam2 --session <path> [options]
+  uv run scripts/calib.py offline stereo --session <path> [options]
 
-常用:
-  uv run scripts/calib.py brightness
-  uv run scripts/calib.py preview
-  uv run scripts/calib.py mono cam1
-  uv run scripts/calib.py mono cam2
-  uv run scripts/calib.py stereo
+online 会应用 calibration 控制配置，打开 ChArUco GUI 采集，然后求解并导出。
+offline 只读取指定 session 求解，不打开相机或 GUI。
+亮度检查、原始预览和控制配置请使用 scripts/camera.py。
 
-默认:
-  brightness devices: /dev/video0,/dev/video2
-  preview devices: /dev/video0,/dev/video2
-
-选项:
-  --capture-only   只采集，不求解
-  --solve-only     只求解，默认使用最新匹配 session
-  --dry-run        mono/stereo 只打印命令；brightness/preview 不采集图像帧
-
-查看子命令:
-  uv run scripts/calib.py preview --help
-  uv run scripts/calib.py mono --help
-  uv run scripts/calib.py stereo --help
+通用选项:
+  --session <path>  online 可指定输出 session；offline 必须指定输入 session
+  --output <path>   标定包输出路径
+  --dry-run         只打印步骤
 """
     )
 
