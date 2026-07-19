@@ -1,0 +1,3 @@
+[console_scripts]
+pytest = tennisbot_recording.pytest_main:main
+tennisbot-recording = tennisbot_recording.cli:main

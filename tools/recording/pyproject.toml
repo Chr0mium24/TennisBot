@@ -6,7 +6,11 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "pyyaml>=6.0.0",
+    "tennisbot-vision",
 ]
+
+[tool.uv.sources]
+tennisbot-vision = { path = "../../packages/vision-python", editable = true }
 
 [project.scripts]
 tennisbot-recording = "tennisbot_recording.cli:main"

@@ -15,6 +15,7 @@ import time
 from typing import Sequence, TextIO
 
 from .config import RecordingConfig, format_control_value, safe_label
+from tennisbot_camera.config import load_camera_config
 
 
 CONTROL_NAMES = (
@@ -437,6 +438,7 @@ def record_single(plan: SingleRecordingPlan, config: RecordingConfig, *, dry_run
         time.sleep(config.capture.settle_seconds)
     write_single_metadata(plan, config)
     status = run_foreground(plan.record_command)
+    write_packet_timing_logs(plan.out_dir, ((canonical_camera_id(plan.set_format_command[2]), plan.output),))
     print_saved_videos((plan.output,))
     return status
 
@@ -471,6 +473,7 @@ def record_dual(
         status = run_parallel_dual(plan)
     else:
         status = run_foreground(plan.single_process_command)
+    write_packet_timing_logs(plan.out_dir, (("cam1", plan.outputs[0]), ("cam2", plan.outputs[1])))
     print_saved_videos(plan.outputs)
     return status
 
@@ -514,6 +517,7 @@ def print_dual_plan(plan: DualRecordingPlan, *, preview: bool, parallel_capture:
 
 
 def write_single_metadata(plan: SingleRecordingPlan, config: RecordingConfig) -> None:
+    camera_id = canonical_camera_id(plan.set_format_command[2])
     lines = [
         f"timestamp={plan.timestamp}",
         f"config={config.path}",
@@ -546,6 +550,22 @@ def write_single_metadata(plan: SingleRecordingPlan, config: RecordingConfig) ->
         run_text(["v4l2-ctl", "-d", plan.set_format_command[2], "--list-ctrls-menus"]),
     ]
     plan.metadata.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    payload = {
+        "schema_version": "tennisbot.recording.session.v1",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "mode": "mono",
+        "camera_ids": [camera_id],
+        "devices": [plan.set_format_command[2]],
+        "streams": {camera_id: str(plan.output)},
+        "capture": {
+            "width": config.capture.width,
+            "height": config.capture.height,
+            "fps": config.capture.fps,
+            "input_format": config.capture.input_format,
+        },
+        "controls": {name: format_control_value(value) for name, value in config.v4l2_controls()},
+    }
+    (plan.out_dir / "session.json").write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
 def write_dual_session(
@@ -557,12 +577,15 @@ def write_dual_session(
     parallel_capture: bool,
 ) -> None:
     payload = {
-        "schema_version": "tennisbot.ffmpeg_recording_session.v1",
+        "schema_version": "tennisbot.recording.session.v1",
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "mode": "stereo",
+        "camera_ids": ["cam1", "cam2"],
         "timestamp": plan.timestamp,
         "config": str(config.path),
         "devices": list(devices),
         "outputs": [str(path) for path in plan.outputs],
+        "streams": {"cam1": str(plan.outputs[0]), "cam2": str(plan.outputs[1])},
         "logs": [str(path) for path in plan.log_files],
         "capture": {
             "width": config.capture.width,
@@ -591,6 +614,63 @@ def write_dual_session(
         },
     }
     (plan.out_dir / "session.json").write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def probe_video_timestamps(path: Path) -> list[float]:
+    if not path.is_file():
+        return []
+    command = [
+        "ffprobe", "-v", "error", "-select_streams", "v:0",
+        "-show_entries", "frame=best_effort_timestamp_time", "-of", "json", str(path),
+    ]
+    try:
+        result = subprocess.run(command, text=True, capture_output=True, check=False)
+    except FileNotFoundError:
+        return []
+    if result.returncode != 0:
+        return []
+    try:
+        frames = json.loads(result.stdout).get("frames", [])
+        return [float(item["best_effort_timestamp_time"]) for item in frames if "best_effort_timestamp_time" in item]
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return []
+
+
+def canonical_camera_id(device: str) -> str:
+    config = load_camera_config()
+    for camera_id, camera in config.cameras.items():
+        if camera.device == device:
+            return camera_id
+    return Path(device).name
+
+
+def write_timing_records(out_dir: Path, streams: Sequence[tuple[str, Path, Sequence[float]]]) -> None:
+    with (out_dir / "frames.ndjson").open("w", encoding="utf-8") as frames_file:
+        for camera_id, path, timestamps in streams:
+            for sequence, timestamp_s in enumerate(timestamps):
+                frames_file.write(json.dumps({
+                    "camera_id": camera_id,
+                    "sequence": sequence,
+                    "timestamp_s": timestamp_s,
+                    "video": str(path),
+                }, sort_keys=True) + "\n")
+    if len(streams) != 2:
+        return
+    left, right = streams
+    with (out_dir / "pairs.ndjson").open("w", encoding="utf-8") as pairs_file:
+        for pair_id, (left_s, right_s) in enumerate(zip(left[2], right[2], strict=False)):
+            pairs_file.write(json.dumps({
+                "pair_id": pair_id,
+                "left_sequence": pair_id,
+                "right_sequence": pair_id,
+                "delta_ms": (right_s - left_s) * 1000.0,
+                "within_threshold": abs(right_s - left_s) <= 0.010,
+            }, sort_keys=True) + "\n")
+
+
+def write_packet_timing_logs(out_dir: Path, streams: Sequence[tuple[str, Path]]) -> None:
+    records = [(camera_id, path, probe_video_timestamps(path)) for camera_id, path in streams]
+    write_timing_records(out_dir, records)
 
 
 def run_parallel_dual(plan: DualRecordingPlan) -> int:

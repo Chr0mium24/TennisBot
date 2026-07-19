@@ -20,8 +20,8 @@ single:
 
 dual:
   devices:
-    - /dev/video2
     - /dev/video0
+    - /dev/video2
   preview: false
   soft_sync: true
   parallel_capture: true
@@ -45,4 +45,4 @@ controls:
   sharpness: 1
   backlight_compensation: 0
   focus_automatic_continuous: 0
-  focus_absolute: null
+  focus_absolute: 0

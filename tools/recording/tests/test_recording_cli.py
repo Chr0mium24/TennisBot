@@ -13,6 +13,7 @@ from tennisbot_recording.recording import (
     display_command,
     print_saved_videos,
     terminate_processes,
+    write_timing_records,
 )
 
 
@@ -22,7 +23,7 @@ def test_default_config_loads_record_script_camera_controls() -> None:
     assert config.capture.video_size == "3840x2160"
     assert config.capture.fps == 30
     assert config.single.device == "/dev/video0"
-    assert config.dual.devices == ("/dev/video2", "/dev/video0")
+    assert config.dual.devices == ("/dev/video0", "/dev/video2")
     assert "exposure_time_absolute=10" in config.v4l2_controls_string()
     assert "white_balance_temperature=4600" in config.v4l2_controls_string()
     assert "brightness=-5" in config.v4l2_controls_string()
@@ -42,7 +43,9 @@ def test_single_plan_uses_config_controls_and_sample_fps(tmp_path: Path) -> None
 
     command = display_command(plan.record_command)
     assert plan.output == tmp_path / "20260714_120000" / "20260714_120000_video0.mkv"
-    assert "--set-ctrl=auto_exposure=1,exposure_time_absolute=10" in display_command(plan.set_controls_command)
+    controls_command = display_command(plan.set_controls_command)
+    assert "auto_exposure=1" in controls_command
+    assert "exposure_time_absolute=10" in controls_command
     assert "-vf fps=3" in command
     assert "-t 60" in command
     assert "/dev/video8" in command
@@ -69,6 +72,17 @@ def test_dual_plan_builds_soft_sync_parallel_commands(tmp_path: Path) -> None:
     assert "soft_sync_base_epoch=" in first
     assert "/dev/video2" in first
     assert "/dev/video0" in second
+
+
+def test_timing_records_include_frames_and_pairs(tmp_path: Path) -> None:
+    write_timing_records(
+        tmp_path,
+        (("cam1", Path("left.mkv"), (1.0, 2.0)), ("cam2", Path("right.mkv"), (1.003, 2.02))),
+    )
+    assert len((tmp_path / "frames.ndjson").read_text().splitlines()) == 4
+    pairs = (tmp_path / "pairs.ndjson").read_text().splitlines()
+    assert '"within_threshold": true' in pairs[0]
+    assert '"within_threshold": false' in pairs[1]
 
 
 def test_print_saved_videos_reports_only_existing_outputs(tmp_path: Path, capsys) -> None:

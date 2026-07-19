@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from tennisbot_camera.config import load_camera_config
 
 
 TOOL_ROOT = Path(__file__).resolve().parents[2]
@@ -87,7 +88,26 @@ def load_config(path: Path | str | None = None) -> RecordingConfig:
     data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise ValueError(f"config must be a YAML mapping: {config_path}")
-    return parse_config(data, config_path)
+    config = parse_config(data, config_path)
+    if config_path.resolve() == DEFAULT_CONFIG_PATH.resolve():
+        camera_config = load_camera_config()
+        config = replace(
+            config,
+            capture=replace(
+                config.capture,
+                width=camera_config.capture.width,
+                height=camera_config.capture.height,
+                fps=camera_config.capture.fps,
+                pixel_format=camera_config.capture.pixel_format,
+            ),
+            single=replace(config.single, device=camera_config.camera("cam1").device),
+            dual=replace(
+                config.dual,
+                devices=(camera_config.camera("cam1").device, camera_config.camera("cam2").device),
+            ),
+            controls=dict(camera_config.profile("recording")),
+        )
+    return config
 
 
 def parse_config(data: dict[str, Any], path: Path) -> RecordingConfig:

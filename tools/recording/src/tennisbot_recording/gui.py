@@ -21,6 +21,8 @@ from .recording import (
     terminate_processes,
     write_dual_session,
     write_single_metadata,
+    write_packet_timing_logs,
+    canonical_camera_id,
     SingleRecordingPlan,
 )
 
@@ -172,6 +174,10 @@ class TennisRecorderGui:
         self.stop_button.configure(state=DISABLED)
         self.record_button.configure(state=NORMAL)
         if self.current_output is not None:
+            write_packet_timing_logs(
+                self.current_output.parent,
+                ((canonical_camera_id(self.device), self.current_output),),
+            )
             print_saved_videos((self.current_output,))
         self.current_output = None
         self.configure_camera()
@@ -339,6 +345,10 @@ class TennisDualRecorderGui:
         self.stop_button.configure(state=DISABLED)
         self.record_button.configure(state=NORMAL)
         if self.current_plan is not None:
+            write_packet_timing_logs(
+                self.current_plan.out_dir,
+                (("cam1", self.current_plan.outputs[0]), ("cam2", self.current_plan.outputs[1])),
+            )
             print_saved_videos(self.current_plan.outputs)
         self.current_plan = None
         self.configure_cameras()

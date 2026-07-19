@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import replace
 import json
 import math
 from pathlib import Path
@@ -8,6 +9,7 @@ import subprocess
 from typing import Any
 
 import yaml
+from tennisbot_camera.config import load_camera_config
 
 from .config import ControlValue, REPO_ROOT, load_config
 from .gui import run_dual_gui, run_gui
@@ -54,6 +56,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_common_recording_args(single)
     add_control_override_args(single)
     single.add_argument("--device", default="", help="V4L2 device")
+    single.add_argument("--camera-id", choices=("cam1", "cam2"), default="", help="Canonical camera identity")
     single.add_argument("--container", choices=("mkv", "mjpg"), default="", help="Output container")
     single.add_argument("--sample-fps", type=positive_float, default=None, help="Keep this many frames per second in MKV output")
     single.set_defaults(func=cmd_record_single)
@@ -77,6 +80,7 @@ def build_parser() -> argparse.ArgumentParser:
     add_config_arg(gui_single)
     add_control_override_args(gui_single)
     gui_single.add_argument("--device", default="", help="V4L2 device")
+    gui_single.add_argument("--camera-id", choices=("cam1", "cam2"), default="", help="Canonical camera identity")
     gui_single.add_argument("--out-root", type=Path, default=None, help="Output root")
     gui_single.add_argument("--preview-width", type=positive_int, default=None, help="Preview width")
     gui_single.add_argument("--preview-fps", type=positive_float, default=None, help="Preview frames per second")
@@ -161,7 +165,11 @@ def cmd_config_show(args: argparse.Namespace) -> int:
 
 def cmd_record_single(args: argparse.Namespace) -> int:
     config = config_with_overrides(args)
-    device = args.device or config.single.device
+    if args.device and args.camera_id:
+        raise ValueError("--device and --camera-id are mutually exclusive")
+    device = load_camera_config().camera(args.camera_id).device if args.camera_id else (args.device or config.single.device)
+    if args.camera_id:
+        config = replace(config, single=replace(config.single, output_label=args.camera_id))
     out_root = resolve_out_root(args.out_root, config.recording.output_root)
     container = args.container or config.recording.container
     sample_fps = args.sample_fps if args.sample_fps is not None else config.recording.sample_fps
@@ -205,7 +213,11 @@ def cmd_record_dual(args: argparse.Namespace) -> int:
 
 def cmd_gui_single(args: argparse.Namespace) -> int:
     config = config_with_overrides(args)
-    device = args.device or config.single.device
+    if args.device and args.camera_id:
+        raise ValueError("--device and --camera-id are mutually exclusive")
+    device = load_camera_config().camera(args.camera_id).device if args.camera_id else (args.device or config.single.device)
+    if args.camera_id:
+        config = replace(config, single=replace(config.single, output_label=args.camera_id))
     out_root = resolve_out_root(args.out_root, config.recording.output_root)
     preview_width = args.preview_width if args.preview_width is not None else config.preview.width
     preview_fps = args.preview_fps if args.preview_fps is not None else config.preview.fps
