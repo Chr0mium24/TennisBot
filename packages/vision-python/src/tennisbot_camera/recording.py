@@ -39,10 +39,11 @@ class TestRecordingSink:
         self.overlay_writer = None
         self.overlay_requested = overlay
         self.fps = fps
+        has_triangulation = test_kind in {"triangulation", "replay"}
         self.frames_file = opened(self.session_dir / "frames.ndjson")
         self.pairs_file = opened(self.session_dir / "pairs.ndjson") if len(camera_ids) == 2 else None
         self.detections_file = opened(self.session_dir / "detections.ndjson")
-        self.triangulation_file = opened(self.session_dir / "triangulation.ndjson") if test_kind == "triangulation" else None
+        self.triangulation_file = opened(self.session_dir / "triangulation.ndjson") if has_triangulation else None
         payload = {
             "schema_version": "tennisbot.test_recording.session.v1",
             "created_at": now.isoformat(),
@@ -54,7 +55,7 @@ class TestRecordingSink:
                 "frames": "frames.ndjson",
                 "pairs": "pairs.ndjson" if len(camera_ids) == 2 else None,
                 "detections": "detections.ndjson",
-                "triangulation": "triangulation.ndjson" if test_kind == "triangulation" else None,
+                "triangulation": "triangulation.ndjson" if has_triangulation else None,
                 "overlay": "overlay.mp4" if overlay else None,
             },
             "capture": {"fps": fps, "width": frame_size[0], "height": frame_size[1]},

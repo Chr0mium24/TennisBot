@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import numpy as np
@@ -26,6 +27,57 @@ def test_online_dry_run_contract(capsys) -> None:
     assert '"record": true' in output
     assert '"record_overlay": true' in output
     assert main(["triangulation", "stereo", "--dry-run"]) == 0
+
+
+def test_replay_stereo_dry_run_contract(capsys) -> None:
+    assert main([
+        "replay",
+        "stereo",
+        "--recording",
+        "runs/recording/20260717_155414",
+        "--calibration-package",
+        "artifacts/calibration/stereo_cam1_cam2_20260717_174628_CST",
+        "--frame-start",
+        "75",
+        "--frame-end",
+        "85",
+        "--sync",
+        "frame-index",
+        "--record-overlay",
+        "--dry-run",
+    ]) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["test"] == "replay"
+    assert payload["mode"] == "stereo"
+    assert payload["recording"] == "runs/recording/20260717_155414"
+    assert payload["calibration_package"] == "artifacts/calibration/stereo_cam1_cam2_20260717_174628_CST"
+    assert payload["frame_start"] == 75
+    assert payload["frame_end"] == 85
+    assert payload["sync"] == "frame-index"
+    assert payload["record"] is True
+    assert payload["record_overlay"] is True
+
+
+def test_resolve_stereo_videos_uses_recording_session_streams(tmp_path: Path) -> None:
+    from tennisbot_vision.offline_replay import resolve_stereo_videos
+
+    left = tmp_path / "left.mkv"
+    right = tmp_path / "right.mkv"
+    left.write_bytes(b"left")
+    right.write_bytes(b"right")
+    (tmp_path / "session.json").write_text(json.dumps({
+        "streams": {
+            "cam1": {"file": left.name},
+            "cam2": {"file": right.name},
+        },
+    }))
+
+    resolved = resolve_stereo_videos(recording=tmp_path, left_video=None, right_video=None)
+
+    assert resolved.left_video == left
+    assert resolved.right_video == right
+    assert resolved.recording == tmp_path
 
 
 def test_recording_sink_consumes_owned_frames_without_camera(monkeypatch, tmp_path: Path) -> None:

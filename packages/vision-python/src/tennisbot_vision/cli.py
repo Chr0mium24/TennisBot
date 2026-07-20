@@ -15,6 +15,7 @@ from .calibration import RuntimeStereoCalibration
 from .communication import main as communication_main
 from .detection import YoloBallDetector
 from .matching import StereoBallMatcher
+from .offline_replay import run_offline_stereo_replay, validate_frame_selection
 from .render import draw_detections, render_gui, resize_to_width
 from tennisbot_camera.recording import TestRecordingSink, detection_payload
 
@@ -35,6 +36,9 @@ def build_parser() -> argparse.ArgumentParser:
     tri.add_argument("mode", choices=("stereo",))
     add_online_args(tri)
     tri.add_argument("--calibration-package", type=Path, default=DEFAULT_CALIBRATION)
+    replay = sub.add_parser("replay", help="offline stereo recording replay diagnostics")
+    replay.add_argument("mode", choices=("stereo",))
+    add_replay_args(replay)
     communication = sub.add_parser("communication", help="read-only ROS communication diagnostics")
     communication.add_argument("test", choices=("chassis-position",))
     communication.add_argument("args", nargs=argparse.REMAINDER)
@@ -58,16 +62,67 @@ def add_online_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--dry-run", action="store_true")
 
 
+def add_replay_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--recording", type=Path)
+    parser.add_argument("--left-video", type=Path)
+    parser.add_argument("--right-video", type=Path)
+    parser.add_argument("--calibration-package", type=Path, required=True)
+    parser.add_argument("--model", type=Path, default=DEFAULT_MODEL)
+    parser.add_argument("--conf", type=float, default=0.05)
+    parser.add_argument("--iou", type=float, default=0.5)
+    parser.add_argument("--imgsz", type=int, default=1280)
+    parser.add_argument("--yolo-device", default=None)
+    parser.add_argument("--max-detections", type=int, default=6)
+    parser.add_argument("--frame-start", type=int, default=0)
+    parser.add_argument("--frame-end", type=int)
+    parser.add_argument("--stride", type=int, default=1)
+    parser.add_argument("--sync", choices=("frame-index", "pts"), default="frame-index")
+    parser.add_argument("--max-pair-delta-ms", type=float, default=10.0)
+    parser.add_argument("--resize-to-calibration", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--gui", action="store_true")
+    parser.add_argument("--record", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--record-overlay", action="store_true")
+    parser.add_argument("--record-root", type=Path, default=REPO_ROOT / "runs/test")
+    parser.add_argument("--record-session")
+    parser.add_argument("--output-fps", type=float, default=10.0)
+    parser.add_argument("--display-camera-width", type=int, default=720)
+    parser.add_argument("--plot-x-m", type=float, default=4.0)
+    parser.add_argument("--max-epipolar-error-px", type=float, default=6.0)
+    parser.add_argument("--min-disparity-px", type=float, default=1.0)
+    parser.add_argument("--max-disparity-px", type=float, default=1200.0)
+    parser.add_argument("--max-depth-m", type=float, default=12.0)
+    parser.add_argument("--predict-trajectory", action="store_true")
+    parser.add_argument("--trajectory-horizon-s", type=float, default=0.33)
+    parser.add_argument("--progress-every", type=int, default=25)
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("--dry-run", action="store_true")
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "communication":
         return communication_main(args.args)
+    if args.record_overlay:
+        args.record = True
+    if args.command == "replay":
+        if args.recording is None and (args.left_video is None or args.right_video is None):
+            build_parser().error("replay stereo requires either --recording or both --left-video and --right-video")
+        validate_frame_selection(args.frame_start, args.frame_end, args.stride)
+        if args.max_pair_delta_ms < 0:
+            build_parser().error("max-pair-delta-ms must be non-negative")
+        if args.output_fps <= 0:
+            build_parser().error("output-fps must be positive")
+        if args.display_camera_width <= 0:
+            build_parser().error("display-camera-width must be positive")
+        if args.trajectory_horizon_s <= 0:
+            build_parser().error("trajectory-horizon-s must be positive")
+        if args.dry_run:
+            return print_dry_run(args)
+        return run_offline_stereo_replay(args)
     if args.command == "yolo" and args.mode == "mono" and args.camera_id is None:
         build_parser().error("yolo mono requires cam1 or cam2")
     if args.command == "yolo" and args.mode == "stereo" and args.camera_id is not None:
         build_parser().error("yolo stereo does not accept a camera id")
-    if args.record_overlay:
-        args.record = True
     if args.duration < 0 or args.max_frames < 0:
         build_parser().error("duration and max-frames must be non-negative")
     if args.dry_run:
@@ -213,6 +268,14 @@ def keep_running(args, started: float, count: int) -> bool:
 
 
 def print_dry_run(args) -> int:
+    if args.command == "replay":
+        print(json.dumps({"test": args.command, "mode": args.mode, "recording": None if args.recording is None else str(args.recording),
+            "left_video": None if args.left_video is None else str(args.left_video),
+            "right_video": None if args.right_video is None else str(args.right_video),
+            "calibration_package": str(args.calibration_package), "frame_start": args.frame_start, "frame_end": args.frame_end,
+            "frame_end_inclusive": True, "stride": args.stride, "sync": args.sync, "record": args.record,
+            "record_overlay": args.record_overlay, "model": str(args.model), "predict_trajectory": args.predict_trajectory}, sort_keys=True))
+        return 0
     config = load_camera_config()
     cameras = [args.camera_id] if args.mode == "mono" else ["cam1", "cam2"]
     print(json.dumps({"test": args.command, "mode": args.mode, "cameras": cameras, "devices": [config.camera(item).device for item in cameras],
