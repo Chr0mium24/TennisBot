@@ -218,6 +218,11 @@ requires-dist = [
     { name = "opencv-python", specifier = ">=4.8" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.0" },
     { name = "pyyaml", specifier = ">=6.0" },
+    { name = "torch", marker = "extra == 'detect'", specifier = ">=2.11.0", index = "https://download.pytorch.org/whl/cpu", conflict = { package = "tennisbot-vision", extra = "detect" } },
+    { name = "torch", marker = "extra == 'detect-cuda'", specifier = ">=2.11.0", index = "https://download.pytorch.org/whl/cu130", conflict = { package = "tennisbot-vision", extra = "detect-cuda" } },
+    { name = "torchvision", marker = "extra == 'detect'", specifier = ">=0.26.0", index = "https://download.pytorch.org/whl/cpu", conflict = { package = "tennisbot-vision", extra = "detect" } },
+    { name = "torchvision", marker = "extra == 'detect-cuda'", specifier = ">=0.26.0", index = "https://download.pytorch.org/whl/cu130", conflict = { package = "tennisbot-vision", extra = "detect-cuda" } },
     { name = "ultralytics", marker = "extra == 'detect'", specifier = ">=8.3" },
+    { name = "ultralytics", marker = "extra == 'detect-cuda'", specifier = ">=8.3" },
 ]
-provides-extras = ["detect", "test"]
+provides-extras = ["detect", "detect-cuda", "test"]
