@@ -25,8 +25,13 @@ uv run pytest -q
 默认 `uv sync` 只安装标注服务和模型包工具依赖，不安装 `torch`、
 `ultralytics`、OpenCV、CUDA 或 NVIDIA Python 包。`uv.lock` 会记录
 optional extras 的完整解析结果，所以能看到这些包名；只有运行
-`uv sync --extra augment`、`uv sync --extra detect`、`uv sync --all-extras`
-或 `uv run --extra ...` 时才会把它们装进当前环境。
+`uv sync --extra augment`、`uv sync --extra detect` 或 `uv run --extra ...`
+时才会把对应依赖装进当前环境。由于 CPU 与 CUDA 后端互斥，不要使用
+`--all-extras`。
+
+`detect` 明确使用 PyTorch 官方 CPU wheel，不会在无 NVIDIA 的 Linux
+机器上下载 CUDA 运行库。需要 NVIDIA CUDA 13.0 时使用互斥的
+`detect-cuda` extra，或从仓库根入口传 `--cuda`。
 
 如果旧的 `.venv` 曾经装过检测 extra，回到无 Torch/CUDA 环境时运行：
 
@@ -176,11 +181,16 @@ uv run tennisbot-yolo package create \
 
 ## 纯 YOLO 检测 GUI
 
-这个命令是唯一需要 `tools/yolo` 的 `detect` extra 的入口；它会通过
-`ultralytics` 传递安装 Torch/CUDA 相关包。
+这个命令需要 `tools/yolo` 的 `detect` extra；默认安装 CPU-only Torch。
 
 ```bash
 uv run --extra detect tennisbot-yolo detect-gui
+```
+
+NVIDIA CUDA 13.0：
+
+```bash
+uv run scripts/yolo.py detect-gui --cuda --device 0
 ```
 
 默认值：
@@ -236,6 +246,9 @@ uv run scripts/yolo.py detect-video input.mp4 \
   --tile \
   --overwrite
 ```
+
+NVIDIA CUDA 13.0 可在根入口增加 `--cuda --device 0`；不传 `--cuda` 时
+即使在 Linux 上也保持 CPU-only PyTorch。
 
 常用参数：
 

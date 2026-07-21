@@ -96,7 +96,8 @@ intentionally writing a fixed runtime path.
 
 Calibration and YOLO annotation/package commands do not require Torch, CUDA, or
 Ultralytics. Keep the default `uv sync` path for `tools/calibration` and
-`tools/yolo`; only pure YOLO camera detection uses `uv run --extra detect ...`.
+`tools/yolo`; inference defaults to the CPU-only `detect` extra. Pass `--cuda`
+to `scripts/yolo.py` or `scripts/test.py` only on an NVIDIA CUDA 13.0 host.
 
 Start the YOLO annotation frontend/backend:
 

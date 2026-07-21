@@ -10,8 +10,45 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-detect = ["ultralytics>=8.3"]
+detect = [
+  "torch>=2.11.0",
+  "torchvision>=0.26.0",
+  "ultralytics>=8.3",
+]
+detect-cuda = [
+  "torch>=2.11.0",
+  "torchvision>=0.26.0",
+  "ultralytics>=8.3",
+]
 test = ["pytest>=8.0"]
+
+[tool.uv]
+conflicts = [
+  [
+    { extra = "detect" },
+    { extra = "detect-cuda" },
+  ],
+]
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cpu", extra = "detect" },
+  { index = "pytorch-cu130", extra = "detect-cuda" },
+]
+torchvision = [
+  { index = "pytorch-cpu", extra = "detect" },
+  { index = "pytorch-cu130", extra = "detect-cuda" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
 
 [project.scripts]
 tennisbot-camera = "tennisbot_camera.cli:main"
@@ -26,4 +63,3 @@ packages = ["src/tennisbot_camera", "src/tennisbot_vision"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-

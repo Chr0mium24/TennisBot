@@ -21,8 +21,45 @@ augment = [
 detect = [
     "numpy>=2.0.0",
     "opencv-python>=4.13.0.92",
+    "torch>=2.11.0",
+    "torchvision>=0.26.0",
     "ultralytics>=8.4.46",
 ]
+detect-cuda = [
+    "numpy>=2.0.0",
+    "opencv-python>=4.13.0.92",
+    "torch>=2.11.0",
+    "torchvision>=0.26.0",
+    "ultralytics>=8.4.46",
+]
+
+[tool.uv]
+conflicts = [
+    [
+        { extra = "detect" },
+        { extra = "detect-cuda" },
+    ],
+]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", extra = "detect" },
+    { index = "pytorch-cu130", extra = "detect-cuda" },
+]
+torchvision = [
+    { index = "pytorch-cpu", extra = "detect" },
+    { index = "pytorch-cu130", extra = "detect-cuda" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
 
 [project.scripts]
 tennisbot-yolo = "tennisbot_yolo.cli:main"
