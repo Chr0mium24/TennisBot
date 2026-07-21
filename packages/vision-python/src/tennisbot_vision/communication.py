@@ -8,6 +8,7 @@ import re
 import signal
 import subprocess
 import sys
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -40,6 +41,20 @@ class ParsedMessage:
     x: float | None = None
     y: float | None = None
     yaw: float | None = None
+
+
+@dataclass
+class PublishOptions:
+    topic: str = "/robot/chassis_position"
+    x: float = 0.0
+    y: float = 0.0
+    yaw: float = 0.0
+    sequence_id: int = 0
+    stamp_sec: int | None = None
+    stamp_nanosec: int | None = None
+    dry_run: bool = False
+    auto_source: bool = True
+    setup_files: list[str] = field(default_factory=list)
 
 
 def main(argv: list[str]) -> int:
@@ -110,6 +125,54 @@ def run(options: Options) -> int:
     return 0
 
 
+def publish_chassis_position_main(argv: list[str]) -> int:
+    try:
+        options = parse_publish_options(argv)
+        return publish_chassis_position(options)
+    except ValueError as error:
+        print(error, file=sys.stderr)
+        print("", file=sys.stderr)
+        print_publish_usage()
+        return 2
+
+
+def publish_chassis_position(options: PublishOptions) -> int:
+    stamp_ns = time.time_ns()
+    stamp_sec = options.stamp_sec if options.stamp_sec is not None else stamp_ns // 1_000_000_000
+    stamp_nanosec = options.stamp_nanosec if options.stamp_nanosec is not None else stamp_ns % 1_000_000_000
+    payload = (
+        "{publish_stamp: {sec: "
+        f"{stamp_sec}, nanosec: {stamp_nanosec}"
+        "}, sequence_id: "
+        f"{options.sequence_id}, x: {options.x}, y: {options.y}, yaw: {options.yaw}"
+        "}"
+    )
+    command = ["topic", "pub", "--once", options.topic, "target_msgs/msg/ChassisPosition", payload]
+
+    print("模式: ROS 接口 smoke test（不属于真实 ROS/Gazebo 闭环验证）")
+    print(f"topic: {options.topic}")
+    print(f"point: x={options.x}, y={options.y}, yaw={options.yaw}")
+    print(f"publish_stamp: {stamp_sec}.{stamp_nanosec:09d}")
+    if options.dry_run:
+        wrapped = wrap_ros_command(["ros2", *command], options)
+        print("command: " + " ".join(shell_quote(item) for item in wrapped))
+        return 0
+
+    result = run_ros_command(command, 10000, options)
+    if result.timed_out:
+        print("发布: 10s 内未完成")
+        print("结果: FAIL")
+        return 1
+    if result.code != 0:
+        print("发布: 失败")
+        print_command_error(result)
+        print("结果: FAIL")
+        return 1
+    print("发布: 完成")
+    print("结果: OK")
+    return 0
+
+
 def print_topic_hz(options: Options) -> None:
     timeout_ms = max(1000, round(options.hz_seconds * 1000))
     hz = run_ros_command(["topic", "hz", options.topic], timeout_ms, options, signal.SIGINT)
@@ -159,6 +222,53 @@ def parse_options(args: list[str]) -> Options:
 
     if not options.topic.startswith("/"):
         raise ValueError("--topic must be an absolute ROS topic name")
+    return options
+
+
+def parse_publish_options(args: list[str]) -> PublishOptions:
+    options = PublishOptions(setup_files=default_setup_files())
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        if arg in {"--help", "-h"}:
+            print_publish_usage()
+            raise SystemExit(0)
+        if arg == "--topic":
+            index += 1
+            options.topic = require_value(args, index, arg)
+        elif arg in {"--x", "--y", "--yaw"}:
+            index += 1
+            setattr(options, arg[2:], finite_number(require_value(args, index, arg), arg))
+        elif arg == "--sequence-id":
+            index += 1
+            options.sequence_id = nonnegative_integer(require_value(args, index, arg), arg)
+        elif arg == "--stamp-sec":
+            index += 1
+            options.stamp_sec = nonnegative_integer(require_value(args, index, arg), arg)
+        elif arg == "--stamp-nanosec":
+            index += 1
+            options.stamp_nanosec = nonnegative_integer(require_value(args, index, arg), arg)
+        elif arg == "--dry-run":
+            options.dry_run = True
+        elif arg == "--auto-source":
+            options.auto_source = True
+        elif arg == "--no-auto-source":
+            options.auto_source = False
+        elif arg == "--clear-setup-files":
+            options.setup_files = []
+        elif arg == "--setup-file":
+            index += 1
+            options.setup_files.append(require_value(args, index, arg))
+        else:
+            raise ValueError(f"Unknown option: {arg}")
+        index += 1
+
+    if not options.topic.startswith("/"):
+        raise ValueError("--topic must be an absolute ROS topic name")
+    if options.sequence_id > 0xFFFFFFFF:
+        raise ValueError("--sequence-id must fit uint32")
+    if options.stamp_nanosec is not None and options.stamp_nanosec >= 1_000_000_000:
+        raise ValueError("--stamp-nanosec must be less than 1000000000")
     return options
 
 
@@ -330,6 +440,26 @@ def nonnegative_seconds(value: str, option: str) -> float:
     return seconds
 
 
+def finite_number(value: str, option: str) -> float:
+    try:
+        number = float(value)
+    except ValueError as error:
+        raise ValueError(f"{option} must be a finite number") from error
+    if not math.isfinite(number):
+        raise ValueError(f"{option} must be a finite number")
+    return number
+
+
+def nonnegative_integer(value: str, option: str) -> int:
+    try:
+        number = int(value)
+    except ValueError as error:
+        raise ValueError(f"{option} must be a nonnegative integer") from error
+    if number < 0:
+        raise ValueError(f"{option} must be a nonnegative integer")
+    return number
+
+
 def format_seconds(timeout_ms: int) -> str:
     digits = 0 if timeout_ms % 1000 == 0 else 1
     return f"{timeout_ms / 1000:.{digits}f}s"
@@ -367,6 +497,36 @@ def print_usage() -> None:
   --no-auto-source           不自动 source
   --setup-file <path>        追加 setup.bash，可重复
   --clear-setup-files        清空默认 setup 列表，配合 --setup-file 使用
+"""
+    )
+
+
+def print_publish_usage() -> None:
+    print(
+        """用法:
+  uv run scripts/test.py communication publish-chassis-position [options]
+
+说明:
+  向 /robot/chassis_position 单次发布 target_msgs/msg/ChassisPosition，用于 ROS 接口 smoke test。
+  x/y/yaw 必须使用球场/接口坐标系。本命令不属于真实 ROS/Gazebo 闭环验证。
+
+常用:
+  uv run scripts/test.py communication publish-chassis-position --x 1.0 --y -0.5 --yaw 0.0
+  uv run scripts/test.py communication publish-chassis-position --dry-run
+
+选项:
+  --topic <name>             默认 /robot/chassis_position
+  --x <meters>              球场坐标 x，默认 0
+  --y <meters>              球场坐标 y，默认 0
+  --yaw <radians>           球场坐标 yaw，默认 0
+  --sequence-id <integer>   默认 0
+  --stamp-sec <integer>     默认使用当前系统时间
+  --stamp-nanosec <integer> 默认使用当前系统时间
+  --dry-run                 只打印发布命令
+  --auto-source             自动 source ROS/control/local setup，默认开启
+  --no-auto-source          不自动 source
+  --setup-file <path>       追加 setup.bash，可重复
+  --clear-setup-files       清空默认 setup 列表，配合 --setup-file 使用
 """
     )
 

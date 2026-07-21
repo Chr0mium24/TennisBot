@@ -2,10 +2,12 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from tennisbot_camera.capture import CapturedFrame
 from tennisbot_vision.cli import main
 from tennisbot_camera.recording import TestRecordingSink
+from tennisbot_vision.communication import PublishOptions, parse_publish_options, publish_chassis_position
 
 
 class Writer:
@@ -18,6 +20,36 @@ class Writer:
 
     def release(self) -> None:
         self.closed = True
+
+
+def test_parse_publish_chassis_position_options() -> None:
+    options = parse_publish_options([
+        "--x", "1.25", "--y", "-0.5", "--yaw", "1.5708", "--sequence-id", "7", "--dry-run"
+    ])
+    assert options.x == 1.25
+    assert options.y == -0.5
+    assert options.yaw == 1.5708
+    assert options.sequence_id == 7
+    assert options.dry_run is True
+
+    with pytest.raises(ValueError, match="absolute ROS topic"):
+        parse_publish_options(["--topic", "robot/chassis_position"])
+    with pytest.raises(ValueError, match="less than"):
+        parse_publish_options(["--stamp-nanosec", "1000000000"])
+    with pytest.raises(ValueError, match="uint32"):
+        parse_publish_options(["--sequence-id", "4294967296"])
+
+
+def test_publish_chassis_position_dry_run_has_explicit_smoke_warning(monkeypatch, capsys) -> None:
+    monkeypatch.setattr("tennisbot_vision.communication.time.time_ns", lambda: 1_750_000_000_123_456_789)
+    options = PublishOptions(x=1.0, y=-2.0, yaw=0.5, sequence_id=9, dry_run=True, auto_source=False)
+
+    assert publish_chassis_position(options) == 0
+    output = capsys.readouterr().out
+    assert "不属于真实 ROS/Gazebo 闭环验证" in output
+    assert "publish_stamp: 1750000000.123456789" in output
+    assert "target_msgs/msg/ChassisPosition" in output
+    assert "sequence_id: 9" in output
 
 
 def test_online_dry_run_contract(capsys) -> None:
