@@ -4,7 +4,7 @@
 
 This records the tiny fixed-exposure copy-paste training pass and its frozen
 final raw benchmark results. It does not validate stereo triangulation,
-trajectory prediction, ROS/Gazebo, or chassis control.
+trajectory prediction, real ROS/chassis, or chassis control.
 
 ## Dataset
 

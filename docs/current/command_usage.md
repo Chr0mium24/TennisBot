@@ -99,4 +99,4 @@ uv run scripts/test.py communication publish-raw-target \
   --task-id 1 --sequence-id 0 --target-x 0 --target-y 0
 ```
 
-该命令只用于消息接口联调，不属于真实 ROS/Gazebo 闭环验证。
+该命令只用于消息接口联调，不属于真实 ROS/底盘闭环验证。

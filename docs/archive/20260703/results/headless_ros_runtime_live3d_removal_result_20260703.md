@@ -77,5 +77,5 @@ runtime was disabled.
   `/vision/chassis_pose`.
 - Verify `/vision/target_prediction` reaches `/target/raw` and
   `/target/managed` with consistent ROS clock timing.
-- Complete ROS/Gazebo or real chassis closed-loop validation before claiming
+- Complete real ROS/chassis or real chassis closed-loop validation before claiming
   real catch-loop completion.

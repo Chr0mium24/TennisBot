@@ -39,7 +39,7 @@ node for the main camera-to-target path.
 - Do not add local catch substitutes or non-ROS closed-loop logic.
 - Do not remove `target_manager`.
 - Do not change YOLO training, augmentation, calibration, or stereo GUI tools.
-- Do not claim real catch-loop validation without ROS/Gazebo or real chassis
+- Do not claim real catch-loop validation without real ROS/chassis or real chassis
   control links.
 
 ## Verification

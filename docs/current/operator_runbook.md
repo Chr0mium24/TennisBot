@@ -19,5 +19,5 @@ Date: 2026-07-19
 8. Start the ROS runtime only after camera, calibration, model, and pose input
    checks pass.
 
-The test commands are diagnostics. They do not replace the ROS/Gazebo chassis
+The test commands are diagnostics. They do not replace the real ROS/chassis chassis
 pose/control chain and cannot validate a real catch loop without that backend.

@@ -31,7 +31,7 @@ fixed-gravity model selection behavior as the TS core path.
 - Do not introduce a TypeScript runtime dependency into the ROS node.
 - Do not change camera capture, YOLO detection, stereo matching, ROS topics, or
   coordinate transforms.
-- Do not claim real catch-loop validation without ROS/Gazebo or hardware.
+- Do not claim real catch-loop validation without real ROS/chassis or hardware.
 
 ## Verification
 

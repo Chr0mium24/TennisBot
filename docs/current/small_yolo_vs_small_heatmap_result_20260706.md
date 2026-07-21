@@ -4,7 +4,7 @@
 
 This compares the current full-frame YOLO search baseline against a newly trained low-resolution temporal heatmap student.
 
-This is an offline detector/search comparison only. It does not validate ROS/Gazebo, stereo triangulation, target prediction, or chassis control.
+This is an offline detector/search comparison only. It does not validate real ROS/chassis, stereo triangulation, target prediction, or chassis control.
 
 ## User Concern
 

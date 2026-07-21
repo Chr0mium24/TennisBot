@@ -96,7 +96,7 @@ this item out of the deletion commit.
 - `TennisWebSim/packages/tennis-contracts/`
 - `TennisWebSim/packages/tennis-scene/`
 - `TennisWebSim/packages/tennis-ros/`
-- `TennisWebSim/Tennis_Robot_Chassis/`, if it remains the ROS/Gazebo simulation
+- `TennisWebSim/Tennis_Robot_Chassis/`, if it remains the real ROS/chassis simulation
   backend used by `tennisweb`
 
 ### Original calibration GUI

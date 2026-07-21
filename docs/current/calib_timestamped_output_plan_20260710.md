@@ -23,5 +23,5 @@ packages during the normal mono and stereo workflow.
 ## Non-Goals
 
 - Do not change calibration math or package schema.
-- Do not alter ROS/Gazebo validation requirements.
+- Do not alter real ROS/chassis validation requirements.
 - Do not automatically repoint the runtime config to a newly generated package.

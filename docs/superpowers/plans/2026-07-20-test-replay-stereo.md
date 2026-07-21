@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Do not add local fake robot tracking or catch-loop substitute logic.
-- This is offline recording diagnostics only; do not claim ROS/Gazebo closed-loop validation.
+- This is offline recording diagnostics only; do not claim real ROS/chassis closed-loop validation.
 - Save implementation plan and experimental result as Markdown.
 - Commit all repo changes before completion.
 - Use explicit calibration package paths; do not silently default to the old fixed runtime package.

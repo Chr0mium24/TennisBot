@@ -7,7 +7,7 @@ This dataset intentionally excludes the older current/0260701 training data and
 excludes all copy-paste samples.
 
 This is a detector dataset packaging result only. It does not validate
-ROS/Gazebo, stereo triangulation, trajectory prediction, or chassis control.
+real ROS/chassis, stereo triangulation, trajectory prediction, or chassis control.
 
 ## Inputs
 

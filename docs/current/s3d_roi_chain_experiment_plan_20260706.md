@@ -7,7 +7,7 @@ Measure whether the current S3d temporal heatmap search output can feed ROI YOLO
 ## Scope
 
 This is an offline replay on saved monocular frames from `20260701_155008`.
-It does not validate ROS/Gazebo, stereo triangulation, target prediction, or chassis control.
+It does not validate real ROS/chassis, stereo triangulation, target prediction, or chassis control.
 
 ## Chain
 

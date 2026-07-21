@@ -18,7 +18,7 @@ writes an annotated video with detection boxes.
 
 ## Non-Goals
 
-- Do not add ROS/Gazebo-independent catch-loop logic.
+- Do not add real ROS/chassis-independent catch-loop logic.
 - Do not claim this validates the real stereo catching loop.
 - Do not add local tracking, landing prediction, or robot substitute behavior.
 - Do not preserve source-video audio; OpenCV video export is detection-only.

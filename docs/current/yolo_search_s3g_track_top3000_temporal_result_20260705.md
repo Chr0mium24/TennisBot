@@ -4,7 +4,7 @@
 
 This trains a temporal heatmap teacher using the top-score track-filtered pseudo
 label root. It uses labeled image sequences only and does not validate
-ROS/Gazebo, stereo triangulation, target prediction, or chassis control.
+real ROS/chassis, stereo triangulation, target prediction, or chassis control.
 
 Training was manually stopped after epoch `6` because validation recall did not
 exceed S3d and the curve was not moving toward `>0.90`.

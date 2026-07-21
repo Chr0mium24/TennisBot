@@ -38,7 +38,7 @@ Target main chain:
 - Do not add simulated catch logic or local chassis tracking substitutes.
 - Do not change YOLO training or augmentation code.
 - Do not require the local stereo GUI to publish ROS topics.
-- Do not claim closed-loop validation without ROS/Gazebo or real chassis
+- Do not claim closed-loop validation without real ROS/chassis or real chassis
   control links.
 
 ## Verification

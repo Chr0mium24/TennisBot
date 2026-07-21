@@ -26,7 +26,7 @@ the main runtime path for real operation.
 ## Non-Goals
 
 - Do not create simulated target predictions or a local chassis substitute.
-- Do not claim real catch-loop validation without ROS/Gazebo or real chassis
+- Do not claim real catch-loop validation without real ROS/chassis or real chassis
   pose/control links.
 - Do not touch unrelated YOLO augmentation work already present in the
   worktree.

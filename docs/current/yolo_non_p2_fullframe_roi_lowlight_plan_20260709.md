@@ -7,7 +7,7 @@ better recall when train-time and test-time images use the same deterministic
 low-light enhancement.
 
 This is a detector-only experiment. It does not validate stereo triangulation,
-trajectory prediction, ROS/Gazebo, or chassis control.
+trajectory prediction, real ROS/chassis, or chassis control.
 
 ## Hypothesis
 

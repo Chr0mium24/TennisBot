@@ -800,7 +800,7 @@ def build_roi_report(
         "## Scope",
         "",
         "This is an offline detector-throughput proof for the existing model.",
-        "It does not use ROS/Gazebo, camera capture, stereo triangulation, target prediction, or chassis control.",
+        "It does not use real ROS/chassis, camera capture, stereo triangulation, target prediction, or chassis control.",
         "The `oracle_roi` rows use labels to place the crop and are only an upper bound for locked ROI runtime.",
         "The `coarse_roi` rows prove the full-frame-to-ROI crop path runs, but they are not a real tracker validation.",
         "",
@@ -850,7 +850,7 @@ def build_roi_report(
         "- Low-`imgsz` locked ROI rows can meet the FPS target in this detector-only proof and have much better recall than full-frame at the same `imgsz`.",
         "- Same-frame `coarse_roi` does not meet the FPS target because it runs two detections per camera frame.",
         "- The next runtime step is a stateful ROI mode: full-frame search only while unlocked or periodically, then ROI-only inference while locked.",
-        "- This is not a target-board or ROS/Gazebo proof; do not start more training until that stateful runtime mode is implemented and measured.",
+        "- This is not a target-board or real ROS/chassis proof; do not start more training until that stateful runtime mode is implemented and measured.",
     ]
     return "\n".join(lines) + "\n"
 
@@ -1102,7 +1102,7 @@ def build_roi_track_report(
         "",
         "This replay exercises a stateful visual ROI tracker on an ordered real-frame sequence.",
         "It decides whether each frame runs full-frame search or ROI-only inference.",
-        "It does not use ROS/Gazebo, stereo triangulation, target prediction, or chassis control.",
+        "It does not use real ROS/chassis, stereo triangulation, target prediction, or chassis control.",
         "",
         "## Settings",
         "",
@@ -1147,7 +1147,7 @@ def build_roi_track_report(
         "- This is closer to the intended runtime than `coarse_roi`, because locked frames do not also run full-frame search.",
         "- The result still uses one monocular image sequence and estimates stereo FPS as sequential left+right processing.",
         "- If the tracker locks onto false positives, precision and recall will expose that in this replay.",
-        "- Full ROS/Gazebo catch-loop validation is still separate and must use the real backend pose/control chain.",
+        "- Full real ROS/chassis catch-loop validation is still separate and must use the real backend pose/control chain.",
     ]
     return "\n".join(lines) + "\n"
 
@@ -1494,7 +1494,7 @@ def build_s3d_roi_chain_report(
         "## Scope",
         "",
         "This is an offline monocular replay of `S3d full-frame temporal heatmap search -> ROI crop -> ROI YOLO refinement`.",
-        "It does not use ROS/Gazebo, camera capture, stereo triangulation, target prediction, or chassis control.",
+        "It does not use real ROS/chassis, camera capture, stereo triangulation, target prediction, or chassis control.",
         "It answers whether the current S3d search output can feed the existing ROI YOLO detector without losing most recall.",
         "",
         "## Settings",
@@ -2298,7 +2298,7 @@ def build_final_raw_eval_report(
         "",
         "This evaluates a YOLO detector on the frozen raw-image benchmark manifest.",
         "It reports detection metrics by dataset and target-size bucket.",
-        "It does not validate stereo triangulation, trajectory prediction, ROS/Gazebo, or chassis control.",
+        "It does not validate stereo triangulation, trajectory prediction, real ROS/chassis, or chassis control.",
         "",
         "## Settings",
         "",

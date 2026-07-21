@@ -9,7 +9,7 @@ localization. It covers:
 - candidate CNN heatmap architectures worth testing next;
 - what should and should not be promoted into the runtime chain.
 
-It does not claim ROS/Gazebo catch-loop validation.
+It does not claim real ROS/chassis catch-loop validation.
 
 ## Current Implemented Heatmap Model
 

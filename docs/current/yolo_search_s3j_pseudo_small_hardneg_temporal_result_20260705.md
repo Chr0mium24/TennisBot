@@ -4,7 +4,7 @@
 
 This trains a temporal heatmap teacher using the S3c pseudo-positive label root
 plus `300` high-score hard negatives. It uses labeled image sequences only and
-does not validate ROS/Gazebo, stereo triangulation, target prediction, or
+does not validate real ROS/chassis, stereo triangulation, target prediction, or
 chassis control.
 
 Training was manually stopped after epoch `7` because recall did not exceed

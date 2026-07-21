@@ -4,7 +4,7 @@
 
 This trained a second temporal heatmap search/acquisition model using explicit
 adjacent-frame difference maps. It uses labeled image sequences only and does
-not validate ROS/Gazebo, stereo triangulation, target prediction, or chassis
+not validate real ROS/chassis, stereo triangulation, target prediction, or chassis
 control.
 
 Training was manually stopped after epoch `7` because the best held-out recall

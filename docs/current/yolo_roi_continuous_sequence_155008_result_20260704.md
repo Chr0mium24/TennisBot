@@ -7,7 +7,7 @@ set with the ROI crop model trained on 2026-07-04.
 
 This remains an offline monocular detector replay:
 
-- no ROS/Gazebo validation;
+- no real ROS/chassis validation;
 - no live camera capture;
 - no stereo triangulation timing;
 - no `/target/raw` catch-loop claim.

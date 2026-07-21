@@ -7,7 +7,7 @@ check whether a stride-4 head improves the fixed-exposure tiny-ball recall that
 the current promoted P3/P4/P5 model misses.
 
 This is a detector training/evaluation experiment only. It does not validate
-stereo triangulation, trajectory prediction, ROS/Gazebo, or chassis control.
+stereo triangulation, trajectory prediction, real ROS/chassis, or chassis control.
 
 ## Candidate
 

@@ -6,7 +6,7 @@ Test whether adding confirmed empty full-frame hard negatives improves the
 Search-S1 full-frame acquisition model.
 
 This is an offline detector and ROI replay experiment. It does not validate
-ROS/Gazebo, stereo triangulation, target prediction, or chassis control.
+real ROS/chassis, stereo triangulation, target prediction, or chassis control.
 
 ## Dataset
 

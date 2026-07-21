@@ -277,7 +277,7 @@ Candidate branches:
   - preserve `uv` and `bun` workflow.
 - `refactor/move-sim-app`
   - move active TennisWebSim app code under `apps/sim`;
-  - preserve ROS/Gazebo rules.
+  - preserve real ROS/chassis rules.
 - `refactor/core-migration`
   - move selected BallTrajectoryLab runtime geometry/prediction into
     `packages/core`.

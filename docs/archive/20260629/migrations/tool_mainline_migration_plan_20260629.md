@@ -158,7 +158,7 @@ uv run camera-calib-lab capture stereo-charuco-auto-gui --help
 
 ## Non-Goals For First Pass
 
-- No ROS/Gazebo catch-loop changes.
+- No real ROS/chassis catch-loop changes.
 - No Live3D behavior changes.
 - No generated datasets, captures, model files, or calibration artifacts
   committed.

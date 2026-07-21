@@ -10,7 +10,7 @@ stopping the P2 direction. It covers:
 - deterministic train/test preprocessing with LAB CLAHE plus gamma brightening.
 
 This is detector-only. It does not validate stereo triangulation, trajectory
-prediction, ROS/Gazebo, or chassis control.
+prediction, real ROS/chassis, or chassis control.
 
 ## Transform
 

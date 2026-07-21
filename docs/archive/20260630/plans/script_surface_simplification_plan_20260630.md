@@ -20,7 +20,7 @@ brightness inspection into the calibration tool boundary.
 ## Non-Goals
 
 - Do not delete historical archive records.
-- Do not change ROS/Gazebo receiving-loop claims or add substitute receiving
+- Do not change real ROS/chassis receiving-loop claims or add substitute receiving
   logic.
 
 ## Verification

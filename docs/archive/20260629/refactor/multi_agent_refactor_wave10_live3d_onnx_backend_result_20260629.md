@@ -41,7 +41,7 @@ and NMS, and returns source-frame tennis-ball boxes.
 
 The code implements a real browser ONNX backend path, but this wave did not
 physically validate it with the exported tennis-ball ONNX model, live USB camera
-frames, or the ROS/Gazebo pose and control chain. Do not treat this as completed
+frames, or the real ROS/chassis pose and control chain. Do not treat this as completed
 real catch-loop validation.
 
 Wave 11 still needs to feed real left/right detections through stereo pairing,

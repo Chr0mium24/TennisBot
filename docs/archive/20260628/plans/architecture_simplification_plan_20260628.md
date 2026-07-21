@@ -42,7 +42,7 @@ Use one repository, but keep tools and runtime packages isolated:
 TennisBot/
   apps/
     live3d/                real USB stereo camera + YOLO + 3D visualization
-    sim/                   simulation frontend and ROS/Gazebo adapter
+    sim/                   simulation frontend and real ROS/chassis adapter
 
   packages/
     core/                  coordinates, stereo geometry, tracking, prediction
@@ -143,7 +143,7 @@ missing, it should fail with clear artifact requirements.
 ### `apps/sim`
 
 Simulation remains useful, but it should be separate from the real USB runtime.
-It owns browser simulation, ROS/Gazebo integration, and simulated scene control.
+It owns browser simulation, real ROS/chassis integration, and simulated scene control.
 It can reuse `packages/core` and `packages/contracts`, but must not hide missing
 real-camera or real-calibration behavior with local substitutes.
 

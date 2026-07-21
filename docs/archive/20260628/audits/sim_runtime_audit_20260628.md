@@ -10,9 +10,9 @@ only: `TennisWebSim/**`, `TennisBotCV/**`, and `BallTrajectoryLab/**`.
 ## Executive Summary
 
 `apps/sim` should be the new home for the active TennisWebSim browser simulator,
-ROSBridge client, Gazebo/Omni3 launch helpers, and simulation-only YOLO frame
+ROSBridge client, simulator/Omni3 launch helpers, and simulation-only YOLO frame
 upload experiments. It must stay separate from `apps/live3d` and must continue
-to require ROS/Gazebo for any claim about a real catch loop.
+to require real ROS/chassis for any claim about a real catch loop.
 
 `packages/core` should absorb plain geometry, stereo pairing, 3D state
 estimation, and projectile prediction from `BallTrajectoryLab`, plus the
@@ -40,10 +40,10 @@ Keep as source for `apps/sim`:
   and actor rendering.
 - `TennisWebSim/packages/tennis-ros`: ROSBridge adapter around `roslib`,
   `/omni3_pose`, `/robot_pose`, and `/omni3_api/target`.
-- `TennisWebSim/Tennis_Robot_Chassis`: ROS2/Gazebo workspace for the Omni3
-  model, Gazebo bringup, controller, and tennis court world.
+- `TennisWebSim/Tennis_Robot_Chassis`: ROS2/simulator workspace for the Omni3
+  model, simulator bringup, controller, and tennis court world.
 - `TennisWebSim/apps/tennisweb/scripts/set_ros_env.bash` and
-  `start-gazebo-headless.bash`: simulation launch support that belongs with
+  `start-simulator-headless.bash`: simulation launch support that belongs with
   `apps/sim`.
 - `TennisWebSim/apps/tennisweb/src/vision/*`: simulation vision modes. These
   should remain simulation-specific until their plain data contracts are
@@ -125,7 +125,7 @@ Historical references noted before deletion:
 Own:
 
 - Browser simulation UI currently in `TennisWebSim/apps/tennisweb`.
-- Gazebo/ROSBridge integration and launch helpers.
+- simulator/ROSBridge integration and launch helpers.
 - Omni3 simulation assets and control topics.
 - Simulation-only camera projections, truth/noise modes, replay modes, and
   experiment harnesses.
@@ -137,7 +137,7 @@ Do not own:
 - YOLO training or model export.
 - Canonical live YOLO inference runtime.
 - Calibration solving or package export.
-- Any local robot chase/catch substitute that bypasses ROS/Gazebo.
+- Any local robot chase/catch substitute that bypasses real ROS/chassis.
 
 ### `packages/core`
 
@@ -168,7 +168,7 @@ Own canonical schemas for:
 - 2D detection, detection frame, stereo pair, triangulated 3D point, tracked
   state, prediction curve, and landing point.
 - Simulation telemetry only where it is shared across app boundaries.
-- ROS/Gazebo topic constants if `apps/sim` and shared scene packages both need
+- real ROS/chassis topic constants if `apps/sim` and shared scene packages both need
   them.
 
 The TypeScript and Python shapes should be generated from, or at least checked
@@ -281,7 +281,7 @@ Keep as migrated documentation or references:
 1. Land contracts/core skeleton first.
 2. Move or wrap BallTrajectoryLab pure geometry/prediction into
    `packages/core`.
-3. Move TennisWebSim active app and ROS/Gazebo packages into `apps/sim`, keeping
+3. Move TennisWebSim active app and real ROS/chassis packages into `apps/sim`, keeping
    sim-only substitutes labeled as simulation.
 4. Rewire `apps/sim` to consume `packages/contracts` and `packages/core` where
    practical.
@@ -298,7 +298,7 @@ git status --short --branch
 sed -n '1,240p' docs/multi_agent_refactor_tasks_20260628.md
 sed -n '1,620p' docs/architecture_simplification_plan_20260628.md
 rg --files TennisWebSim TennisBotCV BallTrajectoryLab
-rg -n "YOLO|yolo|ultralytics|detect|prediction|trajectory|triang|stereo|ROS|rosbridge|Gazebo|gazebo" TennisWebSim TennisBotCV BallTrajectoryLab --glob '!**/.git/**' --glob '!**/.venv/**' --glob '!**/node_modules/**' --glob '!**/kernel_work/**'
+rg -n "YOLO|yolo|ultralytics|detect|prediction|trajectory|triang|stereo|ROS|rosbridge|simulator|simulator" TennisWebSim TennisBotCV BallTrajectoryLab --glob '!**/.git/**' --glob '!**/.venv/**' --glob '!**/node_modules/**' --glob '!**/kernel_work/**'
 diff -qr TennisWebSim/packages/tennis-contracts TennisBotCV/packages/tennis-contracts || true
 find TennisWebSim TennisBotCV BallTrajectoryLab -path '*/.git' -prune -o -path '*/.venv' -prune -o -path '*/node_modules' -prune -o -iname '*yolo*' -print | sort
 ```

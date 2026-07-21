@@ -4,7 +4,7 @@
 
 This trains a temporal heatmap teacher using generated interpolation labels
 between adjacent positive anchors in the S3c pseudo label root. It uses labeled
-image sequences only and does not validate ROS/Gazebo, stereo triangulation,
+image sequences only and does not validate real ROS/chassis, stereo triangulation,
 target prediction, or chassis control.
 
 Training was manually stopped after epoch `5` because recall stayed below S3d.

@@ -26,7 +26,7 @@ and FPS by default.
 ## Important Boundary
 
 This is offline 2D YOLO detection export only. It does not validate stereo
-triangulation, trajectory prediction, ROS publication, Gazebo, or the real
+triangulation, trajectory prediction, ROS publication, simulator, or the real
 catching closed loop. OpenCV export does not preserve audio.
 
 The only video file found in the repo at implementation time,

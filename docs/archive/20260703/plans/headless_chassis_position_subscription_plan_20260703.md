@@ -24,4 +24,4 @@ instead of reading `std_msgs/Float64MultiArray` directly from
 
 - Do not change `RawTarget` or `ManagedTarget`.
 - Do not add any local non-ROS catch-loop substitute.
-- Do not validate a real catch loop without ROS/Gazebo or real chassis backend.
+- Do not validate a real catch loop without real ROS/chassis or real chassis backend.

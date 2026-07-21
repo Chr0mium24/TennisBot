@@ -3,7 +3,7 @@
 ## Scope
 
 This trains a separate temporal heatmap teacher for search/acquisition.
-It uses labeled image sequences only and does not validate ROS/Gazebo, stereo
+It uses labeled image sequences only and does not validate real ROS/chassis, stereo
 triangulation, target prediction, or chassis control.
 
 Training was manually stopped after epoch `15` because the best recall did not

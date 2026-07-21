@@ -166,7 +166,7 @@ def publish_raw_target(options: RawTargetPublishOptions) -> int:
     )
     command = ["topic", "pub", "--once", options.topic, "target_msgs/msg/RawTarget", payload]
 
-    print("模式: 发布人工 RawTarget（不属于真实 ROS/Gazebo 闭环验证）")
+    print("模式: 发布人工 RawTarget（不属于真实 ROS/底盘闭环验证）")
     print(f"topic: {options.topic}")
     print(f"id: task={options.task_id}, sequence={options.sequence_id}")
     print(f"target: x={options.target_x}, y={options.target_y}")
@@ -539,7 +539,7 @@ def print_raw_target_publish_usage() -> None:
 
 说明:
   向 /target/raw 单次发布 target_msgs/msg/RawTarget。
-  target-x/target-y 必须使用球场/接口坐标系。本命令不属于真实 ROS/Gazebo 闭环验证。
+  target-x/target-y 必须使用球场/接口坐标系。本命令不属于真实 ROS/底盘闭环验证。
 
 常用:
   uv run scripts/test.py communication publish-raw-target --task-id 1 --sequence-id 0 --target-x 1.0 --target-y -0.5

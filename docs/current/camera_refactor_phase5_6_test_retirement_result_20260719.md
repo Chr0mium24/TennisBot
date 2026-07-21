@@ -50,7 +50,7 @@ Repository searches confirm the active Python code contains no
 
 ## Physical validation still required
 
-No `/dev/video*` cameras or sourced ROS/Gazebo control backend were available.
+No `/dev/video*` cameras or sourced real ROS/chassis control backend were available.
 Consequently this result does not claim camera encoder/GUI performance,
 physical calibration quality, communication success, or real catch-loop
 validation.

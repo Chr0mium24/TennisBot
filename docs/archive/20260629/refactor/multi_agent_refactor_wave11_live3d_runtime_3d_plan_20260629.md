@@ -45,7 +45,7 @@ This wave completes the software-side flow:
 - Use calibration camera ids for runtime detections when calibration is loaded
   so downstream diagnostics align with artifact metadata.
 - Add deterministic tests with synthetic detections and calibration. Tests must
-  not require cameras, ONNX files, browser permissions, or ROS/Gazebo.
+  not require cameras, ONNX files, browser permissions, or real ROS/chassis.
 
 ## Non-Goals
 
@@ -53,7 +53,7 @@ This wave completes the software-side flow:
 - Do not modify calibration capture or calibration package export code.
 - Do not claim real physical validation without running real USB cameras and
   exported artifacts.
-- Do not add ROS/Gazebo control or catch-loop replacement logic.
+- Do not add real ROS/chassis control or catch-loop replacement logic.
 
 ## Expected Design
 
@@ -93,4 +93,4 @@ architecture refactor:
 - run `apps/live3d` against two real USB cameras;
 - validate browser ONNX inference on real frames;
 - verify stereo 3D point stability and prediction quality;
-- only then evaluate ROS/Gazebo closed-loop catch behavior.
+- only then evaluate real ROS/chassis closed-loop catch behavior.

@@ -4,7 +4,7 @@
 
 This trains a temporal heatmap teacher using S3d-derived hard negatives plus
 targeted synthetic positives. It uses labeled image sequences only and does not
-validate ROS/Gazebo, stereo triangulation, target prediction, or chassis
+validate real ROS/chassis, stereo triangulation, target prediction, or chassis
 control.
 
 Training was manually stopped after epoch `4` because recall stayed below S3d.

@@ -8,7 +8,7 @@ with a new benchmark-only failure diagnosis using low-threshold predictions and
 YOLO26 class-head heatmaps.
 
 This is detector-only. It does not validate stereo triangulation, trajectory
-prediction, ROS/Gazebo, or chassis control.
+prediction, real ROS/chassis, or chassis control.
 
 ## Models Checked
 

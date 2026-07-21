@@ -6,7 +6,7 @@ Stop blind search-model experiments and choose the next model from evidence:
 papers, open-source implementations, and the TennisBot runtime/data constraints.
 
 This document is an offline vision-model plan. It does not validate the
-ROS/Gazebo catch loop, stereo triangulation, target prediction, or chassis
+real ROS/chassis catch loop, stereo triangulation, target prediction, or chassis
 control.
 
 ## Sources Reviewed

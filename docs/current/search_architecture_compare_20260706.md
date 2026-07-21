@@ -6,7 +6,7 @@ This compares the available search/acquisition evidence on the same labeled cont
 
 `tools/yolo/workspace/dataset/images/0260701/20260701_155008_cam*_frame_*.jpg`
 
-This is an offline detector comparison. It does not validate ROS/Gazebo, stereo triangulation, target prediction, or chassis control.
+This is an offline detector comparison. It does not validate real ROS/chassis, stereo triangulation, target prediction, or chassis control.
 
 ## Commands
 

@@ -8,7 +8,7 @@ small/medium balls, so this dataset emphasizes fixed-exposure ROI crops while
 keeping a 1080p full-frame path for scale diversity.
 
 This is a detector dataset plan only. It does not validate camera capture,
-stereo triangulation, trajectory prediction, ROS/Gazebo, or chassis control.
+stereo triangulation, trajectory prediction, real ROS/chassis, or chassis control.
 
 ## Command
 

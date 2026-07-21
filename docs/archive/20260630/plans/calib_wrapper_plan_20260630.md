@@ -25,7 +25,7 @@ Add a short root-level calibration wrapper so operators do not need to type long
 ## Non-Goals
 
 - Do not change calibration math.
-- Do not alter ROS/Gazebo receiving-loop requirements.
+- Do not alter real ROS/chassis receiving-loop requirements.
 - Do not touch historical archive records except this plan and the result.
 
 ## Verification

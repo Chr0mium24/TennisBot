@@ -11,7 +11,7 @@ robustness, but it does not by itself make the deployed image domain match the
 training domain.
 
 This is a detector-only experiment. It does not validate stereo triangulation,
-trajectory prediction, ROS/Gazebo, or chassis control.
+trajectory prediction, real ROS/chassis, or chassis control.
 
 ## Hypothesis
 

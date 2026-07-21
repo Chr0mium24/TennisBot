@@ -23,7 +23,7 @@ Merged commit: `2eb2890 Merge Live3D runtime 3D`
 - Runtime scene rendering takes precedence when a runtime 3D point exists;
   fixture scene remains an explicitly labelled fallback.
 - No YOLO or calibration tool package code was modified.
-- No ROS/Gazebo catch-loop substitute logic was added.
+- No real ROS/chassis catch-loop substitute logic was added.
 
 ## Verification
 
@@ -61,5 +61,5 @@ Port check for `5178`, `4173`, and `8765`: no listener left running.
 - The software chain is connected and tested with synthetic detections and
   calibration, but real exported artifacts and physical USB cameras still need
   validation.
-- ROS/Gazebo closed-loop catch behavior still must be validated against the real
+- real ROS/chassis closed-loop catch behavior still must be validated against the real
   backend pose and control chain before claiming catch-loop completion.

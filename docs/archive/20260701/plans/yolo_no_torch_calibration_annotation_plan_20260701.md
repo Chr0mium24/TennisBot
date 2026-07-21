@@ -19,4 +19,4 @@ without installing Torch, CUDA, Ultralytics, or NVIDIA Python packages.
 
 - Do not remove YOLO detection GUI support.
 - Do not change calibration, detection, or stereo runtime behavior.
-- Do not claim real stereo catching-loop validation without ROS/Gazebo.
+- Do not claim real stereo catching-loop validation without real ROS/chassis.

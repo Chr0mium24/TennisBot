@@ -4,7 +4,7 @@
 
 This trains a temporal heatmap teacher using S3j's pseudo + small hard-negative
 label root and targeted synthetic positives. It uses labeled image sequences
-only and does not validate ROS/Gazebo, stereo triangulation, target prediction,
+only and does not validate real ROS/chassis, stereo triangulation, target prediction,
 or chassis control.
 
 Training was manually stopped after epoch `5` because recall did not exceed

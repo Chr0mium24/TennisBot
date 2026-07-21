@@ -3,7 +3,7 @@
 ## Scope
 
 This plan turns the current offline YOLO/ROI evidence into a runtime direction.
-It is a plan, not a completed ROS/Gazebo catch-loop validation.
+It is a plan, not a completed real ROS/chassis catch-loop validation.
 
 The goal is:
 
@@ -181,7 +181,7 @@ Hardware validation:
   before trajectory fitting;
 - verify `/target/raw` timing only with real chassis pose input.
 
-No result should claim a real catch-loop validation unless ROS/Gazebo or the
+No result should claim a real catch-loop validation unless real ROS/chassis or the
 real backend pose/control chain is active.
 
 ## Promotion Criteria

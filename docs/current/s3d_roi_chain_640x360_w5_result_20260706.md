@@ -3,7 +3,7 @@
 ## Scope
 
 This is an offline monocular replay of `S3d full-frame temporal heatmap search -> ROI crop -> ROI YOLO refinement`.
-It does not use ROS/Gazebo, camera capture, stereo triangulation, target prediction, or chassis control.
+It does not use real ROS/chassis, camera capture, stereo triangulation, target prediction, or chassis control.
 It answers whether the current S3d search output can feed the existing ROI YOLO detector without losing most recall.
 
 ## Settings

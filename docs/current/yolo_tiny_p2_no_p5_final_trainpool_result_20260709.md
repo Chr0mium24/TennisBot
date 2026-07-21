@@ -6,7 +6,7 @@ This records the P2-head YOLO training run requested to check whether a
 stride-4 detection head helps the current fixed-exposure tiny-ball failure.
 
 This is a detector-only experiment. It does not validate stereo triangulation,
-trajectory prediction, ROS/Gazebo, or chassis control.
+trajectory prediction, real ROS/chassis, or chassis control.
 
 ## Setup
 

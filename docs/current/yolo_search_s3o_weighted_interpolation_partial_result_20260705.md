@@ -6,7 +6,7 @@ This is a partial result for S3o. The run was interrupted while summarizing the
 project, so the trainer did not write its normal final report. The saved
 checkpoints were loaded post-interruption to record the available metrics.
 
-This is an offline vision experiment only and does not validate ROS/Gazebo,
+This is an offline vision experiment only and does not validate real ROS/chassis,
 stereo triangulation, target prediction, or chassis control.
 
 ## Settings

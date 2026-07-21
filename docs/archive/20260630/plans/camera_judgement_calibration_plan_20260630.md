@@ -13,7 +13,7 @@ Establish the current physical camera flow for TennisBot:
 5. Verify Live3D with real camera frames and a visible tennis ball.
 
 This plan does not claim a real receiving closed loop. Per project rules, true
-receiving-loop validation still requires the ROS/Gazebo backend pose and control
+receiving-loop validation still requires the real ROS/chassis backend pose and control
 chain.
 
 ## Current Constraints

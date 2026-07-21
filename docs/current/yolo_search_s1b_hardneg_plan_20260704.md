@@ -7,7 +7,7 @@ held-out continuous replay. The next conservative experiment is Search-S1b:
 keep the same YOLO26n-like P3/P4/P5 architecture and add confirmed empty
 full-frame hard negatives.
 
-This is still an offline detector experiment. It does not validate ROS/Gazebo,
+This is still an offline detector experiment. It does not validate real ROS/chassis,
 stereo triangulation, target prediction, or chassis control.
 
 ## Data Decision

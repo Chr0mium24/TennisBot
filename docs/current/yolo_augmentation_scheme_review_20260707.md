@@ -6,7 +6,7 @@ This note summarizes the current YOLO augmentation paths and records a visual
 collage generated from real project samples.
 
 It describes data generation and training augmentation only. It does not
-validate ROS/Gazebo, stereo triangulation, trajectory prediction, or chassis
+validate real ROS/chassis, stereo triangulation, trajectory prediction, or chassis
 control.
 
 Visual example:

@@ -4,7 +4,7 @@
 
 This trains the temporal heatmap teacher with the full track-filtered pseudo
 label root from S3f mining. It uses labeled image sequences only and does not
-validate ROS/Gazebo, stereo triangulation, target prediction, or chassis
+validate real ROS/chassis, stereo triangulation, target prediction, or chassis
 control.
 
 ## Settings

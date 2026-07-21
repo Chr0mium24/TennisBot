@@ -5,7 +5,7 @@
 This records the first algorithm fix after the continuous-sequence miss
 diagnosis. It is still an offline monocular replay:
 
-- no ROS/Gazebo validation;
+- no real ROS/chassis validation;
 - no live camera capture;
 - no stereo triangulation timing;
 - no `/target/raw` catch-loop claim.

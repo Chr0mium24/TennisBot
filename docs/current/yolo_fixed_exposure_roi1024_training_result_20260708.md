@@ -10,7 +10,7 @@ The detector trained successfully on `anilam@10.31.151.120` and stopped early at
 epoch 33. Best validation `mAP50-95` was at epoch 23.
 
 This result validates only the YOLO detector training run. It does not validate
-ROS/Gazebo, stereo triangulation, trajectory prediction, or chassis control.
+real ROS/chassis, stereo triangulation, trajectory prediction, or chassis control.
 
 ## Dataset
 

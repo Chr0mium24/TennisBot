@@ -23,4 +23,4 @@ directly, with no runtime Cartesian input mode or ROS-boundary conversion.
 
 - Do not change `RawTarget`, `ManagedTarget`, or target-manager behavior.
 - Do not add a local catch-loop substitute.
-- Do not claim real closed-loop validation without ROS/Gazebo or hardware.
+- Do not claim real closed-loop validation without real ROS/chassis or hardware.

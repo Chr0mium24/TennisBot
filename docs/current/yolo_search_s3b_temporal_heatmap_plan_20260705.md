@@ -6,7 +6,7 @@ Train a second temporal search model before touching runtime distillation.
 Search-S3 proved the direction is viable, but its validation recall was still
 too low for a teacher.
 
-This is an offline vision experiment only. It does not validate ROS/Gazebo,
+This is an offline vision experiment only. It does not validate real ROS/chassis,
 stereo triangulation, target prediction, or chassis control.
 
 ## Why Another Model

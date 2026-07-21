@@ -34,6 +34,6 @@ copy-paste augmentation.
 
 - Do not train YOLO in this change.
 - Do not add segmentation labels.
-- Do not modify Live3D or ROS/Gazebo behavior.
+- Do not modify Live3D or real ROS/chassis behavior.
 - Do not claim detector accuracy improvements before a later training and
   validation experiment.

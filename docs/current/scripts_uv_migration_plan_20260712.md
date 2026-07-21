@@ -24,7 +24,7 @@ Python scripts that can be run with `uv run scripts/*.py`.
 
 - Do not rewrite `packages/contracts`, `packages/core`, or
   `tools/stereo/web/replay` away from TypeScript/Bun.
-- Do not change ROS/Gazebo runtime behavior or add local catch-loop fallback
+- Do not change real ROS/chassis runtime behavior or add local catch-loop fallback
   logic.
 - Do not change calibration, stereo, or YOLO tool internals beyond launcher
   invocation.

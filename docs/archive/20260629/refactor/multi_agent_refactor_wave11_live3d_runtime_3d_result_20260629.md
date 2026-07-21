@@ -8,7 +8,7 @@ Branch: `refactor/live3d-runtime-3d`
 
 Wave 11 connects Live3D runtime YOLO detections to the existing core stereo and
 prediction algorithms without changing YOLO packaging, calibration packaging,
-submodules, or ROS/Gazebo behavior.
+submodules, or real ROS/chassis behavior.
 
 The new app-local runtime scene module consumes:
 
@@ -64,5 +64,5 @@ Lead review result after runtime-state fixes: 38 passing tests, 0 failures.
 
 This wave validates the software path with synthetic detections and calibration.
 It does not validate real browser camera capture quality, the exported ONNX model
-on real frames, real stereo calibration quality, or ROS/Gazebo closed-loop catch
+on real frames, real stereo calibration quality, or real ROS/chassis closed-loop catch
 behavior. Those remain physical validation tasks.

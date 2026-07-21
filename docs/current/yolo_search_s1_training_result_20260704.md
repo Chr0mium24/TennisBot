@@ -7,7 +7,7 @@ model, then verify it on the held-out continuous sequence before promoting it
 for runtime use.
 
 This is an offline detector/tracker replay result. It does not validate the
-real ROS/Gazebo catch loop, stereo triangulation, target prediction, or chassis
+real ROS/chassis catch loop, stereo triangulation, target prediction, or chassis
 control.
 
 ## Dataset

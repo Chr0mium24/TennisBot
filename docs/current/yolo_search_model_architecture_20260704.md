@@ -13,7 +13,7 @@ Runtime role:
 - stereo pairing and tracker gates reject false candidates before updating the
   real lock.
 
-This is an architecture/training plan only. It does not claim ROS/Gazebo or live
+This is an architecture/training plan only. It does not claim real ROS/chassis or live
 camera validation.
 
 ## Current Evidence

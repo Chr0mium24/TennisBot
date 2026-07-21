@@ -12,7 +12,7 @@ from:
 
 `tools/yolo/workspace/dataset/images/0260701/20260701_155008_cam*_frame_*.jpg`
 
-It does not validate ROS/Gazebo, live cameras, stereo triangulation, or the real
+It does not validate real ROS/chassis, live cameras, stereo triangulation, or the real
 catch loop.
 
 ## Model

@@ -17,7 +17,7 @@ The result is mixed:
   detector behavior.
 
 This result validates only detector behavior on local labeled images. It does
-not validate ROS/Gazebo, stereo triangulation, trajectory prediction, or chassis
+not validate real ROS/chassis, stereo triangulation, trajectory prediction, or chassis
 control.
 
 ## Definitions

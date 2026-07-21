@@ -4,7 +4,7 @@
 
 This trains a temporal heatmap teacher with targeted synthetic positives aimed
 at the S3d held-out miss pattern. It uses labeled image sequences only and does
-not validate ROS/Gazebo, stereo triangulation, target prediction, or chassis
+not validate real ROS/chassis, stereo triangulation, target prediction, or chassis
 control.
 
 Training was manually stopped after epoch `6` because recall did not exceed

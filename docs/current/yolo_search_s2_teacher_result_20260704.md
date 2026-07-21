@@ -6,7 +6,7 @@ This experiment follows the research decision in
 `docs/current/yolo_search_model_research_decision_20260704.md`: train a
 pretrained YOLOv8n-P2 full-frame teacher before doing more architecture edits.
 
-This is offline monocular replay only. It does not validate ROS/Gazebo stereo
+This is offline monocular replay only. It does not validate real ROS/chassis stereo
 triangulation, target prediction, or chassis control.
 
 ## Model

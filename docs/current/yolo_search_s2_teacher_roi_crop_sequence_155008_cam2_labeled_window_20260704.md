@@ -4,7 +4,7 @@
 
 This replay exercises a stateful visual ROI tracker on an ordered real-frame sequence.
 It decides whether each frame runs full-frame search or ROI-only inference.
-It does not use ROS/Gazebo, stereo triangulation, target prediction, or chassis control.
+It does not use real ROS/chassis, stereo triangulation, target prediction, or chassis control.
 
 ## Settings
 
@@ -51,4 +51,4 @@ It does not use ROS/Gazebo, stereo triangulation, target prediction, or chassis 
 - This is closer to the intended runtime than `coarse_roi`, because locked frames do not also run full-frame search.
 - The result still uses one monocular image sequence and estimates stereo FPS as sequential left+right processing.
 - If the tracker locks onto false positives, precision and recall will expose that in this replay.
-- Full ROS/Gazebo catch-loop validation is still separate and must use the real backend pose/control chain.
+- Full real ROS/chassis catch-loop validation is still separate and must use the real backend pose/control chain.

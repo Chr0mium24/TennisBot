@@ -84,5 +84,5 @@ git diff --check: passed.
 
 The implementation proves the software solve/export path with synthetic ChArUco
 observations. Real physical acceptance still requires new visible fixed-board
-captures from the actual mounted cameras. No ROS/Gazebo receiving-loop claim is
+captures from the actual mounted cameras. No real ROS/chassis receiving-loop claim is
 made by this result.

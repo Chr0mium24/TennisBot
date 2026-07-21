@@ -64,4 +64,4 @@ Port check for `5178`, `4173`, and `8765`: no listener left running.
   with the exported tennis-ball ONNX model and real USB camera frames.
 - Runtime detections still do not drive stereo pairing, triangulation, or
   prediction. That remains Wave 11.
-- ROS/Gazebo closed-loop catch validation remains out of scope for this wave.
+- real ROS/chassis closed-loop catch validation remains out of scope for this wave.

@@ -405,7 +405,7 @@ adding another ad hoc top-level directory.
 2. Add stereo triangulation tests with GUI/headless presentation.
 3. Add raw and optional overlay recording sinks for online test commands.
 4. Move chassis-position communication checks under the test entry.
-5. Keep communication tests read-only and preserve the real ROS/Gazebo backend
+5. Keep communication tests read-only and preserve the real ROS/chassis backend
    boundary.
 
 ### Phase 6: Retire legacy surfaces
@@ -474,7 +474,7 @@ No non-ROS test may be reported as validation of the real catch loop.
 
 - trajectory fitting, landing prediction, or catch-plane prediction CLI work;
 - a local chassis tracker, predicted-landing follower, or catch-loop substitute;
-- claiming real catch-loop validation without ROS/Gazebo and real backend pose;
+- claiming real catch-loop validation without real ROS/chassis and real backend pose;
 - changing the field/interface coordinate-frame contract;
 - adding `--record` to camera preview or calibration;
 - retaining unrelated utilities under `record` merely for backward

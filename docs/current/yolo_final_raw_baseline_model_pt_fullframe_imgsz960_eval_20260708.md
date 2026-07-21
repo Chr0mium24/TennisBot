@@ -4,7 +4,7 @@
 
 This evaluates a YOLO detector on the frozen raw-image benchmark manifest.
 It reports detection metrics by dataset and target-size bucket.
-It does not validate stereo triangulation, trajectory prediction, ROS/Gazebo, or chassis control.
+It does not validate stereo triangulation, trajectory prediction, real ROS/chassis, or chassis control.
 
 ## Settings
 

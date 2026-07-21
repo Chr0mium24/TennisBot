@@ -3,7 +3,7 @@
 ## Scope
 
 This is an offline detector-throughput proof for the existing model.
-It does not use ROS/Gazebo, camera capture, stereo triangulation, target prediction, or chassis control.
+It does not use real ROS/chassis, camera capture, stereo triangulation, target prediction, or chassis control.
 The `oracle_roi` rows use labels to place the crop and are only an upper bound for locked ROI runtime.
 The `coarse_roi` rows prove the full-frame-to-ROI crop path runs, but they are not a real tracker validation.
 
@@ -60,4 +60,4 @@ The `coarse_roi` rows prove the full-frame-to-ROI crop path runs, but they are n
 - Low-`imgsz` locked ROI rows can meet the FPS target in this detector-only proof and have much better recall than full-frame at the same `imgsz`.
 - Same-frame `coarse_roi` does not meet the FPS target because it runs two detections per camera frame.
 - The next runtime step is a stateful ROI mode: full-frame search only while unlocked or periodically, then ROI-only inference while locked.
-- This is not a target-board or ROS/Gazebo proof; do not start more training until that stateful runtime mode is implemented and measured.
+- This is not a target-board or real ROS/chassis proof; do not start more training until that stateful runtime mode is implemented and measured.

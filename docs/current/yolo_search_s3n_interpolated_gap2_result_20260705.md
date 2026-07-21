@@ -4,7 +4,7 @@
 
 This trains a temporal heatmap teacher using the stricter gap2 interpolation
 label root. It uses labeled image sequences only and does not validate
-ROS/Gazebo, stereo triangulation, target prediction, or chassis control.
+real ROS/chassis, stereo triangulation, target prediction, or chassis control.
 
 Training was manually stopped after epoch `5` because recall stayed below S3d.
 

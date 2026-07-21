@@ -56,7 +56,7 @@ stereo cameras + /robot/chassis_position
   -> /target/managed
 ```
 
-没有 ROS/Gazebo 后端时只能验证纯视觉和前端能力，不能声称完成真实接球闭环。
+没有真实 ROS/底盘后端时只能验证纯视觉和前端能力，不能声称完成真实接球闭环。
 视觉数据必须尽早转换到球场/接口坐标系，再做轨迹拟合和目标发布。
 
 ## 配置与产物

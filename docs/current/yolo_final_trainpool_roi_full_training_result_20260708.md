@@ -4,7 +4,7 @@
 
 This records one retraining pass for the tennis-ball detector and its frozen
 final raw benchmark results. It does not validate stereo triangulation,
-trajectory prediction, ROS/Gazebo, or chassis control.
+trajectory prediction, real ROS/chassis, or chassis control.
 
 ## Training Setup
 

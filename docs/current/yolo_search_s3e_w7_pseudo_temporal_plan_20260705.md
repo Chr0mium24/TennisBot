@@ -21,7 +21,7 @@ whether more motion context can recover additional small/blurred ball cases.
 - Synthetic positives: `1000`.
 
 This is still an offline teacher experiment. It is not a CPU runtime model and
-does not validate ROS/Gazebo, stereo triangulation, target prediction, or
+does not validate real ROS/chassis, stereo triangulation, target prediction, or
 chassis control.
 
 ## Data

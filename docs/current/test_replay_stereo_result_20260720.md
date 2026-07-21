@@ -7,7 +7,7 @@ the existing TennisBot YOLO detector, runtime stereo calibration loader, stereo
 matcher, and diagnostic renderer.
 
 The replay path is diagnostic only. It processes recorded camera frames and does
-not replace ROS/Gazebo closed-loop validation.
+not replace real ROS/chassis closed-loop validation.
 
 ## Input
 

@@ -6,7 +6,7 @@ Run offline YOLO detection and stereo geometry checks on the recent dual-camera
 recordings using the latest accepted stereo calibration package.
 
 This is an offline recording evaluation only. It does not validate the
-ROS/Gazebo closed-loop catching chain.
+real ROS/chassis closed-loop catching chain.
 
 ## Inputs
 

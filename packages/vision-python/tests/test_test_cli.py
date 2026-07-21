@@ -59,7 +59,7 @@ def test_publish_raw_target_dry_run_has_complete_payload(monkeypatch, capsys) ->
 
     assert publish_raw_target(options) == 0
     output = capsys.readouterr().out
-    assert "不属于真实 ROS/Gazebo 闭环验证" in output
+    assert "不属于真实 ROS/底盘闭环验证" in output
     assert "capture_stamp: 1750000000.123456789" in output
     assert "target_msgs/msg/RawTarget" in output
     assert "task_id: 4" in output

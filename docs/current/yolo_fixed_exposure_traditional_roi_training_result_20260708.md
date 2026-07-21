@@ -7,7 +7,7 @@ The fixed-exposure traditional ROI dataset was trained on the remote GPU host
 epoch 31 because validation `mAP50-95` had not improved for 10 epochs.
 
 This result validates only the YOLO detector training run. It does not validate
-ROS/Gazebo, stereo triangulation, trajectory prediction, or chassis control.
+real ROS/chassis, stereo triangulation, trajectory prediction, or chassis control.
 
 ## Dataset
 

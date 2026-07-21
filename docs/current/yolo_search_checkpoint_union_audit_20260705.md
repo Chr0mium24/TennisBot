@@ -4,7 +4,7 @@
 
 This checks whether existing temporal heatmap checkpoints miss different
 held-out frames. It is an offline vision audit only and does not validate
-ROS/Gazebo, stereo triangulation, target prediction, or chassis control.
+real ROS/chassis, stereo triangulation, target prediction, or chassis control.
 
 ## Checkpoints
 

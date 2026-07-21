@@ -4,7 +4,7 @@
 
 This audits the current best teacher, S3d `best_recall.pt`, on the held-out
 `20260701_155008` sequence. It is an offline vision audit only and does not
-validate ROS/Gazebo, stereo triangulation, prediction, or chassis control.
+validate real ROS/chassis, stereo triangulation, prediction, or chassis control.
 
 ## Inputs
 

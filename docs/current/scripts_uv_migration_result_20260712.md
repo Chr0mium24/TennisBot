@@ -63,5 +63,5 @@ cd tools/stereo/web/replay && bun test && bun run typecheck && bun run build
   expected dry-run table.
 - `uv run scripts/stereo.py replay --help` still invokes the Bun replay server
   help path because the replay frontend remains TypeScript/Bun.
-- No ROS/Gazebo closed-loop catch validation was performed; this migration only
+- No real ROS/chassis closed-loop catch validation was performed; this migration only
   changes root launcher implementation and documentation.

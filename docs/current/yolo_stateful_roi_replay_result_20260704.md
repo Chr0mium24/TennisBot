@@ -8,7 +8,7 @@ frames. It decides whether a frame runs full-frame `SEARCH` or ROI-only
 
 This is still an offline monocular detector replay:
 
-- no ROS/Gazebo;
+- no real ROS/chassis;
 - no stereo triangulation;
 - no target prediction;
 - no chassis/control logic;
@@ -30,7 +30,7 @@ State behavior:
 - Return to `SEARCH` after configured consecutive misses.
 
 The tracker only decides where to crop the next frame. It is not target landing
-prediction and does not replace ROS/Gazebo backend pose/control validation.
+prediction and does not replace real ROS/chassis backend pose/control validation.
 
 ## Sequence
 

@@ -9,7 +9,7 @@ augmentation must be derived only from `train_pool.txt`. The files in
 fixed-exposure raw datasets.
 
 This split is a detector benchmark setup only. It does not validate camera
-capture, stereo triangulation, trajectory prediction, ROS/Gazebo, or chassis
+capture, stereo triangulation, trajectory prediction, real ROS/chassis, or chassis
 control.
 
 ## Reproducible Command
@@ -165,5 +165,5 @@ uv run --project tools/yolo --extra detect python -m tennisbot_yolo.cli benchmar
 
 The evaluator reports overall, per-dataset, per-bucket, and dataset-plus-bucket
 rows. It also records median/p95 ms per image, mono FPS, and estimated stereo
-FPS. The timing is an offline detector replay; it is not a camera or ROS/Gazebo
+FPS. The timing is an offline detector replay; it is not a camera or real ROS/chassis
 closed-loop benchmark.

@@ -5,7 +5,7 @@
 This records a non-YOLO classical color/blob baseline for tiny fixed-exposure
 balls. It was run as a quick check after tiny copy-paste failed to recover
 `4-8 px` small targets. It does not validate stereo triangulation,
-trajectory prediction, ROS/Gazebo, or chassis control.
+trajectory prediction, real ROS/chassis, or chassis control.
 
 ## Reason
 

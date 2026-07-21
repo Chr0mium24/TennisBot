@@ -1342,7 +1342,7 @@ def format_report(
             "## Scope",
             "",
             "This trains a small temporal heatmap teacher for search/acquisition.",
-            "It uses labeled image sequences only and does not validate ROS/Gazebo, stereo triangulation, target prediction, or chassis control.",
+            "It uses labeled image sequences only and does not validate real ROS/chassis, stereo triangulation, target prediction, or chassis control.",
             "",
             "## Settings",
             "",

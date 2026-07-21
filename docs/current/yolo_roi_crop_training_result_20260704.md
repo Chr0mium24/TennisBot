@@ -7,7 +7,7 @@ ROI replay logic was added.
 
 This is still an offline detector/runtime proof:
 
-- no ROS/Gazebo catch-loop validation;
+- no real ROS/chassis catch-loop validation;
 - no live USB camera capture in this run;
 - no stereo triangulation timing in the benchmark;
 - no chassis control or `/target/raw` closed-loop claim.

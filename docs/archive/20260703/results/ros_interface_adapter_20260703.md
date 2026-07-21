@@ -95,7 +95,7 @@ Run the adapter:
 ros2 launch tennisbot_interface_adapter interface_adapter.launch.py
 ```
 
-For Gazebo or any `/clock` based run:
+For simulator or any `/clock` based run:
 
 ```bash
 ros2 launch tennisbot_interface_adapter interface_adapter.launch.py use_sim_time:=true

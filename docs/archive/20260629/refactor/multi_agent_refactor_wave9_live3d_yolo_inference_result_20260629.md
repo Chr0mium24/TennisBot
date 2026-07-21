@@ -48,7 +48,7 @@ default backend is intentionally blocked and does not claim real YOLO inference.
   `model.onnx` packages, including preprocessing and postprocessing.
 - Feed real left/right detections through stereo pairing, triangulation, and
   trajectory prediction.
-- Validate the full real-machine closed loop with ROS/Gazebo backend pose and
+- Validate the full real-machine closed loop with real ROS/chassis backend pose and
   control chain before claiming real catch-loop completion.
 
 ## Validation
