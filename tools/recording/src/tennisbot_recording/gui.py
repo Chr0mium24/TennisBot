@@ -11,7 +11,7 @@ from typing import Any, BinaryIO, TextIO
 from .config import RecordingConfig
 from .recording import (
     build_dual_plan,
-    build_set_controls_command,
+    build_set_controls_commands,
     build_set_format_command,
     build_single_ffmpeg_command,
     DualRecordingPlan,
@@ -78,7 +78,8 @@ class TennisRecorderGui:
 
     def configure_camera(self) -> None:
         run_checked(build_set_format_command(self.config, self.device))
-        run_checked(build_set_controls_command(self.config, self.device))
+        for command in build_set_controls_commands(self.config, self.device):
+            run_checked(command)
 
     def start_preview(self) -> None:
         if self.preview_process is not None:
@@ -148,7 +149,7 @@ class TennisRecorderGui:
             output=output,
             metadata=metadata,
             set_format_command=build_set_format_command(self.config, self.device),
-            set_controls_command=build_set_controls_command(self.config, self.device),
+            set_controls_commands=build_set_controls_commands(self.config, self.device),
             record_command=command,
             controls_string=self.config.v4l2_controls_string(),
             container="mkv",
@@ -258,7 +259,8 @@ class TennisDualRecorderGui:
     def configure_cameras(self) -> None:
         for device in self.devices:
             run_checked(build_set_format_command(self.config, device))
-            run_checked(build_set_controls_command(self.config, device))
+            for command in build_set_controls_commands(self.config, device):
+                run_checked(command)
 
     def start_preview(self) -> None:
         if any(process is not None for process in self.preview_processes):

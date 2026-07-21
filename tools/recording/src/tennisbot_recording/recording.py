@@ -43,7 +43,7 @@ class SingleRecordingPlan:
     output: Path
     metadata: Path
     set_format_command: list[str]
-    set_controls_command: list[str]
+    set_controls_commands: tuple[list[str], ...]
     record_command: list[str]
     controls_string: str
     container: str
@@ -58,7 +58,7 @@ class DualRecordingPlan:
     outputs: tuple[Path, Path]
     log_files: tuple[Path, Path]
     set_format_commands: tuple[list[str], list[str]]
-    set_controls_commands: tuple[list[str], list[str]]
+    set_controls_commands: tuple[tuple[list[str], ...], tuple[list[str], ...]]
     record_commands: tuple[list[str], list[str]]
     single_process_command: list[str]
     preview_command: list[str]
@@ -89,7 +89,7 @@ def build_single_plan(
     output = out_dir / f"{timestamp}_{safe_label(config.single.output_label)}.{extension}"
     metadata = output.with_suffix(".controls.txt")
     set_format = build_set_format_command(config, device)
-    set_controls = build_set_controls_command(config, device)
+    set_controls = build_set_controls_commands(config, device)
     if container == "mkv":
         record = build_single_ffmpeg_command(config, device, output, duration=duration, sample_fps=sample_fps)
     else:
@@ -100,7 +100,7 @@ def build_single_plan(
         output=output,
         metadata=metadata,
         set_format_command=set_format,
-        set_controls_command=set_controls,
+        set_controls_commands=set_controls,
         record_command=record,
         controls_string=config.v4l2_controls_string(),
         container=container,
@@ -132,8 +132,8 @@ def build_dual_plan(
         build_set_format_command(config, devices[1]),
     )
     set_controls_commands = (
-        build_set_controls_command(config, devices[0]),
-        build_set_controls_command(config, devices[1]),
+        build_set_controls_commands(config, devices[0]),
+        build_set_controls_commands(config, devices[1]),
     )
     base_epoch = f"{time.time():.9f}" if soft_sync else None
     base_time_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") if soft_sync else None
@@ -213,8 +213,28 @@ def build_set_format_command(config: RecordingConfig, device: str) -> list[str]:
     ]
 
 
-def build_set_controls_command(config: RecordingConfig, device: str) -> list[str]:
-    return ["v4l2-ctl", "-d", device, f"--set-ctrl={config.v4l2_controls_string()}"]
+def build_set_controls_commands(config: RecordingConfig, device: str) -> tuple[list[str], ...]:
+    controls = dict(config.v4l2_controls())
+    phases = (
+        ("auto_exposure", "white_balance_automatic", "focus_automatic_continuous"),
+        ("exposure_time_absolute", "white_balance_temperature", "focus_absolute"),
+    )
+    commands: list[list[str]] = []
+    consumed: set[str] = set()
+    for names in phases:
+        selected = [(name, controls[name]) for name in names if name in controls]
+        if selected:
+            commands.append(build_controls_command(device, selected))
+            consumed.update(name for name, _ in selected)
+    remaining = [(name, value) for name, value in config.v4l2_controls() if name not in consumed]
+    if remaining:
+        commands.append(build_controls_command(device, remaining))
+    return tuple(commands)
+
+
+def build_controls_command(device: str, controls: Sequence[tuple[str, object]]) -> list[str]:
+    value = ",".join(f"{name}={format_control_value(control)}" for name, control in controls)
+    return ["v4l2-ctl", "-d", device, f"--set-ctrl={value}"]
 
 
 def build_single_ffmpeg_command(
@@ -449,7 +469,8 @@ def record_single(plan: SingleRecordingPlan, config: RecordingConfig, *, dry_run
         require_command("ffmpeg")
     plan.out_dir.mkdir(parents=True, exist_ok=True)
     run_checked(plan.set_format_command)
-    run_checked(plan.set_controls_command)
+    for command in plan.set_controls_commands:
+        run_checked(command)
     if config.capture.settle_seconds > 0:
         time.sleep(config.capture.settle_seconds)
     write_single_metadata(plan, config)
@@ -478,8 +499,9 @@ def record_dual(
     plan.out_dir.mkdir(parents=True, exist_ok=True)
     for command in plan.set_format_commands:
         run_checked(command)
-    for command in plan.set_controls_commands:
-        run_checked(command)
+    for commands in plan.set_controls_commands:
+        for command in commands:
+            run_checked(command)
     if config.capture.settle_seconds > 0:
         time.sleep(config.capture.settle_seconds)
     write_dual_session(plan, config, devices=devices, preview=preview, parallel_capture=parallel_capture)
@@ -508,7 +530,8 @@ def print_single_plan(plan: SingleRecordingPlan) -> None:
     print(f"Metadata: {plan.metadata}")
     print(f"Controls: {plan.controls_string}")
     print(display_command(plan.set_format_command))
-    print(display_command(plan.set_controls_command))
+    for command in plan.set_controls_commands:
+        print(display_command(command))
     print(display_command(plan.record_command))
 
 
@@ -523,8 +546,9 @@ def print_dual_plan(plan: DualRecordingPlan, *, preview: bool, parallel_capture:
         print("Soft sync disabled.")
     for command in plan.set_format_commands:
         print(display_command(command))
-    for command in plan.set_controls_commands:
-        print(display_command(command))
+    for commands in plan.set_controls_commands:
+        for command in commands:
+            print(display_command(command))
     if preview:
         print(display_command(plan.preview_command))
         print(display_command(plan.ffplay_command))
@@ -554,7 +578,7 @@ def write_single_metadata(plan: SingleRecordingPlan, config: RecordingConfig) ->
         display_command(plan.set_format_command),
         "",
         "[set_controls_command]",
-        display_command(plan.set_controls_command),
+        "\n".join(display_command(command) for command in plan.set_controls_commands),
         "",
         "[record_command]",
         display_command(plan.record_command),
@@ -622,7 +646,10 @@ def write_dual_session(
         "controls": {name: format_control_value(value) for name, value in config.v4l2_controls()},
         "commands": {
             "set_format": [display_command(command) for command in plan.set_format_commands],
-            "set_controls": [display_command(command) for command in plan.set_controls_commands],
+            "set_controls": [
+                [display_command(command) for command in commands]
+                for commands in plan.set_controls_commands
+            ],
             "record_parallel": [display_command(command) for command in plan.record_commands],
             "record_single_process": display_command(plan.single_process_command),
             "record_preview": display_command(plan.preview_command),

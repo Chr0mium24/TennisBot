@@ -26,6 +26,12 @@ enforced by the Python supervisor's monotonic clock. The supervisor sends
 do not conflict with FFmpeg's relative `-t` handling and both MKV files receive
 a proper trailer.
 
+Camera controls are applied in dependency order for both GUI and headless
+recording: automatic-mode switches first, their manual exposure/white-balance/
+focus values second, and independent image controls last. This accommodates
+UVC drivers that report a manual control as inactive until its automatic mode
+has been disabled in a completed request.
+
 Dataset frame extraction and timestamp normalization remain internal legacy
 modules pending a separate data/media tool decision and are not exposed by
 `scripts/record.py`.

@@ -44,9 +44,12 @@ def test_single_plan_uses_config_controls_and_sample_fps(tmp_path: Path) -> None
 
     command = display_command(plan.record_command)
     assert plan.output == tmp_path / "20260714_120000" / "20260714_120000_video0.mkv"
-    controls_command = display_command(plan.set_controls_command)
-    assert "auto_exposure=1" in controls_command
-    assert "exposure_time_absolute=10" in controls_command
+    controls_commands = [display_command(item) for item in plan.set_controls_commands]
+    assert "auto_exposure=1" in controls_commands[0]
+    assert "focus_automatic_continuous=0" in controls_commands[0]
+    assert "exposure_time_absolute=10" in controls_commands[1]
+    assert "focus_absolute=0" in controls_commands[1]
+    assert "brightness=-5" in controls_commands[2]
     assert "-vf fps=3" in command
     assert "-t 60" in command
     assert "/dev/video8" in command
