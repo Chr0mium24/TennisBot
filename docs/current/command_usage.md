@@ -92,10 +92,11 @@ uv run scripts/vision-runtime.py run
 
 默认通信检查只读真实 ROS topic，不生成球、目标或本地底盘替身。
 
-需要单次验证 ROS 发布接口时，可以显式运行 chassis-position smoke test：
+需要单次验证目标发布接口时，向 `/target/raw` 发布人工目标：
 
 ```bash
-uv run scripts/test.py communication publish-chassis-position --x 0 --y 0 --yaw 0
+uv run scripts/test.py communication publish-raw-target \
+  --task-id 1 --sequence-id 0 --target-x 0 --target-y 0
 ```
 
-该命令发送人工底盘点，只用于消息接口联调，不属于真实 ROS/Gazebo 闭环验证。
+该命令只用于消息接口联调，不属于真实 ROS/Gazebo 闭环验证。

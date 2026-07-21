@@ -12,7 +12,7 @@ from tennisbot_camera.config import load_camera_config
 from tennisbot_camera.controls import apply_command
 
 from .calibration import RuntimeStereoCalibration
-from .communication import main as communication_main, publish_chassis_position_main
+from .communication import main as communication_main, publish_raw_target_main
 from .detection import YoloBallDetector
 from .matching import StereoBallMatcher
 from .offline_replay import run_offline_stereo_replay, validate_frame_selection
@@ -40,7 +40,7 @@ def build_parser() -> argparse.ArgumentParser:
     replay.add_argument("mode", choices=("stereo",))
     add_replay_args(replay)
     communication = sub.add_parser("communication", help="ROS communication diagnostics and explicit smoke tests")
-    communication.add_argument("test", choices=("chassis-position", "publish-chassis-position"))
+    communication.add_argument("test", choices=("chassis-position", "publish-raw-target"))
     communication.add_argument("args", nargs=argparse.REMAINDER)
     return parser
 
@@ -101,8 +101,8 @@ def add_replay_args(parser: argparse.ArgumentParser) -> None:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "communication":
-        if args.test == "publish-chassis-position":
-            return publish_chassis_position_main(args.args)
+        if args.test == "publish-raw-target":
+            return publish_raw_target_main(args.args)
         return communication_main(args.args)
     if args.record_overlay:
         args.record = True

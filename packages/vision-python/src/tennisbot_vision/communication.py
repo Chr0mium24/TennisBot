@@ -44,14 +44,17 @@ class ParsedMessage:
 
 
 @dataclass
-class PublishOptions:
-    topic: str = "/robot/chassis_position"
-    x: float = 0.0
-    y: float = 0.0
-    yaw: float = 0.0
+class RawTargetPublishOptions:
+    topic: str = "/target/raw"
+    task_id: int = 1
     sequence_id: int = 0
-    stamp_sec: int | None = None
-    stamp_nanosec: int | None = None
+    target_x: float = 0.0
+    target_y: float = 0.0
+    predicted_t_remain: float = 1.0
+    sigma_x: float = 0.05
+    sigma_y: float = 0.05
+    capture_stamp_sec: int | None = None
+    capture_stamp_nanosec: int | None = None
     dry_run: bool = False
     auto_source: bool = True
     setup_files: list[str] = field(default_factory=list)
@@ -125,34 +128,50 @@ def run(options: Options) -> int:
     return 0
 
 
-def publish_chassis_position_main(argv: list[str]) -> int:
+def publish_raw_target_main(argv: list[str]) -> int:
     try:
-        options = parse_publish_options(argv)
-        return publish_chassis_position(options)
+        options = parse_raw_target_publish_options(argv)
+        return publish_raw_target(options)
     except ValueError as error:
         print(error, file=sys.stderr)
         print("", file=sys.stderr)
-        print_publish_usage()
+        print_raw_target_publish_usage()
         return 2
 
 
-def publish_chassis_position(options: PublishOptions) -> int:
+def publish_raw_target(options: RawTargetPublishOptions) -> int:
     stamp_ns = time.time_ns()
-    stamp_sec = options.stamp_sec if options.stamp_sec is not None else stamp_ns // 1_000_000_000
-    stamp_nanosec = options.stamp_nanosec if options.stamp_nanosec is not None else stamp_ns % 1_000_000_000
+    stamp_sec = (
+        options.capture_stamp_sec
+        if options.capture_stamp_sec is not None
+        else stamp_ns // 1_000_000_000
+    )
+    stamp_nanosec = (
+        options.capture_stamp_nanosec
+        if options.capture_stamp_nanosec is not None
+        else stamp_ns % 1_000_000_000
+    )
+    remain_ns = round(options.predicted_t_remain * 1_000_000_000)
+    remain_sec, remain_nanosec = divmod(remain_ns, 1_000_000_000)
     payload = (
-        "{publish_stamp: {sec: "
+        "{capture_stamp: {sec: "
         f"{stamp_sec}, nanosec: {stamp_nanosec}"
-        "}, sequence_id: "
-        f"{options.sequence_id}, x: {options.x}, y: {options.y}, yaw: {options.yaw}"
+        "}, task_id: "
+        f"{options.task_id}, sequence_id: {options.sequence_id}, "
+        f"target_x: {options.target_x}, target_y: {options.target_y}, "
+        "predicted_t_remain: {sec: "
+        f"{remain_sec}, nanosec: {remain_nanosec}"
+        f"}}, sigma_x: {options.sigma_x}, sigma_y: {options.sigma_y}"
         "}"
     )
-    command = ["topic", "pub", "--once", options.topic, "target_msgs/msg/ChassisPosition", payload]
+    command = ["topic", "pub", "--once", options.topic, "target_msgs/msg/RawTarget", payload]
 
-    print("模式: ROS 接口 smoke test（不属于真实 ROS/Gazebo 闭环验证）")
+    print("模式: 发布人工 RawTarget（不属于真实 ROS/Gazebo 闭环验证）")
     print(f"topic: {options.topic}")
-    print(f"point: x={options.x}, y={options.y}, yaw={options.yaw}")
-    print(f"publish_stamp: {stamp_sec}.{stamp_nanosec:09d}")
+    print(f"id: task={options.task_id}, sequence={options.sequence_id}")
+    print(f"target: x={options.target_x}, y={options.target_y}")
+    print(f"capture_stamp: {stamp_sec}.{stamp_nanosec:09d}")
+    print(f"predicted_t_remain: {options.predicted_t_remain}s")
     if options.dry_run:
         wrapped = wrap_ros_command(["ros2", *command], options)
         print("command: " + " ".join(shell_quote(item) for item in wrapped))
@@ -225,29 +244,35 @@ def parse_options(args: list[str]) -> Options:
     return options
 
 
-def parse_publish_options(args: list[str]) -> PublishOptions:
-    options = PublishOptions(setup_files=default_setup_files())
+def parse_raw_target_publish_options(args: list[str]) -> RawTargetPublishOptions:
+    options = RawTargetPublishOptions(setup_files=default_setup_files())
     index = 0
     while index < len(args):
         arg = args[index]
         if arg in {"--help", "-h"}:
-            print_publish_usage()
+            print_raw_target_publish_usage()
             raise SystemExit(0)
         if arg == "--topic":
             index += 1
             options.topic = require_value(args, index, arg)
-        elif arg in {"--x", "--y", "--yaw"}:
+        elif arg == "--task-id":
             index += 1
-            setattr(options, arg[2:], finite_number(require_value(args, index, arg), arg))
+            options.task_id = nonnegative_integer(require_value(args, index, arg), arg)
         elif arg == "--sequence-id":
             index += 1
             options.sequence_id = nonnegative_integer(require_value(args, index, arg), arg)
-        elif arg == "--stamp-sec":
+        elif arg in {"--target-x", "--target-y", "--sigma-x", "--sigma-y"}:
             index += 1
-            options.stamp_sec = nonnegative_integer(require_value(args, index, arg), arg)
-        elif arg == "--stamp-nanosec":
+            setattr(options, arg[2:].replace("-", "_"), finite_number(require_value(args, index, arg), arg))
+        elif arg == "--predicted-t-remain":
             index += 1
-            options.stamp_nanosec = nonnegative_integer(require_value(args, index, arg), arg)
+            options.predicted_t_remain = finite_number(require_value(args, index, arg), arg)
+        elif arg == "--capture-stamp-sec":
+            index += 1
+            options.capture_stamp_sec = nonnegative_integer(require_value(args, index, arg), arg)
+        elif arg == "--capture-stamp-nanosec":
+            index += 1
+            options.capture_stamp_nanosec = nonnegative_integer(require_value(args, index, arg), arg)
         elif arg == "--dry-run":
             options.dry_run = True
         elif arg == "--auto-source":
@@ -265,10 +290,16 @@ def parse_publish_options(args: list[str]) -> PublishOptions:
 
     if not options.topic.startswith("/"):
         raise ValueError("--topic must be an absolute ROS topic name")
+    if options.task_id > 0xFFFFFFFFFFFFFFFF:
+        raise ValueError("--task-id must fit uint64")
     if options.sequence_id > 0xFFFFFFFF:
         raise ValueError("--sequence-id must fit uint32")
-    if options.stamp_nanosec is not None and options.stamp_nanosec >= 1_000_000_000:
-        raise ValueError("--stamp-nanosec must be less than 1000000000")
+    if options.capture_stamp_nanosec is not None and options.capture_stamp_nanosec >= 1_000_000_000:
+        raise ValueError("--capture-stamp-nanosec must be less than 1000000000")
+    if options.predicted_t_remain <= 0.0 or options.predicted_t_remain > 5.0:
+        raise ValueError("--predicted-t-remain must be within (0, 5]")
+    if options.sigma_x < 0.0 or options.sigma_y < 0.0:
+        raise ValueError("--sigma-x and --sigma-y must be nonnegative")
     return options
 
 
@@ -501,32 +532,35 @@ def print_usage() -> None:
     )
 
 
-def print_publish_usage() -> None:
+def print_raw_target_publish_usage() -> None:
     print(
         """用法:
-  uv run scripts/test.py communication publish-chassis-position [options]
+  uv run scripts/test.py communication publish-raw-target [options]
 
 说明:
-  向 /robot/chassis_position 单次发布 target_msgs/msg/ChassisPosition，用于 ROS 接口 smoke test。
-  x/y/yaw 必须使用球场/接口坐标系。本命令不属于真实 ROS/Gazebo 闭环验证。
+  向 /target/raw 单次发布 target_msgs/msg/RawTarget。
+  target-x/target-y 必须使用球场/接口坐标系。本命令不属于真实 ROS/Gazebo 闭环验证。
 
 常用:
-  uv run scripts/test.py communication publish-chassis-position --x 1.0 --y -0.5 --yaw 0.0
-  uv run scripts/test.py communication publish-chassis-position --dry-run
+  uv run scripts/test.py communication publish-raw-target --task-id 1 --sequence-id 0 --target-x 1.0 --target-y -0.5
+  uv run scripts/test.py communication publish-raw-target --dry-run
 
 选项:
-  --topic <name>             默认 /robot/chassis_position
-  --x <meters>              球场坐标 x，默认 0
-  --y <meters>              球场坐标 y，默认 0
-  --yaw <radians>           球场坐标 yaw，默认 0
-  --sequence-id <integer>   默认 0
-  --stamp-sec <integer>     默认使用当前系统时间
-  --stamp-nanosec <integer> 默认使用当前系统时间
-  --dry-run                 只打印发布命令
-  --auto-source             自动 source ROS/control/local setup，默认开启
-  --no-auto-source          不自动 source
-  --setup-file <path>       追加 setup.bash，可重复
-  --clear-setup-files       清空默认 setup 列表，配合 --setup-file 使用
+  --topic <name>                    默认 /target/raw
+  --task-id <integer>               默认 1
+  --sequence-id <integer>           默认 0
+  --target-x <meters>               球场坐标 x，默认 0
+  --target-y <meters>               球场坐标 y，默认 0
+  --predicted-t-remain <seconds>    默认 1.0，范围 (0, 5]
+  --sigma-x <meters>                默认 0.05
+  --sigma-y <meters>                默认 0.05
+  --capture-stamp-sec <integer>     默认使用当前系统时间
+  --capture-stamp-nanosec <integer> 默认使用当前系统时间
+  --dry-run                         只打印发布命令
+  --auto-source                     自动 source ROS/control/local setup，默认开启
+  --no-auto-source                  不自动 source
+  --setup-file <path>               追加 setup.bash，可重复
+  --clear-setup-files               清空默认 setup 列表，配合 --setup-file 使用
 """
     )
 

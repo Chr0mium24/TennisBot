@@ -7,7 +7,11 @@ import pytest
 from tennisbot_camera.capture import CapturedFrame
 from tennisbot_vision.cli import main
 from tennisbot_camera.recording import TestRecordingSink
-from tennisbot_vision.communication import PublishOptions, parse_publish_options, publish_chassis_position
+from tennisbot_vision.communication import (
+    RawTargetPublishOptions,
+    parse_raw_target_publish_options,
+    publish_raw_target,
+)
 
 
 class Writer:
@@ -22,34 +26,45 @@ class Writer:
         self.closed = True
 
 
-def test_parse_publish_chassis_position_options() -> None:
-    options = parse_publish_options([
-        "--x", "1.25", "--y", "-0.5", "--yaw", "1.5708", "--sequence-id", "7", "--dry-run"
+def test_parse_publish_raw_target_options() -> None:
+    options = parse_raw_target_publish_options([
+        "--task-id", "12", "--sequence-id", "7", "--target-x", "1.25", "--target-y", "-0.5",
+        "--predicted-t-remain", "1.5", "--sigma-x", "0.1", "--sigma-y", "0.2", "--dry-run"
     ])
-    assert options.x == 1.25
-    assert options.y == -0.5
-    assert options.yaw == 1.5708
+    assert options.task_id == 12
     assert options.sequence_id == 7
+    assert options.target_x == 1.25
+    assert options.target_y == -0.5
+    assert options.predicted_t_remain == 1.5
+    assert options.sigma_x == 0.1
+    assert options.sigma_y == 0.2
     assert options.dry_run is True
 
     with pytest.raises(ValueError, match="absolute ROS topic"):
-        parse_publish_options(["--topic", "robot/chassis_position"])
+        parse_raw_target_publish_options(["--topic", "target/raw"])
     with pytest.raises(ValueError, match="less than"):
-        parse_publish_options(["--stamp-nanosec", "1000000000"])
+        parse_raw_target_publish_options(["--capture-stamp-nanosec", "1000000000"])
     with pytest.raises(ValueError, match="uint32"):
-        parse_publish_options(["--sequence-id", "4294967296"])
+        parse_raw_target_publish_options(["--sequence-id", "4294967296"])
+    with pytest.raises(ValueError, match=r"\(0, 5]"):
+        parse_raw_target_publish_options(["--predicted-t-remain", "0"])
 
 
-def test_publish_chassis_position_dry_run_has_explicit_smoke_warning(monkeypatch, capsys) -> None:
+def test_publish_raw_target_dry_run_has_complete_payload(monkeypatch, capsys) -> None:
     monkeypatch.setattr("tennisbot_vision.communication.time.time_ns", lambda: 1_750_000_000_123_456_789)
-    options = PublishOptions(x=1.0, y=-2.0, yaw=0.5, sequence_id=9, dry_run=True, auto_source=False)
+    options = RawTargetPublishOptions(
+        task_id=4, sequence_id=9, target_x=1.0, target_y=-2.0,
+        predicted_t_remain=1.25, sigma_x=0.1, sigma_y=0.2, dry_run=True, auto_source=False,
+    )
 
-    assert publish_chassis_position(options) == 0
+    assert publish_raw_target(options) == 0
     output = capsys.readouterr().out
     assert "不属于真实 ROS/Gazebo 闭环验证" in output
-    assert "publish_stamp: 1750000000.123456789" in output
-    assert "target_msgs/msg/ChassisPosition" in output
+    assert "capture_stamp: 1750000000.123456789" in output
+    assert "target_msgs/msg/RawTarget" in output
+    assert "task_id: 4" in output
     assert "sequence_id: 9" in output
+    assert "predicted_t_remain: {sec: 1, nanosec: 250000000}" in output
 
 
 def test_online_dry_run_contract(capsys) -> None:
