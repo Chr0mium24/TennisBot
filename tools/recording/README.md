@@ -20,6 +20,12 @@ Outputs default to `runs/recording`. Every session has `session.json` and
 same recording builders and metadata writers. Soft synchronization is a
 software timestamp relationship, not hardware synchronization.
 
+For headless stereo recording with soft synchronization, `--duration` is
+enforced by the Python supervisor's monotonic clock. The supervisor sends
+`SIGINT` to both FFmpeg processes at the deadline so absolute V4L2 timestamps
+do not conflict with FFmpeg's relative `-t` handling and both MKV files receive
+a proper trailer.
+
 Dataset frame extraction and timestamp normalization remain internal legacy
 modules pending a separate data/media tool decision and are not exposed by
 `scripts/record.py`.

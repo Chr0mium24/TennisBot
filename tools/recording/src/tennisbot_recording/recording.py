@@ -66,6 +66,7 @@ class DualRecordingPlan:
     controls_string: str
     soft_sync_base_epoch: str | None
     soft_sync_base_time_utc: str | None
+    duration: float | None
 
 
 def build_single_plan(
@@ -137,8 +138,22 @@ def build_dual_plan(
     base_epoch = f"{time.time():.9f}" if soft_sync else None
     base_time_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") if soft_sync else None
     record_commands = (
-        build_dual_ffmpeg_command(config, devices[0], outputs[0], soft_sync_base_epoch=base_epoch, soft_sync_base_time_utc=base_time_utc, duration=duration),
-        build_dual_ffmpeg_command(config, devices[1], outputs[1], soft_sync_base_epoch=base_epoch, soft_sync_base_time_utc=base_time_utc, duration=duration),
+        build_dual_ffmpeg_command(
+            config,
+            devices[0],
+            outputs[0],
+            soft_sync_base_epoch=base_epoch,
+            soft_sync_base_time_utc=base_time_utc,
+            duration=None if soft_sync else duration,
+        ),
+        build_dual_ffmpeg_command(
+            config,
+            devices[1],
+            outputs[1],
+            soft_sync_base_epoch=base_epoch,
+            soft_sync_base_time_utc=base_time_utc,
+            duration=None if soft_sync else duration,
+        ),
     )
     single_process_command = build_dual_single_process_command(
         config,
@@ -146,7 +161,7 @@ def build_dual_plan(
         outputs,
         soft_sync_base_epoch=base_epoch,
         soft_sync_base_time_utc=base_time_utc,
-        duration=duration,
+        duration=None if soft_sync else duration,
     )
     preview_command = build_dual_preview_ffmpeg_command(
         config,
@@ -154,7 +169,7 @@ def build_dual_plan(
         outputs,
         soft_sync_base_epoch=base_epoch,
         soft_sync_base_time_utc=base_time_utc,
-        duration=duration,
+        duration=None if soft_sync else duration,
     )
     ffplay_command = [
         "ffplay",
@@ -184,6 +199,7 @@ def build_dual_plan(
         controls_string=config.v4l2_controls_string(),
         soft_sync_base_epoch=base_epoch,
         soft_sync_base_time_utc=base_time_utc,
+        duration=duration,
     )
 
 
@@ -472,7 +488,10 @@ def record_dual(
     elif parallel_capture:
         status = run_parallel_dual(plan)
     else:
-        status = run_foreground(plan.single_process_command)
+        status = run_foreground(
+            plan.single_process_command,
+            duration=plan.duration if plan.soft_sync_base_epoch is not None else None,
+        )
     write_packet_timing_logs(plan.out_dir, (("cam1", plan.outputs[0]), ("cam2", plan.outputs[1])))
     print_saved_videos(plan.outputs)
     return status
@@ -690,7 +709,10 @@ def run_parallel_dual(plan: DualRecordingPlan) -> int:
             release_fifo(fifo_a)
             release_fifo(fifo_b)
             print("Preview disabled. Press q then Enter or Ctrl+C to stop.")
-            return monitor_processes(processes)
+            return monitor_processes(
+                processes,
+                duration=plan.duration if plan.soft_sync_base_epoch is not None else None,
+            )
         finally:
             terminate_processes(processes)
             for log in logs:
@@ -703,7 +725,10 @@ def run_preview_dual(plan: DualRecordingPlan) -> int:
     if ffmpeg_process.poll() is not None:
         return int(ffmpeg_process.returncode or 1)
     try:
-        ffplay_status = run_foreground(plan.ffplay_command)
+        ffplay_status = run_foreground(
+            plan.ffplay_command,
+            duration=plan.duration if plan.soft_sync_base_epoch is not None else None,
+        )
     finally:
         terminate_process(ffmpeg_process)
     return ffplay_status
@@ -719,10 +744,19 @@ def release_fifo(fifo: Path) -> None:
         stream.write("go\n")
 
 
-def monitor_processes(processes: Sequence[subprocess.Popen[bytes]]) -> int:
+def monitor_processes(
+    processes: Sequence[subprocess.Popen[bytes]],
+    *,
+    duration: float | None = None,
+) -> int:
+    deadline = None if duration is None else time.monotonic() + duration
     try:
         while any(process.poll() is None for process in processes):
-            readable, _, _ = select.select([sys.stdin], [], [], 0.5)
+            if deadline is not None and time.monotonic() >= deadline:
+                terminate_processes(processes)
+                break
+            timeout = 0.5 if deadline is None else min(0.5, max(deadline - time.monotonic(), 0.0))
+            readable, _, _ = select.select([sys.stdin], [], [], timeout)
             if readable:
                 line = sys.stdin.readline()
                 if line.strip().lower() == "q":
@@ -739,10 +773,16 @@ def monitor_processes(processes: Sequence[subprocess.Popen[bytes]]) -> int:
     return int(nonzero[0]) if nonzero else 0
 
 
-def run_foreground(command: Sequence[str]) -> int:
+def run_foreground(command: Sequence[str], *, duration: float | None = None) -> int:
     process = subprocess.Popen(list(command))
     try:
-        return int(process.wait())
+        if duration is None:
+            return int(process.wait())
+        try:
+            return int(process.wait(timeout=duration))
+        except subprocess.TimeoutExpired:
+            terminate_process(process)
+            return 0
     except KeyboardInterrupt:
         terminate_process(process)
         return int(process.returncode or 130)

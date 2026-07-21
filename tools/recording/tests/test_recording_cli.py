@@ -12,6 +12,7 @@ from tennisbot_recording.recording import (
     build_single_plan,
     display_command,
     print_saved_videos,
+    run_foreground,
     terminate_processes,
     write_timing_records,
 )
@@ -69,9 +70,28 @@ def test_dual_plan_builds_soft_sync_parallel_commands(tmp_path: Path) -> None:
     assert plan.outputs[1].name == "20260714_120001_video0.mkv"
     assert "-copyts" in first
     assert "-timestamps abs" in first
+    assert "-t 10" not in first
+    assert "-t 10" not in second
+    assert plan.duration == 10
     assert "soft_sync_base_epoch=" in first
     assert "/dev/video2" in first
     assert "/dev/video0" in second
+
+
+def test_dual_plan_keeps_ffmpeg_duration_without_soft_sync(tmp_path: Path) -> None:
+    config = load_config(DEFAULT_CONFIG_PATH)
+    plan = build_dual_plan(
+        config,
+        devices=("/dev/video0", "/dev/video2"),
+        out_root=tmp_path,
+        preview=False,
+        soft_sync=False,
+        duration=30,
+        timestamp="20260721_170000",
+    )
+
+    assert "-t 30" in display_command(plan.record_commands[0])
+    assert "-t 30" in display_command(plan.single_process_command)
 
 
 def test_timing_records_include_frames_and_pairs(tmp_path: Path) -> None:
@@ -120,6 +140,30 @@ def test_terminate_processes_signals_all_captures_before_waiting() -> None:
 
     assert events[:2] == [f"signal:left:{signal.SIGINT}", f"signal:right:{signal.SIGINT}"]
     assert events[2:] == ["wait:left", "wait:right"]
+
+
+def test_run_foreground_enforces_external_duration(monkeypatch) -> None:
+    events: list[object] = []
+
+    class FakeProcess:
+        returncode = -signal.SIGINT
+
+        def poll(self):
+            return None
+
+        def wait(self, timeout=None):
+            events.append(("wait", timeout))
+            if timeout == 12:
+                raise subprocess.TimeoutExpired("ffmpeg", timeout)
+            return self.returncode
+
+        def send_signal(self, sent_signal):
+            events.append(("signal", sent_signal))
+
+    monkeypatch.setattr("tennisbot_recording.recording.subprocess.Popen", lambda command: FakeProcess())
+
+    assert run_foreground(["ffmpeg"], duration=12) == 0
+    assert events == [("wait", 12), ("signal", signal.SIGINT), ("wait", 5)]
 
 
 def test_record_single_dry_run_accepts_negative_brightness_override(capsys) -> None:
